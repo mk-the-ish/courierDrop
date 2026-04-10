@@ -1,4 +1,12 @@
-export default function DashboardHeader({ title, subtitle, actions }) {
+import React from 'react';
+
+interface DashboardHeaderProps {
+  title: string;
+  subtitle?: string;
+  actions?: React.ReactNode;
+}
+
+export default function DashboardHeader({ title, subtitle, actions }: DashboardHeaderProps) {
   return (
     <div className="flex items-start justify-between mb-8">
       <div>

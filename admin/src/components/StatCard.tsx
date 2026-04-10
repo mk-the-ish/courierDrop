@@ -1,4 +1,23 @@
-export default function StatCard({ title, value, icon: Icon, description, trend, color = 'teal' }) {
+import React from 'react';
+import { LucideIcon } from 'lucide-react';
+
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  icon?: LucideIcon;
+  description?: string;
+  trend?: number;
+  color?: 'teal' | 'slate' | 'amber' | 'green' | 'red';
+}
+
+export default function StatCard({
+  title,
+  value,
+  icon: Icon,
+  description,
+  trend,
+  color = 'teal',
+}: StatCardProps) {
   const colorMap = {
     teal: 'bg-transit-teal/10 text-transit-teal',
     slate: 'bg-safe-slate/10 text-safe-slate',
@@ -13,10 +32,8 @@ export default function StatCard({ title, value, icon: Icon, description, trend,
         <div>
           <p className="text-gray-600 text-sm font-medium">{title}</p>
           <p className="text-3xl font-bold text-safe-slate mt-2">{value}</p>
-          {description && (
-            <p className="text-xs text-gray-500 mt-2">{description}</p>
-          )}
-          {trend && (
+          {description && <p className="text-xs text-gray-500 mt-2">{description}</p>}
+          {trend !== undefined && (
             <p className={`text-sm mt-2 ${trend > 0 ? 'text-heartbeat-active' : 'text-heartbeat-alert'}`}>
               {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
             </p>

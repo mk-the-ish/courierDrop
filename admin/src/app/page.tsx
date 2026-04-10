@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import DashboardHeader from '@/components/DashboardHeader';
-import StatCard from '@/components/StatCard';
-import HeartbeatVisualization from '@/components/HeartbeatVisualization';
+import DashboardHeader from '@/components/DashboardHeader.tsx';
+import StatCard from '@/components/StatCard.tsx';
+import HeartbeatVisualization from '@/components/HeartbeatVisualization.tsx';
 import { Activity, Briefcase, Clock, Users, Server } from 'lucide-react';
 
 const mockCouriers = [
@@ -78,6 +78,7 @@ export default function Dashboard() {
       <DashboardHeader
         title="Operational Dashboard"
         subtitle="Welcome to DropCity Admin Panel"
+        actions={null}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -87,6 +88,7 @@ export default function Dashboard() {
           icon={Server}
           color="teal"
           description="Server health status"
+          trend={0}
         />
         <StatCard
           title="Active Jobs"
@@ -94,6 +96,7 @@ export default function Dashboard() {
           icon={Briefcase}
           color="teal"
           description="Jobs currently in progress"
+          trend={0}
         />
         <StatCard
           title="Pending Matches"
@@ -101,6 +104,7 @@ export default function Dashboard() {
           icon={Clock}
           color="amber"
           description="Jobs awaiting courier assignment"
+          trend={0}
         />
         <StatCard
           title="Couriers Online"
@@ -108,6 +112,7 @@ export default function Dashboard() {
           icon={Users}
           color="slate"
           description="Couriers currently on-duty"
+          trend={0}
         />
       </div>
 
@@ -158,7 +163,7 @@ export default function Dashboard() {
             </div>
             <div className="flex justify-between items-center py-2 border-b border-slate-200">
               <span className="text-slate-600">Last Updated</span>
-              <span className="font-semibold text-slate-900">{new Date().toLocaleString()}</span>
+              <span className="font-semibold text-slate-900">{currentTime}</span>
             </div>
           </div>
         </div>

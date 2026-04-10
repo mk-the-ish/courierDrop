@@ -1,9 +1,21 @@
 'use client';
 
-import { Home, AlertCircle, Settings, BarChart3, Clock } from 'lucide-react';
+import React from 'react';
+import { Home, AlertCircle, Settings, BarChart3, Clock, LucideIcon } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab }) {
-  const tabs = [
+interface SidebarProps {
+  activeTab: string;
+  setActiveTab: (tabId: string) => void;
+}
+
+interface Tab {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const tabs: Tab[] = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'alerts', label: 'Alert Rules', icon: AlertCircle },
     { id: 'health', label: 'System Health', icon: BarChart3 },
@@ -30,9 +42,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`w-full px-6 py-3 flex items-center gap-3 transition duration-200 ${
-                activeTab === tab.id
-                  ? 'bg-transit-teal border-l-4 border-alert-amber'
-                  : 'hover:bg-gray-700'
+                activeTab === tab.id ? 'bg-transit-teal border-l-4 border-alert-amber' : 'hover:bg-gray-700'
               }`}
             >
               <Icon size={20} />
