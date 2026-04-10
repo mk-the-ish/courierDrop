@@ -4,13 +4,29 @@ import { useEffect, useState } from 'react';
 import DashboardHeader from '@/components/DashboardHeader.tsx';
 import StatCard from '@/components/StatCard.tsx';
 import HeartbeatVisualization from '@/components/HeartbeatVisualization.tsx';
+import { apiClient } from '@/lib/api-client';
 import { Activity, Briefcase, Clock, Users, Server } from 'lucide-react';
 
-const mockCouriers = [
-  { id: 'COUR-001', name: 'Alex Johnson', status: 'on-duty' },
-  { id: 'COUR-002', name: 'Maria Garcia', status: 'on-duty' },
-  { id: 'COUR-003', name: 'Chen Wei', status: 'off-duty' },
-];
+interface Job {
+  id: string;
+  status: 'in-progress' | 'pending' | 'completed' | 'cancelled';
+  courierId?: string;
+  courierName?: string;
+  lastReportedAt: string;
+}
+
+interface Courier {
+  id: string;
+  name: string;
+  status: 'on-duty' | 'off-duty';
+}
+
+interface Heartbeat {
+  id: string;
+  name: string;
+  state: 'active' | 'missed' | 'alert';
+  lastUpdate: string;
+}
 
 const getStatusVariant = (status: string) => {
   switch (status) {
@@ -27,51 +43,62 @@ const getStatusVariant = (status: string) => {
   }
 };
 
-const getCourierName = (courierId: string | null) => {
-  if (!courierId) return 'N/A';
-  const courier = mockCouriers.find((c) => c.id === courierId);
-  return courier ? courier.name : 'N/A';
-};
-
 export default function Dashboard() {
-  const [mockJobs, setMockJobs] = useState([
-    { id: 'JOB-9871', status: 'in-progress', courierId: 'COUR-001', lastReportedAt: '' },
-    { id: 'JOB-9872', status: 'pending', courierId: null, lastReportedAt: '' },
-    { id: 'JOB-9873', status: 'completed', courierId: 'COUR-003', lastReportedAt: '' },
-    { id: 'JOB-9874', status: 'in-progress', courierId: 'COUR-002', lastReportedAt: '' },
-    { id: 'JOB-9875', status: 'pending', courierId: null, lastReportedAt: '' },
-  ]);
-
-  const [heartbeatItems, setHeartbeatItems] = useState([
-    { id: 'api', name: 'API Server', state: 'active' as const, lastUpdate: '' },
-    { id: 'db', name: 'Database', state: 'active' as const, lastUpdate: '' },
-    { id: 'scheduler', name: 'Job Scheduler', state: 'missed' as const, lastUpdate: '' },
-  ]);
-
-  const [currentTime, setCurrentTime] = useState('');
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [couriers, setCouriers] = useState<Courier[]>([]);
+  const [heartbeats, setHeartbeats] = useState<Heartbeat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const now = new Date();
-    setCurrentTime(now.toLocaleString());
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-    setMockJobs([
-      { id: 'JOB-9871', status: 'in-progress', courierId: 'COUR-001', lastReportedAt: new Date(Date.now() - 60000).toLocaleString() },
-      { id: 'JOB-9872', status: 'pending', courierId: null, lastReportedAt: new Date(Date.now() - 3600000).toLocaleString() },
-      { id: 'JOB-9873', status: 'completed', courierId: 'COUR-003', lastReportedAt: new Date(Date.now() - 7200000).toLocaleString() },
-      { id: 'JOB-9874', status: 'in-progress', courierId: 'COUR-002', lastReportedAt: new Date(Date.now() - 120000).toLocaleString() },
-      { id: 'JOB-9875', status: 'pending', courierId: null, lastReportedAt: new Date(Date.now() - 1800000).toLocaleString() },
-    ]);
+        // Fetch data from backend
+        const [jobsData, couriersData, heartbeatData] = await Promise.all([
+          apiClient.getJobs().catch(() => []),
+          apiClient.getCouriers().catch(() => []),
+          apiClient.getHeartbeats().catch(() => []),
+        ]);
 
-    setHeartbeatItems([
-      { id: 'api', name: 'API Server', state: 'active' as const, lastUpdate: new Date().toLocaleTimeString() },
-      { id: 'db', name: 'Database', state: 'active' as const, lastUpdate: new Date().toLocaleTimeString() },
-      { id: 'scheduler', name: 'Job Scheduler', state: 'missed' as const, lastUpdate: new Date(Date.now() - 30000).toLocaleTimeString() },
-    ]);
+        setJobs(Array.isArray(jobsData) ? jobsData : []);
+        setCouriers(Array.isArray(couriersData) ? couriersData : []);
+        setHeartbeats(Array.isArray(heartbeatData) ? heartbeatData : []);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+        setError('Failed to load dashboard data. Backend may be offline.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+
+    // Refresh data every 30 seconds
+    const interval = setInterval(fetchDashboardData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  const activeJobs = mockJobs.filter((j) => j.status === 'in-progress').length;
-  const pendingJobs = mockJobs.filter((j) => j.status === 'pending').length;
-  const onlineCouriers = mockCouriers.filter((c) => c.status === 'on-duty').length;
+  const activeJobs = jobs.filter((j) => j.status === 'in-progress').length;
+  const pendingJobs = jobs.filter((j) => j.status === 'pending').length;
+  const onlineCouriers = couriers.filter((c) => c.status === 'on-duty').length;
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <DashboardHeader
+          title="Operational Dashboard"
+          subtitle="Loading..."
+          actions={null}
+        />
+        <div className="text-center py-12">
+          <p className="text-gray-600">Fetching data from backend...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -80,6 +107,12 @@ export default function Dashboard() {
         subtitle="Welcome to DropCity Admin Panel"
         actions={null}
       />
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
@@ -133,18 +166,26 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {mockJobs.map((job) => (
-                  <tr key={job.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="py-3 px-2 font-medium text-slate-900">{job.id}</td>
-                    <td className="py-3 px-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusVariant(job.status)}`}>
-                        {job.status}
-                      </span>
+                {jobs.length > 0 ? (
+                  jobs.map((job) => (
+                    <tr key={job.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-3 px-2 font-medium text-slate-900">{job.id}</td>
+                      <td className="py-3 px-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusVariant(job.status)}`}>
+                          {job.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-slate-600">{job.courierName || 'N/A'}</td>
+                      <td className="py-3 px-2 text-slate-600">{job.lastReportedAt}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-gray-600">
+                      No jobs found
                     </td>
-                    <td className="py-3 px-2 text-slate-600">{getCourierName(job.courierId)}</td>
-                    <td className="py-3 px-2 text-slate-600">{job.lastReportedAt}</td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -155,21 +196,25 @@ export default function Dashboard() {
           <div className="space-y-3">
             <div className="flex justify-between items-center py-2 border-b border-slate-200">
               <span className="text-slate-600">API Server</span>
-              <span className="font-semibold text-slate-900">http://localhost:8080</span>
+              <span className="font-semibold text-slate-900">{process.env.NEXT_PUBLIC_API_URL}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-slate-200">
               <span className="text-slate-600">Environment</span>
-              <span className="font-semibold text-slate-900">Development</span>
+              <span className="font-semibold text-slate-900">Production</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-slate-200">
-              <span className="text-slate-600">Last Updated</span>
-              <span className="font-semibold text-slate-900">{currentTime}</span>
+              <span className="text-slate-600">Couriers Online</span>
+              <span className="font-semibold text-slate-900">{onlineCouriers} / {couriers.length}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-slate-200">
+              <span className="text-slate-600">Total Jobs</span>
+              <span className="font-semibold text-slate-900">{jobs.length}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <HeartbeatVisualization items={heartbeatItems} title="System Heartbeat" />
+      {heartbeats.length > 0 && <HeartbeatVisualization items={heartbeats} title="System Heartbeat" />}
     </div>
   );
 }

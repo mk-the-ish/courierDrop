@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: dropcity-admin
+    env: node
+    repo: YOUR_GITHUB_REPO_URL
+    branch: main
+    buildCommand: npm run build
+    startCommand: npm start
+    
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://dropcity-backend.onrender.com
+      - key: NEXT_PUBLIC_WS_URL
+        value: wss://dropcity-backend.onrender.com
