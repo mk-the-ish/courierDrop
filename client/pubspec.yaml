@@ -1,0 +1,26 @@
+name: dropcity_client
+description: DropCity Client App (scaffold)
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  device_info_plus: ^11.2.1
+  shared_preferences: ^2.3.2
+  connectivity_plus: ^6.0.5
+  uuid: ^4.5.1
+  google_maps_flutter: ^2.9.0
+  web_socket_channel: ^3.0.1
+  image_picker: ^1.1.2
+  mobile_scanner: ^7.2.0
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.1.0
+  geolocator: ^13.0.2
+
+flutter:
+  uses-material-design: true

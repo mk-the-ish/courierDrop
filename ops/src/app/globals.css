@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: 248 249 250; /* Cloud White */
+    --foreground: 47 79 79; /* Safe Slate */
+    --card: 248 249 250;
+    --card-foreground: 47 79 79;
+    --popover: 248 249 250;
+    --popover-foreground: 47 79 79;
+    --primary: 0 128 128; /* Transit Teal */
+    --primary-foreground: 248 249 250;
+    --secondary: 47 79 79; /* Safe Slate */
+    --secondary-foreground: 248 249 250;
+    --muted: 224 224 224;
+    --muted-foreground: 100 116 139;
+    --accent: 255 191 0; /* Alert Amber */
+    --accent-foreground: 47 79 79;
+    --destructive: 239 68 68;
+    --destructive-foreground: 248 249 250;
+    --border: 226 232 240;
+    --input: 226 232 240;
+    --ring: 0 128 128; /* Transit Teal */
+    --chart-1: 0 128 128; /* Transit Teal */
+    --chart-2: 34 197 94; /* Success Green */
+    --chart-3: 255 191 0; /* Alert Amber */
+    --chart-4: 239 68 68; /* Error Red */
+    --chart-5: 47 79 79; /* Safe Slate */
+    --radius: 0.5rem;
+    --sidebar-background: 47 79 79; /* Safe Slate */
+    --sidebar-foreground: 248 249 250;
+    --sidebar-primary: 0 128 128; /* Transit Teal */
+    --sidebar-primary-foreground: 248 249 250;
+    --sidebar-accent: 255 191 0; /* Alert Amber */
+    --sidebar-accent-foreground: 47 79 79;
+    --sidebar-border: 100 116 139;
+    --sidebar-ring: 0 128 128; /* Transit Teal */
+  }
+  .dark {
+    --background: 15 23 42; /* Dark variant */
+    --foreground: 248 249 250;
+    --card: 30 41 59;
+    --card-foreground: 248 249 250;
+    --popover: 30 41 59;
+    --popover-foreground: 248 249 250;
+    --primary: 0 128 128; /* Transit Teal */
+    --primary-foreground: 248 249 250;
+    --secondary: 100 116 139;
+    --secondary-foreground: 248 249 250;
+    --muted: 71 85 105;
+    --muted-foreground: 203 213 225;
+    --accent: 255 191 0; /* Alert Amber */
+    --accent-foreground: 15 23 42;
+    --destructive: 239 68 68;
+    --destructive-foreground: 248 249 250;
+    --border: 71 85 105;
+    --input: 71 85 105;
+    --ring: 0 128 128; /* Transit Teal */
+    --chart-1: 0 128 128; /* Transit Teal */
+    --chart-2: 34 197 94; /* Success Green */
+    --chart-3: 255 191 0; /* Alert Amber */
+    --chart-4: 239 68 68; /* Error Red */
+    --chart-5: 100 116 139;
+    --sidebar-background: 47 79 79;
+    --sidebar-foreground: 248 249 250;
+    --sidebar-primary: 0 128 128;
+    --sidebar-primary-foreground: 248 249 250;
+    --sidebar-accent: 255 191 0;
+    --sidebar-accent-foreground: 248 249 250;
+    --sidebar-border: 100 116 139;
+    --sidebar-ring: 0 128 128;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

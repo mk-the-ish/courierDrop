@@ -1,0 +1,145 @@
+import { addDays, format, subDays } from 'date-fns';
+import type { Courier, Job, MatchLog, Admin } from './types';
+
+export const couriers: Courier[] = [
+  {
+    id: 'COUR-001',
+    name: 'Alex Johnson',
+    avatarUrl: 'https://i.pravatar.cc/150?u=COUR-001',
+    courierStatus: 'on-duty',
+    averageRating: 4.9,
+    jobsCompleted: 124,
+    registrationDate: format(subDays(new Date(), 365), 'yyyy-MM-dd'),
+    acceptanceRate: 95,
+    historicalAverage: { jobs: 100, rating: 4.8 },
+  },
+  {
+    id: 'COUR-002',
+    name: 'Maria Garcia',
+    avatarUrl: 'https://i.pravatar.cc/150?u=COUR-002',
+    courierStatus: 'on-duty',
+    averageRating: 4.7,
+    jobsCompleted: 88,
+    registrationDate: format(subDays(new Date(), 240), 'yyyy-MM-dd'),
+    acceptanceRate: 92,
+    historicalAverage: { jobs: 70, rating: 4.75 },
+  },
+  {
+    id: 'COUR-003',
+    name: 'Chen Wei',
+    avatarUrl: 'https://i.pravatar.cc/150?u=COUR-003',
+    courierStatus: 'off-duty',
+    averageRating: 4.8,
+    jobsCompleted: 210,
+    registrationDate: format(subDays(new Date(), 500), 'yyyy-MM-dd'),
+    acceptanceRate: 88,
+    historicalAverage: { jobs: 220, rating: 4.8 },
+  },
+  {
+    id: 'COUR-004',
+    name: 'Fatima Al-Fassi',
+    avatarUrl: 'https://i.pravatar.cc/150?u=COUR-004',
+    courierStatus: 'on-duty',
+    averageRating: 4.95,
+    jobsCompleted: 350,
+    registrationDate: format(subDays(new Date(), 730), 'yyyy-MM-dd'),
+    acceptanceRate: 98,
+    historicalAverage: { jobs: 320, rating: 4.9 },
+  },
+  {
+    id: 'COUR-005',
+    name: 'David Smith',
+    avatarUrl: 'https://i.pravatar.cc/150?u=COUR-005',
+    courierStatus: 'inactive',
+    averageRating: 4.5,
+    jobsCompleted: 45,
+    registrationDate: format(subDays(new Date(), 90), 'yyyy-MM-dd'),
+    acceptanceRate: 85,
+    historicalAverage: { jobs: 50, rating: 4.6 },
+  },
+];
+
+export const jobs: Job[] = [
+  {
+    id: 'JOB-9871',
+    status: 'in-progress',
+    clientId: 'CL-012',
+    courierId: 'COUR-001',
+    lastReportedAt: format(new Date(), 'PPpp'),
+    pickupLocation: '123 Main St',
+    dropoffLocation: '456 Oak Ave',
+  },
+  {
+    id: 'JOB-9872',
+    status: 'pending',
+    clientId: 'CL-013',
+    courierId: null,
+    lastReportedAt: format(subDays(new Date(), 1), 'PPpp'),
+    pickupLocation: '789 Pine Ln',
+    dropoffLocation: '101 Maple Dr',
+  },
+  {
+    id: 'JOB-9873',
+    status: 'completed',
+    clientId: 'CL-014',
+    courierId: 'COUR-002',
+    lastReportedAt: format(subDays(new Date(), 2), 'PPpp'),
+    pickupLocation: '210 Birch Rd',
+    dropoffLocation: '315 Cedar Blvd',
+  },
+  {
+    id: 'JOB-9874',
+    status: 'pending',
+    clientId: 'CL-015',
+    courierId: null,
+    lastReportedAt: format(new Date(), 'PPpp'),
+    pickupLocation: '420 Elm St',
+    dropoffLocation: '525 Spruce Way',
+  },
+  {
+    id: 'JOB-9875',
+    status: 'cancelled',
+    clientId: 'CL-016',
+    courierId: null,
+    lastReportedAt: format(subDays(new Date(), 3), 'PPpp'),
+    pickupLocation: '630 Willow Ct',
+    dropoffLocation: '735 Aspen Cir',
+  },
+];
+
+export const matchLogs: MatchLog[] = [
+  ...Array.from({ length: 15 }, (_, i) => ({
+    orderId: `ORD-${7654 - i}`,
+    courierId: `COUR-${String(Math.floor(Math.random() * 5) + 1).padStart(3, '0')}`,
+    courierName: couriers[Math.floor(Math.random() * couriers.length)].name,
+    detourCost: parseFloat((Math.random() * 5 + 1).toFixed(2)),
+    matchScore: parseFloat((Math.random() * (0.98 - 0.75) + 0.75).toFixed(4)),
+    timestamp: format(subDays(new Date(), i), 'yyyy-MM-dd HH:mm:ss'),
+    rawResults: {
+      courierLocation: [34.0522, -118.2437] as [number, number],
+      pickupLocation: [34.055, -118.25] as [number, number],
+      dropoffLocation: [34.06, -118.26] as [number, number],
+      originalRouteDistance: Math.random() * 5,
+      newRouteDistance: Math.random() * 8,
+      courierReputation: Math.random(),
+      finalScoreBreakdown: 'w1*detour + w2*reputation = score',
+    },
+  })),
+];
+
+export const admins: Admin[] = [
+  {
+    id: 'ADMIN-001',
+    name: 'Jane Doe',
+    email: 'jane.doe@drop.city',
+    role: 'super-admin',
+    avatarUrl: 'https://i.pravatar.cc/150?u=ADMIN-001',
+  },
+  {
+    id: 'ADMIN-002',
+    name: 'John Smith',
+    email: 'john.smith@drop.city',
+    role: 'admin',
+    avatarUrl: 'https://i.pravatar.cc/150?u=ADMIN-002',
+  },
+];

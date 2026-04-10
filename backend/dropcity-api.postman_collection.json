@@ -1,0 +1,615 @@
+{
+  "info": {
+    "_postman_id": "dropcity-api-collection",
+    "name": "DropCity API Testing",
+    "description": "Complete Postman collection for testing DropCity backend API including alert system, error tracking, and admin endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Alert System",
+      "item": [
+        {
+          "name": "Get All Alert Rules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/alerts/rules",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "alerts",
+                "rules"
+              ]
+            },
+            "description": "Fetch all alert rules configured in the system"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Alert Rule - Error Spike",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"error_spike\",\n  \"name\": \"High Error Volume Alert\",\n  \"threshold\": 50,\n  \"time_window_minutes\": 30,\n  \"severity\": \"warning\",\n  \"notification_channels\": [\"slack\", \"email\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/alerts/rules",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "alerts",
+                "rules"
+              ]
+            },
+            "description": "Create a new error spike alert rule"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Alert Rule - Stuck Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"stuck_job\",\n  \"name\": \"Stuck Background Job Alert\",\n  \"threshold\": null,\n  \"time_window_minutes\": null,\n  \"severity\": \"critical\",\n  \"notification_channels\": [\"slack\", \"email\", \"sms\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/alerts/rules",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "alerts",
+                "rules"
+              ]
+            },
+            "description": "Create a new stuck job alert rule"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Alert Rule - High Failure Rate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"high_failure_rate\",\n  \"name\": \"Job Failure Rate Alert\",\n  \"threshold\": 25,\n  \"time_window_minutes\": 60,\n  \"severity\": \"warning\",\n  \"notification_channels\": [\"slack\", \"email\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/alerts/rules",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "alerts",
+                "rules"
+              ]
+            },
+            "description": "Create a new high failure rate alert rule"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Alert Rule",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": false,\n  \"threshold\": 75,\n  \"notification_channels\": [\"slack\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/alerts/rules/{{rule_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "alerts",
+                "rules",
+                "{{rule_id}}"
+              ]
+            },
+            "description": "Update an existing alert rule (change threshold, channels, or enable/disable)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Alert Rule",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/alerts/rules/{{rule_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "alerts",
+                "rules",
+                "{{rule_id}}"
+              ]
+            },
+            "description": "Delete an alert rule"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Alert History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/alerts/history?limit=50&rule_id={{rule_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "alerts",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "rule_id",
+                  "value": "{{rule_id}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Fetch alert history with optional filtering by rule_id"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Tracking",
+      "item": [
+        {
+          "name": "Get Error Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/errors/summary?days=7",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "errors",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "7"
+                },
+                {
+                  "key": "device",
+                  "value": "iPhone",
+                  "disabled": true
+                },
+                {
+                  "key": "os_version",
+                  "value": "iOS 15",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get error summary statistics (total count, by device, by OS)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Errors with Filters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/errors?page=0&limit=50&days=7&device=&os_version=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "errors"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "days",
+                  "value": "7"
+                },
+                {
+                  "key": "device",
+                  "value": ""
+                },
+                {
+                  "key": "os_version",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Get paginated list of errors with optional filtering"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "System Health",
+      "item": [
+        {
+          "name": "Get Scheduler Job Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/health/jobs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health",
+                "jobs"
+              ]
+            },
+            "description": "Get status of all background jobs (heartbeat_watchdog, check_alerts)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get API Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": "Check if API is running (no auth required)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Operations",
+      "item": [
+        {
+          "name": "Set User Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uid\": \"{{user_uid}}\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_uid}}/role",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{user_uid}}",
+                "role"
+              ]
+            },
+            "description": "Set user role (admin, courier, client)"
+          },
+          "response": []
+        },
+        {
+          "name": "Clear User Role",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_uid}}/role",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{user_uid}}",
+                "role"
+              ]
+            },
+            "description": "Clear user role (remove admin/courier/client role)"
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Parcel to Courier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parcel_id\": \"{{parcel_id}}\",\n  \"courier_uid\": \"{{courier_uid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/parcels/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "parcels",
+                "assign"
+              ]
+            },
+            "description": "Manually assign a parcel to a courier"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Logging",
+      "item": [
+        {
+          "name": "Log Test Error",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Test error message\",\n  \"stack\": \"Error: Test error\\n    at testFunction (file.js:10:5)\\n    at Object.<anonymous> (file.js:20:3)\",\n  \"context\": {\n    \"screen\": \"home\",\n    \"action\": \"tap_button\",\n    \"user_id\": \"user123\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/logs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "logs"
+              ]
+            },
+            "description": "Log an error from mobile app or client"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "WebSocket Testing",
+      "item": [
+        {
+          "name": "WebSocket Handshake",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Upgrade",
+                "value": "websocket",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "Upgrade",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "ws://{{base_url_ws}}/handshake?token={{user_token}}&parcelId={{parcel_id}}",
+              "host": [
+                "{{base_url_ws}}"
+              ],
+              "path": [
+                "handshake"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}"
+                },
+                {
+                  "key": "parcelId",
+                  "value": "{{parcel_id}}"
+                }
+              ]
+            },
+            "description": "WebSocket connection for real-time handshake events (use Postman WebSocket feature or external tool)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "base_url_ws",
+      "value": "localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "YOUR_FIREBASE_ADMIN_TOKEN_HERE",
+      "type": "string"
+    },
+    {
+      "key": "user_token",
+      "value": "YOUR_FIREBASE_USER_TOKEN_HERE",
+      "type": "string"
+    },
+    {
+      "key": "user_uid",
+      "value": "firebase_uid_here",
+      "type": "string"
+    },
+    {
+      "key": "rule_id",
+      "value": "alert_rule_id_here",
+      "type": "string"
+    },
+    {
+      "key": "parcel_id",
+      "value": "parcel_id_here",
+      "type": "string"
+    },
+    {
+      "key": "courier_uid",
+      "value": "courier_uid_here",
+      "type": "string"
+    }
+  ]
+}
