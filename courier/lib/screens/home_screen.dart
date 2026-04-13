@@ -1,7 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../auth/auth_state.dart";
-import "route_declaration_screen.dart";
+import "courier_dashboard_screen.dart";
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.authState});
@@ -10,6 +10,6 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RouteDeclarationScreen(authState: authState);
+    return CourierDashboardScreen(authState: authState);
   }
 }

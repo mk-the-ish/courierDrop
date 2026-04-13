@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -8,10 +11,12 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val localProperties = java.util.Properties()
+val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
-if (localPropertiesFile.exists()) {
-    localProperties.load(localPropertiesFile.inputStream())
+val androidLocalPropertiesFile = rootProject.file("android/local.properties")
+when {
+    localPropertiesFile.exists() -> localProperties.load(localPropertiesFile.inputStream())
+    androidLocalPropertiesFile.exists() -> localProperties.load(androidLocalPropertiesFile.inputStream())
 }
 val mapsApiKey = localProperties.getProperty("MAPS_API_KEY") ?: ""
 

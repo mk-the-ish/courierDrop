@@ -17,7 +17,7 @@ class AuthResponse {
 class ApiClient {
   ApiClient({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
-        baseUrl = baseUrl ?? "http://localhost:8080";
+        baseUrl = baseUrl ?? "https://dropcity-backend.onrender.com";
 
   final http.Client _client;
   final String baseUrl;

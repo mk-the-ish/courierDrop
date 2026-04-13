@@ -1,6 +1,6 @@
 "use client";
 
-import PageHeader from '@/components/page-header';
+import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock } from 'lucide-react';
 

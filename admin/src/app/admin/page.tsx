@@ -8,22 +8,30 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import StatCard from '@/components/stat-card';
-import PageHeader from '@/components/page-header';
+import StatCard from '@/components/StatCard';
+import { PageHeader } from '@/components/page-header';
 
 const baseUrl = 'http://localhost:8080';
 
+type HealthStatus = {
+  status?: 'ok' | 'error' | string;
+  uptime?: string | number;
+  timestamp?: string;
+  [key: string]: unknown;
+};
+
+type JobsStatus = {
+  running?: boolean;
+  [key: string]: unknown;
+};
+
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<{
+    health: HealthStatus | null;
+    jobs: JobsStatus | null;
+    alerts: unknown | null;
+  }>({
     health: null,
     jobs: null,
     alerts: null,
@@ -65,7 +73,7 @@ export default function AdminDashboard() {
 
   const getHealthColor = () => {
     if (!stats.health) return 'default';
-    return stats.health.status === 'ok' ? 'default' : 'destructive';
+    return stats.health.status === 'ok' ? 'default' : 'error';
   };
 
   return (
@@ -88,19 +96,19 @@ export default function AdminDashboard() {
             <StatCard
               title="API Status"
               value={getHealthStatus()}
-              icon={<Server className="h-4 w-4 text-muted-foreground" />}
+              icon={Server}
               description="Backend API health"
             />
             <StatCard
               title="Scheduler Status"
               value={stats.jobs?.running ? 'Active' : 'Inactive'}
-              icon={<Activity className="h-4 w-4 text-muted-foreground" />}
+              icon={Activity}
               description="Job scheduler status"
             />
             <StatCard
               title="Uptime"
               value={stats.health?.uptime || '-'}
-              icon={<CheckCircle className="h-4 w-4 text-muted-foreground" />}
+              icon={CheckCircle}
               description="System uptime"
             />
             <StatCard
@@ -109,7 +117,7 @@ export default function AdminDashboard() {
                 ? new Date(stats.health.timestamp).toLocaleTimeString()
                 : '-'
               }
-              icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
+              icon={AlertCircle}
               description="Last health check"
             />
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { AlertCircle, Edit2, Trash2, Plus } from 'lucide-react';
 import {
   Card,
@@ -15,36 +15,40 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  Form,
   FormControl,
-  FormDescription,
-  FormField,
   FormItem,
   FormLabel,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
   Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  SelectOption,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import PageHeader from '@/components/page-header';
+import { PageHeader } from '@/components/page-header';
 import { useToast } from '@/hooks/use-toast';
 
 const baseUrl = 'http://localhost:8080';
 
+type AlertRule = {
+  id: string;
+  name: string;
+  metric: string;
+  operator: string;
+  threshold: number;
+  notification_channel: string;
+};
+
+type AlertRuleForm = Omit<AlertRule, 'id'>;
+
 export default function AlertsPage() {
-  const [rules, setRules] = useState([]);
+  const [rules, setRules] = useState<AlertRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<AlertRuleForm>({
     name: '',
     metric: 'uptime',
     operator: 'less_than',
@@ -72,7 +76,7 @@ export default function AlertsPage() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('adminToken');
@@ -109,7 +113,7 @@ export default function AlertsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Delete this rule?')) return;
     try {
       const token = localStorage.getItem('adminToken');
@@ -143,8 +147,14 @@ export default function AlertsPage() {
     });
   };
 
-  const handleEdit = (rule) => {
-    setFormData(rule);
+  const handleEdit = (rule: AlertRule) => {
+    setFormData({
+      name: rule.name,
+      metric: rule.metric,
+      operator: rule.operator,
+      threshold: rule.threshold,
+      notification_channel: rule.notification_channel,
+    });
     setEditingId(rule.id);
     setOpen(true);
   };
@@ -157,12 +167,15 @@ export default function AlertsPage() {
           description="Manage system alerts and notifications"
         />
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => resetForm()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Rule
-            </Button>
-          </DialogTrigger>
+          <Button
+            onClick={() => {
+              resetForm();
+              setOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Rule
+          </Button>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
@@ -188,43 +201,33 @@ export default function AlertsPage() {
               </FormItem>
 
               <FormItem>
-                <FormLabel>Metric</FormLabel>
-                <Select
-                  value={formData.metric}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, metric: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="uptime">Uptime</SelectItem>
-                    <SelectItem value="error_rate">Error Rate</SelectItem>
-                    <SelectItem value="response_time">Response Time</SelectItem>
-                    <SelectItem value="job_failures">Job Failures</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FormItem>
+              <FormLabel>Metric</FormLabel>
+              <Select
+                value={formData.metric}
+                onChange={(e) =>
+                  setFormData({ ...formData, metric: e.target.value })
+                }
+              >
+                <SelectOption value="uptime">Uptime</SelectOption>
+                <SelectOption value="error_rate">Error Rate</SelectOption>
+                <SelectOption value="response_time">Response Time</SelectOption>
+                <SelectOption value="job_failures">Job Failures</SelectOption>
+              </Select>
+            </FormItem>
 
               <FormItem>
-                <FormLabel>Condition</FormLabel>
-                <Select
-                  value={formData.operator}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, operator: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="less_than">Less than</SelectItem>
-                    <SelectItem value="greater_than">Greater than</SelectItem>
-                    <SelectItem value="equal">Equal to</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FormItem>
+              <FormLabel>Condition</FormLabel>
+              <Select
+                value={formData.operator}
+                onChange={(e) =>
+                  setFormData({ ...formData, operator: e.target.value })
+                }
+              >
+                <SelectOption value="less_than">Less than</SelectOption>
+                <SelectOption value="greater_than">Greater than</SelectOption>
+                <SelectOption value="equal">Equal to</SelectOption>
+              </Select>
+            </FormItem>
 
               <FormItem>
                 <FormLabel>Threshold</FormLabel>
@@ -244,26 +247,21 @@ export default function AlertsPage() {
               </FormItem>
 
               <FormItem>
-                <FormLabel>Notification Channel</FormLabel>
-                <Select
-                  value={formData.notification_channel}
-                  onValueChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      notification_channel: value,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="slack">Slack</SelectItem>
-                    <SelectItem value="webhook">Webhook</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FormItem>
+              <FormLabel>Notification Channel</FormLabel>
+              <Select
+                value={formData.notification_channel}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    notification_channel: e.target.value,
+                  })
+                }
+              >
+                <SelectOption value="email">Email</SelectOption>
+                <SelectOption value="slack">Slack</SelectOption>
+                <SelectOption value="webhook">Webhook</SelectOption>
+              </Select>
+            </FormItem>
 
               <div className="flex gap-2 justify-end">
                 <Button

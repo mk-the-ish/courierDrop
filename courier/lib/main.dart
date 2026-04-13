@@ -14,31 +14,43 @@ import "screens/login_screen.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
 
-Future<void> main() async {
+void main() {
+  // MUST be the first call - before any async/zone operations
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Run everything in the same async zone
   runZonedGuarded(
-    () async {
-      WidgetsFlutterBinding.ensureInitialized();
-      await Firebase.initializeApp();
-      final apiClient = ApiClient();
-      final authState = AuthState(AuthService(apiClient: apiClient));
-      final errorReporter = ErrorReporter(apiClient: apiClient, authState: authState);
-      final offlineQueue = OfflineQueue.instance(apiClient);
-      errorReporter.start();
-
-      FlutterError.onError = errorReporter.reportFlutterError;
-      PlatformDispatcher.instance.onError = (error, stack) {
-        errorReporter.report(error, stack, context: "platform");
-        return true;
-      };
-
-      runApp(DropCityCourierApp(authState: authState, offlineQueue: offlineQueue));
-    },
+    () => _runApp(),
     (error, stack) {
-      // Handle zone errors
-      print("Zone error: $error");
-      print("Stack: $stack");
+      // Fallback error handling if app fails
+      debugPrint("Uncaught zone error: $error");
+      debugPrintStack(stackTrace: stack);
     },
   );
+}
+
+Future<void> _runApp() async {
+  try {
+    await Firebase.initializeApp();
+    final apiClient = ApiClient();
+    final authState = AuthState(AuthService(apiClient: apiClient));
+    final errorReporter =
+        ErrorReporter(apiClient: apiClient, authState: authState);
+    final offlineQueue = OfflineQueue.instance(apiClient);
+    errorReporter.start();
+
+    FlutterError.onError = errorReporter.reportFlutterError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      errorReporter.report(error, stack, context: "platform");
+      return true;
+    };
+
+    runApp(DropCityCourierApp(authState: authState, offlineQueue: offlineQueue));
+  } catch (e, stack) {
+    debugPrint("Failed to initialize app: $e");
+    debugPrintStack(stackTrace: stack);
+    rethrow;
+  }
 }
 
 class DropCityCourierApp extends StatefulWidget {

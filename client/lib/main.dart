@@ -9,31 +9,48 @@ import "dart:io";
 import "api/api_client.dart";
 import "auth/auth_service.dart";
 import "auth/auth_state.dart";
-import "screens/home_screen.dart";
+import "screens/dashboard_screen.dart";
 import "screens/login_screen.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
 
-Future<void> main() async {
+void main() {
+  // MUST be the first call - before any async/zone operations
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  final apiClient = ApiClient();
-  final authState = AuthState(AuthService(apiClient: apiClient));
-  final errorReporter = ErrorReporter(apiClient: apiClient, authState: authState);
-  final offlineQueue = OfflineQueue.instance(apiClient);
-  errorReporter.start();
 
-  FlutterError.onError = errorReporter.reportFlutterError;
-  PlatformDispatcher.instance.onError = (error, stack) {
-    errorReporter.report(error, stack, context: "platform");
-    return true;
-  };
-
+  // Run everything in the same async zone
   runZonedGuarded(
-    () =>
-        runApp(DropCityClientApp(authState: authState, offlineQueue: offlineQueue)),
-    (error, stack) => errorReporter.report(error, stack, context: "zone"),
+    () => _runApp(),
+    (error, stack) {
+      // Fallback error handling if app fails
+      debugPrint("Uncaught zone error: $error");
+      debugPrintStack(stackTrace: stack);
+    },
   );
+}
+
+Future<void> _runApp() async {
+  try {
+    await Firebase.initializeApp();
+    final apiClient = ApiClient();
+    final authState = AuthState(AuthService(apiClient: apiClient));
+    final errorReporter =
+        ErrorReporter(apiClient: apiClient, authState: authState);
+    final offlineQueue = OfflineQueue.instance(apiClient);
+    errorReporter.start();
+
+    FlutterError.onError = errorReporter.reportFlutterError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      errorReporter.report(error, stack, context: "platform");
+      return true;
+    };
+
+    runApp(DropCityClientApp(authState: authState, offlineQueue: offlineQueue));
+  } catch (e, stack) {
+    debugPrint("Failed to initialize app: $e");
+    debugPrintStack(stackTrace: stack);
+    rethrow;
+  }
 }
 
 class DropCityClientApp extends StatefulWidget {
@@ -133,7 +150,7 @@ class _DropCityClientAppState extends State<DropCityClientApp> {
           home: _restoring
               ? const _SplashScreen()
               : widget.authState.isAuthenticated
-                  ? HomeScreen(authState: widget.authState)
+                  ? DashboardScreen(authState: widget.authState)
                   : LoginScreen(authState: widget.authState),
         );
       },
