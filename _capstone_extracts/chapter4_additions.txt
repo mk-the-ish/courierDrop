@@ -1,0 +1,161 @@
+A GUIDE TO CHAPTER 4 CAPSTONE PROJECT.
+All figure captions are placed below the figure. Explain what is on your figure.
+All table captions are placed above the table. Explain what is on your table.
+Discuss and Interpret results
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CHAPTER 4: RESULTS AND DISCUSSION
+
+This part of the paper discusses the process and the results of the study. In addition to that, several technical aspects of the research, such as the test strategy, test cases and hardware and software specifications for running the system are included here. This section of the paper will also examine other aspects of the study, such as the proportion of users who evaluate the system and recommendations for the future improvements.
+Hardware specification
+This section is about the specification of the hardware used in the system developed.
+Table 4.1 Computer Specifications needed
+
+Table 4.2 Mobile App hardware requirements
+
+Software requirements
+This part describes what the software will do and how it will be expected to perform. It also describes the functionality of the product to fulfil specific requirements.
+Table 4.3 Mobile Phone Web browsers
+
+Table 4.4 Computer Web browsers
+
+
+
+TEST PLAN
+This part of the paper discusses how the system was tested and the tools used to test the system. The roles of the Researcher will be discussed.
+Quality Objectives
+The test objectives verify the Functionality of websites Click Boat: Boat Repair and Rental Management System. The project should focus on testing the banking operation such as reservation, accuracy of the gps. Ratings of services to guarantee all these operations can work normally in real business environment.
+Integration testing
+Integration testing aimed to test different parts of the system in combination in order to assess if they work correctly together. By testing the units in groups, any faults in the system can be identified.
+There many ways to test how different components of the system function at their interface: tester can adopt either bottom-up or top-down integration method. In bottom-up integration testing, testing builds on the results of unit testing by testing higher level combination of units (called modules) in successively more complex scenarios. It is recommended that testers start with this approach first before apply the top-down approach which tests higher level modules first and studies simpler ones later.
+System testing
+The next level of testing is System testing. As the name implies, all the components of the software are tested as a whole in order to ensure that the overall product meets the requirements specified. Software testing is very important as the software is almost ready to ship and it can be tested in an environment which is very to that which the user will experience once it is deployed.
+System testing enables testers to ensure that the product meets business requirements, as well as determine that it runs smoothly within its operating environment. This type of testing is typically performed by a specialised testing team.
+
+
+
+
+
+
+
+
+
+Table 4.5 Login Module
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Table 4.6 Signup Module
+
+
+
+
+
+
+Table 4. 7 Forgot Password Module
+
+
+
+
+
+
+
+Table 4. 8 Destination Module
+
+Table 4. 9 Repair Update Module 
+
+Table 4. 10 MapView Module
+N.B All modules must be tested
+
+IMPLEMENTATION PLAN
+The purpose of this plan was to implement “Kabesa de barangay: Boat Repair and Rental Management System” which aimed to automate tasks around marina based business such as Tourist itinerary, Yacht repair management, boat repair and rental scheduling.
+System Overview
+Click Boat is a mobile/ web application which focused on boat repair and rental. The boat rental is based on other transportation based apps like UBER and GRAB but the difference is that it offers boat rides on specific destination with the help of Google maps and Geolocation API. While the boat repair side focused more on automating status updates of repairs through email and SMS on the clients of Yacht charter.
+System Description
+The System is a mobile/web app that has the capability to notify users in two ways; first is email and second is SMS or text messages. The system has four users.  First is the tourist. The tourist has the capability to see, rate and request for boat on specific destinations. The second user is the boat driver. The boat driver can accept or reject boat ride requests by the tourists. They also receive ratings from the tourist after they provided the service. The third is the Yacht owners. These users can create repair appointments for boat repairs on the yacht charter and they can also view islands destination and see its geographic view on the map. The is the yacht charter. This user can manage repairs, generate reports and view current repairs being executed.
+Organisational Awareness and Approval
+A letter of approval was presented to the target organisation to purpose the solution on the business problem. Moreover, the user acceptance test with evaluation forms will be given to the respondents to calculate the acceptability of the system on the selected organisation.
+Documents and Materials Procurement
+The letter will serve as the document in proposing to implement the specified system. They will also discuss to the possible end users on how to use the system and it actually works, the needed budget for the procurement of the technology to be used.
+
+Table 4.11 Implementation Plan
+
+ Table 4.11 shows the implantation plan of the Researcher. It includes the strategy used, the activities, the persons involved and the duration of the implementation. The Researcher performed some activities like uploading of the system to Web Server and the persons involved in performing this activity is the developer of the system. In monitoring, the developer should monitor the system for some bugs after it was implemented. 
+
+
+EVALUATION
+The Researcher conducted the evaluation of the developed system to the 71 respondents including forty (40) tourists, one (1) yacht charter, ten (10) yacht owner and twenty (20) boat drivers. The researcher also provided four (4) sets of survey questionnaires, one for the yacht charter, one for the tourist, one for the boat driver and one for the yacht owner that seek to answer the evaluation to determine the common problems on Boat repair, Yacht repair management, tourist itinerary and boat scheduling in traditional way and different problems they encountered in the existing system. The Yacht charter manager was also asked to answer the level of acceptability in the developed system and give their comments and suggestions. While the tourists, yacht owner and boat owners were asked to evaluate the developed system in terms of User friendliness and Functionality.
+
+FINDINGS AND INTERPRETATION
+This part presents the findings and interpretation of the data being gathered by the Researcher. The Researcher presented the developed system to the respondents. In analysing the gathered data, the Researcher used the Likert Scale that is a 1-5-point scale that has a range of answer options, getting the weighted mean and the verbal interpretation. In order for the Researcher to compare the results, the data gathered from the Papaya Yacht Charter, Yacht owner, Tourist and Boat owner were separated.
+
+
+
+
+
+Problems Encountered by the Respondents on the Existing System
+Table 4.12 Problems Encountered in the Tourist itinerary
+As shown in the table above the major problem faced by the respondents in terms of tourist itinerary is “Finding a good boat driver for the boat ride service” which is answered by 39 (97.5%) of the respondents. It can be assumed that it is an untidy job or there is no actual platform that deals with this type of business process same goes by the difficulty in “Finding a good destination” which answered by 35 (87.5%) of the respondents while the problem on “Searching for comments and feedbacks from other tourists” is answered by 17 (42.5%) respondents and only using Google maps as a platform gets 25 (62.5%) answers from the respondents which can be assumed that the lack of platforms for tourist itinerary is a problem for tourists.
+Table 4.13 Problems Encountered in Boat Scheduling
+The respondents were asked what are the problems they have encountered in scheduling of the boat ride service for the tourist, the results as shown on the table that 20 (100%) of the respondents have experienced “difficulty in dealing with bulk transactions especially during peak season”; while 19 (95%) of the respondents have find it difficult on “Monitoring the good service provided by the boat owner to tourist “and 17 (85%) of them have found it difficult in terms of “Managing boat reservation and scheduling transaction in manual manner”
+Table 4.14 Problems Encountered in Yacht repair scheduling
+When respondents were asked to indicate their problems on yacht repair scheduling, 10 (100%) of the respondents answered “difficulty in the manual process”; 8 (80%) of the respondents answered “repair status update is not timely” and also 10 (100%) have said that the “repair scheduling is challenging due to the reason of service fee are not cascaded”.
+Table 4.15 Problems encountered in Yacht Repair Management
+The table above shows the problems that the yacht charter had experienced using manual system. According to Renato F. Lisud, the manager of Papaya Yacht Charter and Services Inc., stated that although there is a system they are using in the company, they find it hard to use it because it needed expertise in terms of accounting and proficiency in using flat database management systems such as Microsoft excel. He also added that that his business lacks automation and different clients would like to have the possible and easiest way to access the yacht repair services. As the Researcher demonstrated the technological solution to the Charter manager, he saw how the system notification capabilities function on both email and SMS, and he expressed his desire to have that type of automation around their business, stating that he wanted to install it on the company.
+Modules of the System developed to address the common problems encountered by the respondents
+Table 4.16 Modules of the System Developed to Address the Problem
+The table 4.16 shows the modules of the system the Researcher has developed to address the problems of the respondents shown in table 4.11, 4.12, 4.13 and 4.14 which describes the problem they encountered in using the manual or traditional business process. With these the Researcher has come up to the idea of creating modules that will automate the business process in terms of report generation and transaction awareness through system generated notifications that involved SMS and email.
+Tools and technology used to develop the solution to the problem
+Table 4.17 Tools and Technology used to develop the System
+The table the technology and tools the Researcher used to develop the software in addressing the problem faced by the respondents. Majority of these tools are used in creating progressive web apps and APIs were only used to give additional features on the system such as notifications like PHPMailer and Itextmo do. There were also present Geographic mapping tools used in the development such as OpenStreetmaps and Google maps API.
+
+Level of acceptance of the respondents in the developed System
+Table 4.18 System Acceptability Rating in terms of User-Friendliness
+
+The table above shows the level of acceptance of the respondents in terms of the system’s User-Friendliness. The mode is either 5 or 4 which tells moderate and high acceptability of the system’s User-friendliness. The traditional tourism industry was unable to follow with the development trend and with the emergence of modern personalised information services, and the service provided by the tourism e-commerce environment also important for improving the tourists’ satisfaction and also the competitiveness (Yang, 2019). A different system has been on the trend to provide newer experience to the target market to avoid churns and decline of possible clients. 
+
+
+Table 4.19 System Acceptability Rating in terms of Functionality.
+The table above shows the level of acceptance of the respondents in terms of the system’s Functionality. The mode is either 5 or 4 which tells moderate and high acceptability of the system’s Functionality. While the incorporation of some earlier RAISA technologies such as the ATM may have radically changed the way the customer experiences (Stanislav and Craig, 2017) the concept of this information system is to automate the system even though the automation itself is not in the form of holistic automation but automating some of the most vital parts of the process such as analytics, notifications and other informatics related function that this system can bring on User and persuade to use newer systems.
+Issues encountered during the deployment of the System
+Table 4.20 Deployment Issues
+The following data on the table shows different issues that the Researcher has encountered during the deployment of the System that is according to the ISTQB (International Software Testing Qualifications Board), to sum it up, it can be seen that a web based system may encounter unexpected problems such as downtime due to multiple services and requests it is receiving across the network. In the 24/7 web industry business owners can feel a constant need to push the latest and greatest software to the live site in order to remain competitive and ensure growth (John, Motsashari and Mansouri, 2011). It is important to always have a backup and select the best Web service package service as soon as possible because cheap services may bring drawbacks as the system scales up such as increasing volume of Users and data that it process. In addition to that cross platform system such as combination of Native and mobile Apps are a bit complicated due to the way they access the data and present it to the users.
+System features recommended by the respondents
+Table 4.21 Recommended features
+The implication of this finding is that the respondents have suggested different features that may improve the system for later purposes. This explains why the respondents wanted to automate almost the entire process in the business which involved notification features. The payment facility is the second majority feature they wanted to be added, with these results we can assume that the need of the users for automation for payment process is a must implemented feature on the system. In the Geographic features, the respondents wanted to add the Google map direction services because this gives better routes on the users. While the analytics have the least number of recommendation it might be assumed that respondents have less experience or knowledge to the analytics itself.
+ 

@@ -7,6 +7,7 @@ const config = require("./config");
 const { authMiddleware, requireUser } = require("./middleware/auth");
 const healthRoutes = require("./routes/health");
 const authRoutes = require("./routes/auth");
+const usersRoutes = require("./routes/users");
 const corridorRoutes = require("./routes/corridors");
 const parcelRoutes = require("./routes/parcels");
 const matchingRoutes = require("./routes/matching");
@@ -60,6 +61,7 @@ app.get("/", (_req, res) => {
 
 app.use(authMiddleware);
 
+app.use("/users", requireUser, usersRoutes);
 app.use("/corridors", requireUser, corridorRoutes);
 app.use("/parcels", requireUser, parcelRoutes);
 app.use("/matches", requireUser, matchingRoutes);

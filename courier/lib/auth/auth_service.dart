@@ -49,6 +49,7 @@ class AuthService {
     required String email,
     required String password,
     String? displayName,
+    String? role,
   }) async {
     final result = await _apiClient.signUp(
       email: email,
@@ -65,6 +66,17 @@ class AuthService {
       email: email,
       idToken: result.idToken,
     );
+
+    // Set user role if provided
+    if (role != null && (role == "client" || role == "courier")) {
+      try {
+        await _apiClient.setupUserRole(role: role);
+      } catch (e) {
+        print("[Auth] Warning: Failed to set user role: $e");
+        // Don't throw - user can set role later
+      }
+    }
+
     return _currentUser!;
   }
 

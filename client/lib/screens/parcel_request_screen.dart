@@ -1,9 +1,27 @@
+import "dart:async";
+import "dart:convert";
+
 import "package:flutter/material.dart";
+import "package:http/http.dart" as http;
 import "package:uuid/uuid.dart";
 
 import "../auth/auth_state.dart";
 import "../utils/offline_queue.dart";
-import "map_selection_screen.dart";
+
+class _PlaceSuggestion {
+  const _PlaceSuggestion({
+    required this.displayName,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final String displayName;
+  final double latitude;
+  final double longitude;
+
+  String get coordString =>
+      "${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}";
+}
 
 class ParcelRequestScreen extends StatefulWidget {
   const ParcelRequestScreen({super.key, required this.authState});
@@ -25,14 +43,94 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
   bool _fragile = false;
   bool _isSubmitting = false;
   String? _lastParcelId;
+  bool _isSearchingOrigin = false;
+  bool _isSearchingDestination = false;
+  Timer? _originDebounce;
+  Timer? _destinationDebounce;
+  List<_PlaceSuggestion> _originSuggestions = [];
+  List<_PlaceSuggestion> _destinationSuggestions = [];
+  _PlaceSuggestion? _selectedOrigin;
+  _PlaceSuggestion? _selectedDestination;
 
   @override
   void dispose() {
+    _originDebounce?.cancel();
+    _destinationDebounce?.cancel();
     _originController.dispose();
     _destinationController.dispose();
     _sizeController.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  Future<List<_PlaceSuggestion>> _fetchSuggestions(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.length < 3) {
+      return [];
+    }
+    final uri = Uri.https(
+      "nominatim.openstreetmap.org",
+      "/search",
+      {
+        "q": trimmed,
+        "format": "jsonv2",
+        "addressdetails": "1",
+        "limit": "5",
+      },
+    );
+    final response = await http.get(
+      uri,
+      headers: const {"User-Agent": "dropcity-client"},
+    );
+    if (response.statusCode != 200) {
+      return [];
+    }
+    final decoded = jsonDecode(response.body) as List<dynamic>;
+    return decoded.map((item) {
+      final map = item as Map<String, dynamic>;
+      return _PlaceSuggestion(
+        displayName: map["display_name"]?.toString() ?? "Unknown location",
+        latitude: double.tryParse(map["lat"]?.toString() ?? "") ?? 0,
+        longitude: double.tryParse(map["lon"]?.toString() ?? "") ?? 0,
+      );
+    }).where((suggestion) => suggestion.latitude != 0 || suggestion.longitude != 0).toList();
+  }
+
+  void _onOriginChanged(String value) {
+    if (_selectedOrigin != null && value.trim() != _selectedOrigin!.displayName) {
+      _selectedOrigin = null;
+    }
+    _originDebounce?.cancel();
+    _originDebounce = Timer(const Duration(milliseconds: 400), () async {
+      setState(() => _isSearchingOrigin = true);
+      final results = await _fetchSuggestions(value);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _originSuggestions = results;
+        _isSearchingOrigin = false;
+      });
+    });
+  }
+
+  void _onDestinationChanged(String value) {
+    if (_selectedDestination != null &&
+        value.trim() != _selectedDestination!.displayName) {
+      _selectedDestination = null;
+    }
+    _destinationDebounce?.cancel();
+    _destinationDebounce = Timer(const Duration(milliseconds: 400), () async {
+      setState(() => _isSearchingDestination = true);
+      final results = await _fetchSuggestions(value);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _destinationSuggestions = results;
+        _isSearchingDestination = false;
+      });
+    });
   }
 
   Future<void> _submit() async {
@@ -41,10 +139,14 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
     }
 
     setState(() => _isSubmitting = true);
+    final originValue = _selectedOrigin?.coordString ??
+        _originController.text.trim();
+    final destinationValue = _selectedDestination?.coordString ??
+        _destinationController.text.trim();
     final payload = {
       "clientId": const Uuid().v4(),
-      "origin": _originController.text.trim(),
-      "destination": _destinationController.text.trim(),
+      "origin": originValue,
+      "destination": destinationValue,
       "size": _sizeController.text.trim(),
       "priority": _priority,
       "fragile": _fragile,
@@ -53,8 +155,8 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
     try {
       final parcelId = await widget.authState.apiClient.postParcelRequest(
         clientId: payload["clientId"] as String,
-        origin: payload["origin"] as String,
-        destination: payload["destination"] as String,
+        origin: originValue,
+        destination: destinationValue,
         size: payload["size"] as String?,
         priority: payload["priority"] as String,
         fragile: payload["fragile"] as bool? ?? false,
@@ -74,6 +176,10 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
       _notesController.clear();
       _priority = "Standard";
       _fragile = false;
+      _selectedOrigin = null;
+      _selectedDestination = null;
+      _originSuggestions = [];
+      _destinationSuggestions = [];
     } catch (_) {
       await OfflineQueue.instance(widget.authState.apiClient)
           .enqueueParcel(payload);
@@ -128,9 +234,38 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.location_on),
                 ),
+                onChanged: _onOriginChanged,
                 validator: (value) =>
-                    value == null || value.trim().isEmpty ? "Required" : null,
+                    value == null || value.trim().isEmpty
+                        ? "Required"
+                        : _selectedOrigin == null
+                            ? "Select a suggested location"
+                            : null,
               ),
+              if (_isSearchingOrigin)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              if (_originSuggestions.isNotEmpty)
+                _SuggestionList(
+                  suggestions: _originSuggestions,
+                  onSelected: (suggestion) {
+                    setState(() {
+                      _originController.text = suggestion.displayName;
+                      _selectedOrigin = suggestion;
+                      _originSuggestions = [];
+                    });
+                  },
+                ),
+              if (_selectedOrigin != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    "Using coordinates: ${_selectedOrigin!.coordString}",
+                    style: const TextStyle(fontSize: 12, color: Colors.teal),
+                  ),
+                ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _destinationController,
@@ -140,32 +275,38 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.location_on),
                 ),
+                onChanged: _onDestinationChanged,
                 validator: (value) =>
-                    value == null || value.trim().isEmpty ? "Required" : null,
+                    value == null || value.trim().isEmpty
+                        ? "Required"
+                        : _selectedDestination == null
+                            ? "Select a suggested location"
+                            : null,
               ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          MapSelectionScreen(authState: widget.authState),
-                    ),
-                  );
-                  if (result != null) {
-                    final origin = result['origin'];
-                    final destination = result['destination'];
+              if (_isSearchingDestination)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              if (_destinationSuggestions.isNotEmpty)
+                _SuggestionList(
+                  suggestions: _destinationSuggestions,
+                  onSelected: (suggestion) {
                     setState(() {
-                      _originController.text =
-                          "${origin.latitude.toStringAsFixed(4)}, ${origin.longitude.toStringAsFixed(4)}";
-                      _destinationController.text =
-                          "${destination.latitude.toStringAsFixed(4)}, ${destination.longitude.toStringAsFixed(4)}";
+                      _destinationController.text = suggestion.displayName;
+                      _selectedDestination = suggestion;
+                      _destinationSuggestions = [];
                     });
-                  }
-                },
-                icon: const Icon(Icons.map),
-                label: const Text("Select on Map"),
-              ),
+                  },
+                ),
+              if (_selectedDestination != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    "Using coordinates: ${_selectedDestination!.coordString}",
+                    style: const TextStyle(fontSize: 12, color: Colors.teal),
+                  ),
+                ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _sizeController,
@@ -217,6 +358,38 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SuggestionList extends StatelessWidget {
+  const _SuggestionList({
+    required this.suggestions,
+    required this.onSelected,
+  });
+
+  final List<_PlaceSuggestion> suggestions;
+  final ValueChanged<_PlaceSuggestion> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(top: 6),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemBuilder: (context, index) {
+          final suggestion = suggestions[index];
+          return ListTile(
+            dense: true,
+            title: Text(suggestion.displayName),
+            subtitle: Text(suggestion.coordString),
+            onTap: () => onSelected(suggestion),
+          );
+        },
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemCount: suggestions.length,
       ),
     );
   }

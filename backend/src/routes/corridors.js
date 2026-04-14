@@ -103,6 +103,25 @@ router.post(
     request_id: req.requestId || null
   };
 
+  // Parse coordinates from "latitude, longitude" string format
+  const parseCoordinates = (coordString) => {
+    if (!coordString) return null;
+    const parts = coordString.trim().split(",").map((s) => parseFloat(s.trim()));
+    if (parts.length !== 2 || parts.some((p) => isNaN(p))) return null;
+    return { lat: parts[0], lng: parts[1] };
+  };
+
+  const startCoords = parseCoordinates(startLocation);
+  const endCoords = parseCoordinates(endLocation);
+
+  if (startCoords) {
+    payload.start_point = `SRID=4326;POINT(${startCoords.lng} ${startCoords.lat})`;
+  }
+
+  if (endCoords) {
+    payload.end_point = `SRID=4326;POINT(${endCoords.lng} ${endCoords.lat})`;
+  }
+
   const { data, error } = await supabase
     .from("corridors")
     .upsert(payload, { onConflict: "id" })

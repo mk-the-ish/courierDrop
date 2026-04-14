@@ -89,10 +89,33 @@ router.post(
     }
   }
 
+  // Parse coordinates from "latitude, longitude" string format
+  const parseCoordinates = (coordString) => {
+    if (!coordString) return null;
+    const parts = coordString.trim().split(",").map((s) => parseFloat(s.trim()));
+    if (parts.length !== 2 || parts.some((p) => isNaN(p))) return null;
+    const [lat, lng] = parts;
+    // PostGIS expects POINT(longitude latitude)
+    return { lat, lng };
+  };
+
+  const originCoords = parseCoordinates(origin);
+  const destCoords = parseCoordinates(destination);
+
+  if (!originCoords) {
+    throw new ApiError("Invalid origin coordinates format. Expected 'latitude, longitude'", 400, "PARCEL_INVALID_ORIGIN");
+  }
+
+  if (!destCoords) {
+    throw new ApiError("Invalid destination coordinates format. Expected 'latitude, longitude'", 400, "PARCEL_INVALID_DESTINATION");
+  }
+
   const payload = {
     ...(clientId ? { id: clientId } : {}),
     origin,
     destination,
+    origin_point: `POINT(${originCoords.lng} ${originCoords.lat})`,
+    destination_point: `POINT(${destCoords.lng} ${destCoords.lat})`,
     size: size || null,
     priority,
     fragile: Boolean(fragile),

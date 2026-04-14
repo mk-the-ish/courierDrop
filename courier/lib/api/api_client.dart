@@ -150,6 +150,31 @@ class ApiClient {
     );
   }
 
+  Future<void> setupUserRole({required String role}) async {
+    // Valid roles: 'client' or 'courier'
+    if (role != "client" && role != "courier") {
+      throw Exception("Invalid role. Must be 'client' or 'courier'.");
+    }
+
+    final uri = Uri.parse("$baseUrl/users/setup-role");
+    final payload = {
+      "role": role,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception(
+          "Failed to set user role: ${response.statusCode} ${response.body}");
+    }
+
+    // Role was successfully set
+  }
+
   Future<void> logout() async {
     // Logout implementation
   }
