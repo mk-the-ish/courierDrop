@@ -45,7 +45,7 @@ class AuthState extends ChangeNotifier implements ValueListenable<Object?> {
     }
   }
 
-  Future<void> signUp(String email, String password, {String? displayName}) async {
+  Future<void> signUp(String email, String password, {String? displayName, String? role}) async {
     _isBusy = true;
     notifyListeners();
     try {
@@ -53,6 +53,7 @@ class AuthState extends ChangeNotifier implements ValueListenable<Object?> {
         email: email,
         password: password,
         displayName: displayName,
+        role: role,
       );
       _scheduleRefresh();
     } finally {

@@ -165,6 +165,41 @@ class ApiClient {
     // Role was successfully set
   }
 
+  Future<void> submitVehicleInfo({
+    required String vehicleType,
+    required String licensePlate,
+    required int maxCapacityKg,
+    String? make,
+    String? model,
+    int? year,
+    String? color,
+    String? notes,
+  }) async {
+    final uri = Uri.parse("$baseUrl/vehicles");
+    final payload = <String, dynamic>{
+      "vehicleType": vehicleType,
+      "licensePlate": licensePlate,
+      "maxCapacityKg": maxCapacityKg,
+      if (make != null) "make": make,
+      if (model != null) "model": model,
+      if (year != null) "year": year,
+      if (color != null) "color": color,
+      if (notes != null) "notes": notes,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception("Failed to submit vehicle info: ${response.body}");
+    }
+
+    // Vehicle info was successfully saved
+  }
+
   Future<String> postParcelRequest({
     required String origin,
     required String destination,

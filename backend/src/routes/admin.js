@@ -354,4 +354,165 @@ router.get(
   })
 );
 
+// Vehicle Verification Endpoints
+router.get(
+  "/vehicles",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { status = "unverified", limit = 50, offset = 0 } = req.query || {};
+    const supabase = getSupabase();
+
+    let query = supabase
+      .from("vehicles")
+      .select(
+        `
+        id,
+        courier_id,
+        vehicle_type,
+        make,
+        model,
+        year,
+        color,
+        license_plate,
+        max_capacity_kg,
+        current_utilization_kg,
+        is_active,
+        verification_status,
+        created_at,
+        updated_at,
+        users:courier_id(
+          id,
+          email,
+          display_name,
+          phone_number,
+          role
+        )
+        `,
+        { count: "exact" }
+      )
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      query = query.eq("verification_status", status);
+    }
+
+    query = query.range(Number(offset), Number(offset) + Number(limit) - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      throw new ApiError(error.message, 500, "VEHICLE_FETCH_FAILED");
+    }
+
+    return res.json({
+      total: count || 0,
+      limit: Number(limit),
+      offset: Number(offset),
+      vehicles: data || []
+    });
+  })
+);
+
+router.get(
+  "/vehicles/:id",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+      .from("vehicles")
+      .select(
+        `
+        id,
+        courier_id,
+        vehicle_type,
+        make,
+        model,
+        year,
+        color,
+        license_plate,
+        max_capacity_kg,
+        current_utilization_kg,
+        is_active,
+        verification_status,
+        created_at,
+        updated_at,
+        users:courier_id(
+          id,
+          email,
+          display_name,
+          phone_number,
+          phone_number,
+          role
+        )
+        `
+      )
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      throw new ApiError(error.message, 404, "VEHICLE_NOT_FOUND");
+    }
+
+    return res.json(data);
+  })
+);
+
+router.patch(
+  "/vehicles/:id/verify",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { verified, notes } = req.body || {};
+
+    if (verified === undefined) {
+      throw new ApiError("verified (boolean) required", 400, "INVALID_INPUT");
+    }
+
+    const supabase = getSupabase();
+    const status = verified ? "verified" : "rejected";
+
+    const { data, error } = await supabase
+      .from("vehicles")
+      .update({
+        verification_status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new ApiError(error.message, 500, "VEHICLE_VERIFY_FAILED");
+    }
+
+    return res.json({
+      status: "ok",
+      vehicle: data,
+      message: `Vehicle ${verified ? "verified" : "rejected"} successfully`
+    });
+  })
+);
+
+router.delete(
+  "/vehicles/:id",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const supabase = getSupabase();
+
+    const { error } = await supabase
+      .from("vehicles")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      throw new ApiError(error.message, 500, "VEHICLE_DELETE_FAILED");
+    }
+
+    return res.json({ status: "ok", id });
+  })
+);
+
 module.exports = router;

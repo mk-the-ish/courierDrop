@@ -28,7 +28,7 @@ class AuthState extends ChangeNotifier {
     }
   }
 
-  Future<void> signUp(String email, String password, {String? displayName}) async {
+  Future<void> signUp(String email, String password, {String? displayName, String? role}) async {
     _isBusy = true;
     notifyListeners();
     try {
@@ -36,6 +36,7 @@ class AuthState extends ChangeNotifier {
         email: email,
         password: password,
         displayName: displayName,
+        role: role,
       );
     } finally {
       _isBusy = false;

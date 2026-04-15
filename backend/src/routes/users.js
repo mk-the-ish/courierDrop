@@ -54,6 +54,7 @@ router.post(
       throw new ApiError("User ID not found in token", 400, "USER_ID_MISSING");
     }
 
+
     const { role, displayName } = req.body || {};
 
     if (!role || !["client", "courier"].includes(role)) {
@@ -63,7 +64,7 @@ router.post(
         "USER_INVALID_ROLE"
       );
     }
-
+                                                                                                                                              
     const supabase = getSupabase();
 
     // Check if user already has a role

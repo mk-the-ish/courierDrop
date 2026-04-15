@@ -41,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
         email,
         password,
         displayName: _nameController.text.trim(),
+        role: "courier",
       );
     } else {
       await widget.authState.signIn(email, password);

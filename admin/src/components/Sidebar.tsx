@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, AlertCircle, Settings, BarChart3, Clock, LucideIcon } from 'lucide-react';
+import { Home, AlertCircle, Settings, BarChart3, Clock, Truck, LucideIcon } from 'lucide-react';
 
 interface Tab {
   id: string;
@@ -18,6 +18,7 @@ export default function Sidebar() {
   const tabs: Tab[] = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/' },
     { id: 'alerts', label: 'Alert Rules', icon: AlertCircle, href: '/alerts' },
+    { id: 'vehicles', label: 'Vehicle Verification', icon: Truck, href: '/vehicles' },
     { id: 'health', label: 'System Health', icon: BarChart3, href: '/health' },
     { id: 'scheduler', label: 'Scheduler', icon: Clock, href: '/scheduler' },
     { id: 'settings', label: 'Settings', icon: Settings, href: '/settings' },
