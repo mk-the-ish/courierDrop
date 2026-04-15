@@ -17,7 +17,7 @@ async function matchPendingParcels() {
     // Get all parcels that are REQUESTED and not yet assigned
     const { data: parcels, error: parcelError } = await supabase
       .from("parcels")
-      .select("id, origin_point, destination_point")
+      .select("id, origin_point, destination_point, origin, destination")
       .eq("status", "REQUESTED")
       .is("assigned_courier_id", null);
 
@@ -32,6 +32,16 @@ async function matchPendingParcels() {
     }
 
     console.log(`[Matching] Found ${parcels.length} pending parcels to match`);
+
+    // Also get all corridors with lines for debugging
+    const { data: corridors, error: corridorError } = await supabase
+      .from("corridors")
+      .select("id, created_by, corridor_line")
+      .not("corridor_line", "is", null);
+
+    if (!corridorError && corridors) {
+      console.log(`[Matching] Found ${corridors.length} corridors with lines available`);
+    }
 
     let matchedCount = 0;
     let queuedCount = 0;
@@ -60,7 +70,7 @@ async function matchPendingParcels() {
           {
             p_origin: parcel.origin_point,
             p_destination: parcel.destination_point,
-            p_max_detour_m: 50
+            p_max_detour_m: 50000 // 50km default
           }
         );
 
@@ -70,7 +80,7 @@ async function matchPendingParcels() {
         }
 
         if (!matches || matches.length === 0) {
-          console.log(`[Matching] No matching corridors found for parcel ${parcel.id}`);
+          console.log(`[Matching] No matching corridors found for parcel ${parcel.id} (${parcel.origin} → ${parcel.destination})`);
           continue;
         }
 
