@@ -357,11 +357,11 @@ router.post(
 
     const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
     if (parcelInfo?.created_by) {
-      sendToUser(parcelInfo.created_by, "Courier accepted", "Your courier accepted the delivery.", {
+      await sendToUser(parcelInfo.created_by, "Courier accepted", "Your courier accepted the delivery.", {
         parcelId
       });
     }
-    sendToParcelTopic(parcelId, "Courier accepted", "Your courier accepted the delivery.", {
+    await sendToParcelTopic(parcelId, "Courier accepted", "Your courier accepted the delivery.", {
       parcelId,
       status: "ASSIGNED"
     });
@@ -452,11 +452,11 @@ router.post(
 
           const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
           if (nextCorridor?.created_by) {
-            sendToUser(nextCorridor.created_by, "New delivery request", "You have a new parcel request.", {
+            await sendToUser(nextCorridor.created_by, "New delivery request", "You have a new parcel request.", {
               parcelId
             });
           }
-          sendToParcelTopic(parcelId, "Courier reassigned", "Finding a new courier.", {
+          await sendToParcelTopic(parcelId, "Courier reassigned", "Finding a new courier.", {
             parcelId,
             status: "ASSIGNED"
           });
