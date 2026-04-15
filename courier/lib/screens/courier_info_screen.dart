@@ -44,39 +44,37 @@ class _CourierInfoScreenState extends State<CourierInfoScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final payload = {
-        "vehicleType": _selectedVehicleType,
-        "make": _makeController.text.trim(),
-        "model": _modelController.text.trim(),
-        "year": int.tryParse(_yearController.text.trim()),
-        "color": _colorController.text.trim(),
-        "licensePlate": _licensePlateController.text.trim(),
-        "maxCapacityKg": int.tryParse(_maxCapacityController.text.trim()),
-      };
+      final year = int.tryParse(_yearController.text.trim());
+      final maxCapacity = int.tryParse(_maxCapacityController.text.trim());
 
-      // TODO: Implement backend endpoint to save vehicle info
-      // await widget.authState.apiClient.submitVehicleInfo(payload);
+      if (year == null || maxCapacity == null) {
+        throw Exception("Year and capacity must be valid numbers");
+      }
 
-      // For now, just log the payload
-      debugPrint("[CourierInfo] Vehicle info payload: $payload");
+      await widget.authState.apiClient.submitVehicleInfo(
+        vehicleType: _selectedVehicleType!,
+        make: _makeController.text.trim(),
+        model: _modelController.text.trim(),
+        year: year,
+        color: _colorController.text.trim(),
+        licensePlate: _licensePlateController.text.trim(),
+        maxCapacityKg: maxCapacity,
+      );
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Vehicle information saved!")),
+        const SnackBar(content: Text("✅ Vehicle information saved!")),
       );
 
-      // Navigate to dashboard
+      // Navigate to dashboard and replace the entire HomeScreen stack
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          "/dashboard",
-          (route) => false,
-        );
+        Navigator.of(context).pushReplacementNamed("/");
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(content: Text("❌ Error: $e")),
       );
     } finally {
       if (mounted) {
@@ -228,10 +226,7 @@ class _CourierInfoScreenState extends State<CourierInfoScreen> {
                 child: OutlinedButton(
                   onPressed: _isSubmitting
                       ? null
-                      : () => Navigator.of(context).pushNamedAndRemoveUntil(
-                            "/dashboard",
-                            (route) => false,
-                          ),
+                      : () => Navigator.of(context).pushReplacementNamed("/"),
                   child: const Text("Skip for now"),
                 ),
               ),

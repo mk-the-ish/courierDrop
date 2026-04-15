@@ -1,6 +1,7 @@
 const cron = require("node-cron");
 const { runHeartbeatWatchdog } = require("../jobs/heartbeat_watchdog");
 const { checkAlerts } = require("../jobs/check_alerts");
+const { matchPendingParcels } = require("./matching");
 
 class JobScheduler {
   constructor() {
@@ -237,6 +238,16 @@ function initializeDefaultJobs() {
     checkAlerts,
     {
       description: "Evaluates alert rules and sends notifications"
+    }
+  );
+
+  // Parcel matching: runs every 3 minutes
+  scheduler.registerJob(
+    "match_parcels",
+    "*/3 * * * *", // Every 3 minutes
+    matchPendingParcels,
+    {
+      description: "Matches pending parcels with available corridors"
     }
   );
 }

@@ -470,9 +470,10 @@ router.get(
     const { data, error } = await supabase
       .from("parcels")
       .select(
-        "id,status,origin,destination,priority,fragile,assigned_at"
+        "id,status,origin,destination,priority,fragile,assigned_at,created_at,origin_point,destination_point"
       )
-      .eq("assigned_courier_id", req.user?.uid || "");
+      .eq("assigned_courier_id", req.user?.uid || "")
+      .order("created_at", { ascending: false });
     if (error) {
       throw new ApiError(error.message, 500, "PARCEL_FETCH_FAILED");
     }

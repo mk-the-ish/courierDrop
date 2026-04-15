@@ -3,6 +3,7 @@ import "../auth/auth_state.dart";
 import "route_declaration_screen.dart";
 import "pickup_mode_screen.dart";
 import "assigned_parcels_screen.dart";
+import "settings_screen.dart";
 
 class CourierDashboardScreen extends StatelessWidget {
   const CourierDashboardScreen({super.key, required this.authState});
@@ -15,12 +16,16 @@ class CourierDashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text("DropCity Courier"),
         actions: [
-          TextButton(
-            onPressed: authState.signOut,
-            child: const Text(
-              "Sign out",
-              style: TextStyle(color: Colors.white),
-            ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsScreen(authState: authState),
+                ),
+              );
+            },
           ),
         ],
       ),
