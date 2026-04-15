@@ -281,35 +281,80 @@ router.post(
   requireRole("courier"),
   asyncHandler(async (req, res) => {
     const parcelId = req.params.id;
+    const courierId = req.user?.uid;
     const supabase = getSupabase();
+
+    // Get parcel and check if it's in the queue for one of our corridors
     const { data: parcel, error: lookupError } = await supabase
       .from("parcels")
-      .select("assigned_courier_id,status")
+      .select("status")
       .eq("id", parcelId)
       .maybeSingle();
+
     if (lookupError) {
       throw new ApiError(lookupError.message, 500, "PARCEL_LOOKUP_FAILED");
     }
     if (!parcel) {
       throw new ApiError("Parcel not found", 404, "PARCEL_NOT_FOUND");
     }
-    if (parcel.assigned_courier_id !== req.user?.uid) {
-      throw new ApiError("Not assigned to this courier", 403, "PARCEL_NOT_ASSIGNED");
+
+    // Get the queue entry for this parcel in our corridors
+    const { data: corridors } = await supabase
+      .from("corridors")
+      .select("id")
+      .eq("created_by", courierId);
+
+    const corridorIds = (corridors || []).map((c) => c.id);
+    if (corridorIds.length === 0) {
+      throw new ApiError("No corridors found for this courier", 403, "NO_CORRIDORS");
     }
-    const { error } = await supabase
+
+    const { data: queueEntry, error: queueError } = await supabase
+      .from("parcel_assignment_queue")
+      .select("corridor_id,status")
+      .eq("parcel_id", parcelId)
+      .in("corridor_id", corridorIds)
+      .maybeSingle();
+
+    if (queueError) {
+      throw new ApiError(queueError.message, 500, "QUEUE_LOOKUP_FAILED");
+    }
+    if (!queueEntry) {
+      throw new ApiError("Parcel not in queue for this courier", 403, "PARCEL_NOT_IN_QUEUE");
+    }
+
+    // Update parcel to ASSIGNED with this courier
+    const { error: updateError } = await supabase
       .from("parcels")
-      .update({ status: "ACCEPTED" })
+      .update({
+        assigned_courier_id: courierId,
+        assigned_at: new Date().toISOString(),
+        status: "ASSIGNED"
+      })
       .eq("id", parcelId);
-    if (error) {
-      throw new ApiError(error.message, 500, "PARCEL_ACCEPT_FAILED");
+
+    if (updateError) {
+      throw new ApiError(updateError.message, 500, "PARCEL_ASSIGN_FAILED");
     }
-    const { broadcastParcelStatus } = require("../ws");
-    broadcastParcelStatus(parcelId, { status: "ACCEPTED", parcelId });
+
+    // Update queue entry to ASSIGNED
+    const { error: queueUpdateError } = await supabase
+      .from("parcel_assignment_queue")
+      .update({ status: "ASSIGNED" })
+      .eq("parcel_id", parcelId)
+      .eq("corridor_id", queueEntry.corridor_id);
+
+    if (queueUpdateError) {
+      throw new ApiError(queueUpdateError.message, 500, "QUEUE_UPDATE_FAILED");
+    }
+
+    // Send notifications
     const { data: parcelInfo } = await supabase
       .from("parcels")
       .select("created_by")
       .eq("id", parcelId)
       .maybeSingle();
+
     const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
     if (parcelInfo?.created_by) {
       sendToUser(parcelInfo.created_by, "Courier accepted", "Your courier accepted the delivery.", {
@@ -318,9 +363,13 @@ router.post(
     }
     sendToParcelTopic(parcelId, "Courier accepted", "Your courier accepted the delivery.", {
       parcelId,
-      status: "ACCEPTED"
+      status: "ASSIGNED"
     });
-    return res.json({ status: "ok", parcelId });
+
+    const { broadcastParcelStatus } = require("../ws");
+    broadcastParcelStatus(parcelId, { status: "ASSIGNED", parcelId });
+
+    return res.json({ status: "ok", parcelId, courierId });
   })
 );
 
@@ -329,34 +378,38 @@ router.post(
   requireRole("courier"),
   asyncHandler(async (req, res) => {
     const parcelId = req.params.id;
+    const courierId = req.user?.uid;
     const supabase = getSupabase();
-    const { data: parcel, error: lookupError } = await supabase
-      .from("parcels")
-      .select("assigned_courier_id,status")
-      .eq("id", parcelId)
-      .maybeSingle();
-    if (lookupError) {
-      throw new ApiError(lookupError.message, 500, "PARCEL_LOOKUP_FAILED");
-    }
-    if (!parcel) {
-      throw new ApiError("Parcel not found", 404, "PARCEL_NOT_FOUND");
-    }
-    if (parcel.assigned_courier_id !== req.user?.uid) {
-      throw new ApiError("Not assigned to this courier", 403, "PARCEL_NOT_ASSIGNED");
-    }
-    const { data: currentCorridor } = await supabase
+
+    // Get courier's corridors
+    const { data: corridors } = await supabase
       .from("corridors")
       .select("id")
-      .eq("created_by", parcel.assigned_courier_id)
+      .eq("created_by", courierId);
+
+    const corridorIds = (corridors || []).map((c) => c.id);
+
+    // Find and mark the queue entry as DECLINED
+    const { data: queueEntry, error: queueError } = await supabase
+      .from("parcel_assignment_queue")
+      .select("corridor_id,rank")
+      .eq("parcel_id", parcelId)
+      .in("corridor_id", corridorIds)
       .maybeSingle();
-    if (currentCorridor?.id) {
+
+    if (queueError) {
+      throw new ApiError(queueError.message, 500, "QUEUE_LOOKUP_FAILED");
+    }
+
+    if (queueEntry?.corridor_id) {
       await supabase
         .from("parcel_assignment_queue")
         .update({ status: "DECLINED" })
         .eq("parcel_id", parcelId)
-        .eq("corridor_id", currentCorridor.id);
+        .eq("corridor_id", queueEntry.corridor_id);
     }
 
+    // Look for next PENDING candidate in queue
     const { data: nextCandidate } = await supabase
       .from("parcel_assignment_queue")
       .select("corridor_id")
@@ -366,47 +419,54 @@ router.post(
       .maybeSingle();
 
     if (nextCandidate?.corridor_id) {
-      const { data: corridor } = await supabase
+      // Assign to next courier
+      const { data: nextCorridor } = await supabase
         .from("corridors")
         .select("created_by")
         .eq("id", nextCandidate.corridor_id)
         .maybeSingle();
-      if (corridor?.created_by) {
+
+      if (nextCorridor?.created_by) {
         const { error: assignError } = await supabase
           .from("parcels")
           .update({
-            assigned_courier_id: corridor.created_by,
+            assigned_courier_id: nextCorridor.created_by,
             assigned_at: new Date().toISOString(),
             status: "ASSIGNED"
           })
           .eq("id", parcelId);
-        if (assignError) {
-          throw new ApiError(assignError.message, 500, "PARCEL_ASSIGN_FAILED");
-        }
-        await supabase
-          .from("parcel_assignment_queue")
-          .update({ status: "ASSIGNED" })
-          .eq("parcel_id", parcelId)
-          .eq("corridor_id", nextCandidate.corridor_id);
-        const { broadcastParcelStatus } = require("../ws");
-        broadcastParcelStatus(parcelId, {
-          status: "ASSIGNED",
-          parcelId,
-          reassigned: true
-        });
-        const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
-        if (corridor?.created_by) {
-          sendToUser(corridor.created_by, "New delivery request", "You have a new parcel request.", {
-            parcelId
+
+        if (!assignError) {
+          await supabase
+            .from("parcel_assignment_queue")
+            .update({ status: "ASSIGNED" })
+            .eq("parcel_id", parcelId)
+            .eq("corridor_id", nextCandidate.corridor_id);
+
+          const { broadcastParcelStatus } = require("../ws");
+          broadcastParcelStatus(parcelId, {
+            status: "ASSIGNED",
+            parcelId,
+            reassigned: true
           });
+
+          const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
+          if (nextCorridor?.created_by) {
+            sendToUser(nextCorridor.created_by, "New delivery request", "You have a new parcel request.", {
+              parcelId
+            });
+          }
+          sendToParcelTopic(parcelId, "Courier reassigned", "Finding a new courier.", {
+            parcelId,
+            status: "ASSIGNED"
+          });
+
+          return res.json({ status: "reassigned", parcelId });
         }
-        sendToParcelTopic(parcelId, "Courier reassigned", "Finding a new courier.", {
-          parcelId,
-          status: "ASSIGNED"
-        });
-        return res.json({ status: "reassigned", parcelId });
       }
     }
+
+    // No more candidates - reset parcel status
     const { error } = await supabase
       .from("parcels")
       .update({
@@ -415,11 +475,14 @@ router.post(
         status: "REQUESTED"
       })
       .eq("id", parcelId);
+
     if (error) {
       throw new ApiError(error.message, 500, "PARCEL_DECLINE_FAILED");
     }
+
     const { broadcastParcelStatus } = require("../ws");
     broadcastParcelStatus(parcelId, { status: "REQUESTED", parcelId });
+
     return res.json({ status: "ok", parcelId });
   })
 );
@@ -478,6 +541,75 @@ router.get(
       throw new ApiError(error.message, 500, "PARCEL_FETCH_FAILED");
     }
     return res.json({ parcels: data || [] });
+  })
+);
+
+router.get(
+  "/pending/me",
+  requireRole("courier"),
+  asyncHandler(async (req, res) => {
+    const courierId = req.user?.uid;
+    const supabase = getSupabase();
+
+    // Get corridors created by this courier
+    const { data: corridors, error: corridorError } = await supabase
+      .from("corridors")
+      .select("id")
+      .eq("created_by", courierId);
+
+    if (corridorError) {
+      throw new ApiError(corridorError.message, 500, "CORRIDOR_FETCH_FAILED");
+    }
+
+    if (!corridors || corridors.length === 0) {
+      return res.json({ parcels: [] });
+    }
+
+    const corridorIds = corridors.map((c) => c.id);
+
+    // Get parcels in the assignment queue for these corridors with PENDING status
+    const { data: queueEntries, error: queueError } = await supabase
+      .from("parcel_assignment_queue")
+      .select(
+        "parcel_id,corridor_id,rank,status,created_at"
+      )
+      .in("corridor_id", corridorIds)
+      .eq("status", "PENDING")
+      .order("rank", { ascending: true });
+
+    if (queueError) {
+      throw new ApiError(queueError.message, 500, "QUEUE_FETCH_FAILED");
+    }
+
+    if (!queueEntries || queueEntries.length === 0) {
+      return res.json({ parcels: [] });
+    }
+
+    const parcelIds = queueEntries.map((q) => q.parcel_id);
+
+    // Get full parcel details
+    const { data: parcels, error: parcelError } = await supabase
+      .from("parcels")
+      .select(
+        "id,status,origin,destination,priority,fragile,created_at,origin_point,destination_point,size,notes"
+      )
+      .in("id", parcelIds);
+
+    if (parcelError) {
+      throw new ApiError(parcelError.message, 500, "PARCEL_FETCH_FAILED");
+    }
+
+    // Enrich parcels with queue info (rank)
+    const enrichedParcels = (parcels || []).map((parcel) => {
+      const queueInfo = queueEntries.find((q) => q.parcel_id === parcel.id);
+      return {
+        ...parcel,
+        queueRank: queueInfo?.rank || 0,
+        queuedAt: queueInfo?.created_at
+      };
+    });
+
+    return res.json({ parcels: enrichedParcels });
   })
 );
 

@@ -364,6 +364,33 @@ class ApiClient {
     return items.map((e) => (e as Map).cast<String, dynamic>()).toList();
   }
 
+  Future<List<Map<String, dynamic>>> getPendingParcels() async {
+    final uri = Uri.parse("$baseUrl/parcels/pending/me");
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Pending parcels failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = decoded["parcels"] as List<dynamic>? ?? [];
+    return items.map((e) => (e as Map).cast<String, dynamic>()).toList();
+  }
+
+  Future<void> acceptPendingParcel(String parcelId) async {
+    final uri = Uri.parse("$baseUrl/parcels/$parcelId/accept");
+    final response = await _client.post(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Accept pending parcel failed: ${response.body}");
+    }
+  }
+
+  Future<void> declinePendingParcel(String parcelId) async {
+    final uri = Uri.parse("$baseUrl/parcels/$parcelId/decline");
+    final response = await _client.post(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Decline pending parcel failed: ${response.body}");
+    }
+  }
+
   Future<void> registerDeviceToken({
     required String token,
     required String platform,
