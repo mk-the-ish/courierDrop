@@ -107,7 +107,7 @@ router.post(
       parcelId
     });
     const { sendToParcelTopic } = require("../utils/notifications");
-    sendToParcelTopic(parcelId, "PINs ready", "Pickup and dropoff PINs have been set.", {
+    await sendToParcelTopic(parcelId, "PINs ready", "Pickup and dropoff PINs have been set.", {
       parcelId,
       status: "PINS_SET"
     });
@@ -248,11 +248,11 @@ router.post(
       .maybeSingle();
     const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
     if (parcelOwner?.created_by) {
-      sendToUser(parcelOwner.created_by, "Pickup complete", "Parcel is in transit.", {
+      await sendToUser(parcelOwner.created_by, "Pickup complete", "Parcel is in transit.", {
         parcelId
       });
     }
-    sendToParcelTopic(parcelId, "Pickup complete", "Parcel is in transit.", {
+    await sendToParcelTopic(parcelId, "Pickup complete", "Parcel is in transit.", {
       parcelId,
       status: "IN_TRANSIT"
     });
@@ -396,11 +396,11 @@ router.post(
       .maybeSingle();
     const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
     if (parcelOwner?.created_by) {
-      sendToUser(parcelOwner.created_by, "Delivery complete", "Parcel delivered.", {
+      await sendToUser(parcelOwner.created_by, "Delivery complete", "Parcel delivered.", {
         parcelId
       });
     }
-    sendToParcelTopic(parcelId, "Delivery complete", "Parcel delivered.", {
+    await sendToParcelTopic(parcelId, "Delivery complete", "Parcel delivered.", {
       parcelId,
       status: "COMPLETED"
     });

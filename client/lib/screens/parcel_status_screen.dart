@@ -13,9 +13,14 @@ import "package:mobile_scanner/mobile_scanner.dart";
 import "../auth/auth_state.dart";
 
 class ParcelStatusScreen extends StatefulWidget {
-  const ParcelStatusScreen({super.key, required this.authState});
+  const ParcelStatusScreen({
+    super.key,
+    required this.authState,
+    this.initialParcelId,
+  });
 
   final AuthState authState;
+  final String? initialParcelId;
 
   @override
   State<ParcelStatusScreen> createState() => _ParcelStatusScreenState();
@@ -43,6 +48,16 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
   void initState() {
     super.initState();
     _loadDismissPreference();
+    final initialParcelId = widget.initialParcelId?.trim();
+    if (initialParcelId != null && initialParcelId.isNotEmpty) {
+      _parcelIdController.text = initialParcelId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _beginTracking();
+      });
+    }
   }
 
   @override
@@ -151,6 +166,13 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchStatus());
+  }
+
+  void _beginTracking() {
+    _reconnectAttempted = false;
+    _fetchStatus();
+    _startPolling();
+    _connectWebSocket();
   }
 
   Future<void> _connectWebSocket() async {
@@ -437,14 +459,7 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () {
-                          _reconnectAttempted = false;
-                          _fetchStatus();
-                          _startPolling();
-                          _connectWebSocket();
-                        },
+                  onPressed: _isLoading ? null : _beginTracking,
                   child: Text(_isLoading ? "Loading..." : "Track parcel"),
                 ),
               ),

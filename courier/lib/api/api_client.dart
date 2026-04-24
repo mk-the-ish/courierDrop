@@ -375,6 +375,17 @@ class ApiClient {
     return items.map((e) => (e as Map).cast<String, dynamic>()).toList();
   }
 
+  Future<List<Map<String, dynamic>>> getMyCorridors() async {
+    final uri = Uri.parse("$baseUrl/corridors/me");
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("My corridors failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = decoded["corridors"] as List<dynamic>? ?? [];
+    return items.map((e) => (e as Map).cast<String, dynamic>()).toList();
+  }
+
   Future<void> acceptPendingParcel(String parcelId) async {
     final uri = Uri.parse("$baseUrl/parcels/$parcelId/accept");
     final response = await _client.post(uri, headers: _headers());

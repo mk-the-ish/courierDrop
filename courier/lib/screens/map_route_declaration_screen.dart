@@ -28,6 +28,7 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
   final List<LatLng> _polylinePoints = [];
   GoogleMapController? _mapController;
   bool _isLocating = false;
+  final GlobalKey _mapKey = GlobalKey();
 
   CameraPosition _cameraPosition = const CameraPosition(
     target: LatLng(-17.8252, 31.0335), // Harare Coordinates
@@ -43,6 +44,7 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
   void _onMapCreated(GoogleMapController controller) {
     // Use setState to ensure the UI knows the controller is ready
     setState(() {
+      key: _mapKey;
       _mapController = controller;
     });
   }

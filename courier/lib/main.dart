@@ -69,21 +69,62 @@ class DropCityCourierApp extends StatefulWidget {
 
 class _DropCityCourierAppState extends State<DropCityCourierApp> {
   bool _restoring = true;
+  bool _showContinueOption = false;
+  String? _restoreHint;
   String? _pendingPushToken;
   String? _registeredPushToken;
   StreamSubscription<String>? _tokenRefreshSub;
+  Timer? _restoreHintTimer;
 
   @override
   void initState() {
     super.initState();
     widget.authState.addListener(_onAuthChanged);
+    widget.offlineQueue.start();
+    _restoreHintTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted || !_restoring) {
+        return;
+      }
+      setState(() => _showContinueOption = true);
+    });
     _restoreSession();
     _initPushNotifications();
   }
 
   Future<void> _restoreSession() async {
-    await widget.authState.restoreSession();
-    widget.offlineQueue.start();
+    final restoreFuture = widget.authState.restoreSession();
+    restoreFuture.then((_) {
+      if (!mounted || !_restoring) {
+        return;
+      }
+      setState(() => _restoring = false);
+    }).catchError((_) {
+      // Errors are handled by the timeout/try-catch path below.
+    });
+
+    try {
+      await restoreFuture.timeout(const Duration(seconds: 8));
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _restoreHint =
+              "We are taking longer than expected. You can continue now.";
+          _showContinueOption = true;
+        });
+      }
+      return;
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _restoreHint = "Could not refresh the session. Please sign in again.";
+          _showContinueOption = true;
+        });
+      }
+      return;
+    }
+  }
+
+  void _continueWithoutWaiting() {
     setState(() => _restoring = false);
   }
 
@@ -133,8 +174,10 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
   void dispose() {
     widget.authState.removeListener(_onAuthChanged);
     _tokenRefreshSub?.cancel();
+    _restoreHintTimer?.cancel();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -148,7 +191,11 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
             useMaterial3: true,
           ),
           home: _restoring
-              ? const _SplashScreen()
+              ? _LaunchScreen(
+                  hint: _restoreHint,
+                  showContinueOption: _showContinueOption,
+                  onContinue: _continueWithoutWaiting,
+                )
               : widget.authState.isAuthenticated
                   ? HomeScreen(authState: widget.authState)
                   : LoginScreen(authState: widget.authState),
@@ -158,20 +205,68 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
   }
 }
 
-class _SplashScreen extends StatelessWidget {
-  const _SplashScreen();
+class _LaunchScreen extends StatelessWidget {
+  const _LaunchScreen({
+    required this.hint,
+    required this.showContinueOption,
+    required this.onContinue,
+  });
+
+  final String? hint;
+  final bool showContinueOption;
+  final VoidCallback onContinue;
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 12),
-            Text("Restoring session..."),
-          ],
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFE8EBFF), Colors.white],
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.local_shipping, size: 56, color: Colors.indigo),
+                const SizedBox(height: 16),
+                Text(
+                  "DropCity Courier",
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Preparing your route workspace...",
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                const CircularProgressIndicator(),
+                if (hint != null) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    hint!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.orange.shade800),
+                  ),
+                ],
+                if (showContinueOption) ...[
+                  const SizedBox(height: 14),
+                  TextButton(
+                    onPressed: onContinue,
+                    child: const Text("Continue to sign in"),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:convert";
 
 import "../api/api_client.dart";
 import "../utils/token_store.dart";
@@ -105,7 +106,53 @@ class AuthService {
     return result.idToken;
   }
 
-  Future<void> restoreSession() async {
-    await refreshSession();
+  Map<String, dynamic>? _decodeJwtPayload(String token) {
+    final parts = token.split(".");
+    if (parts.length < 2) {
+      return null;
+    }
+    try {
+      final normalized = base64Url.normalize(parts[1]);
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      return (jsonDecode(decoded) as Map).cast<String, dynamic>();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _restoreFromCachedIdToken(String token) {
+    final payload = _decodeJwtPayload(token);
+    final uid = payload?["user_id"]?.toString() ??
+        payload?["sub"]?.toString() ??
+        "";
+    if (uid.isEmpty) {
+      return false;
+    }
+    _apiClient.setAuthToken(token);
+    _currentUser = AuthUser(
+      uid: uid,
+      email: payload?["email"]?.toString() ?? "",
+      idToken: token,
+    );
+    return true;
+  }
+
+  Future<bool> restoreSession() async {
+    final cachedIdToken = await _tokenStore.getIdToken();
+    var restoredFromCache = false;
+    if (cachedIdToken != null && cachedIdToken.isNotEmpty) {
+      restoredFromCache = _restoreFromCachedIdToken(cachedIdToken);
+    }
+
+    try {
+      final refreshed = await refreshSession();
+      return refreshed != null;
+    } catch (_) {
+      if (restoredFromCache) {
+        return true;
+      }
+      await signOut();
+      return false;
+    }
   }
 }

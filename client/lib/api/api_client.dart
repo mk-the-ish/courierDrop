@@ -14,6 +14,16 @@ class AuthResponse {
   final String? refreshToken;
 }
 
+class ClientDashboardData {
+  const ClientDashboardData({
+    required this.stats,
+    required this.parcels,
+  });
+
+  final Map<String, dynamic> stats;
+  final List<Map<String, dynamic>> parcels;
+}
+
 class ApiClient {
   ApiClient({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
@@ -383,6 +393,28 @@ class ApiClient {
     }
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     return (decoded["parcel"] as Map).cast<String, dynamic>();
+  }
+
+  Future<ClientDashboardData> getClientDashboard() async {
+    final uri = Uri.parse("$baseUrl/parcels/created/me");
+    final response = await _client.get(
+      uri,
+      headers: _headers(),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Dashboard fetch failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final stats = (decoded["stats"] as Map?)?.cast<String, dynamic>() ??
+        <String, dynamic>{};
+    final parcelsRaw = decoded["parcels"] as List<dynamic>? ?? <dynamic>[];
+    final parcels = parcelsRaw
+        .map((item) => (item as Map).cast<String, dynamic>())
+        .toList();
+    return ClientDashboardData(
+      stats: stats,
+      parcels: parcels,
+    );
   }
 
   Future<List<Map<String, dynamic>>> getHandshakeEvents(String parcelId) async {

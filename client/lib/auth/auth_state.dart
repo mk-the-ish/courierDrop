@@ -66,11 +66,11 @@ class AuthState extends ChangeNotifier {
     }
   }
 
-  Future<void> restoreSession() async {
+  Future<bool> restoreSession() async {
     _isBusy = true;
     notifyListeners();
     try {
-      await _authService.restoreSession();
+      return await _authService.restoreSession();
     } finally {
       _isBusy = false;
       notifyListeners();

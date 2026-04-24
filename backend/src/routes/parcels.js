@@ -3,11 +3,36 @@ const { getSupabase } = require("../supabase");
 const ApiError = require("../utils/api_error");
 const asyncHandler = require("../utils/async_handler");
 const { requireRole } = require("../middleware/auth");
+const { parseWktPoint, haversineMeters } = require("../utils/geo");
 
 const router = express.Router();
 const conflictAttempts = new Map();
 const CONFLICT_WINDOW_MS = 10 * 60 * 1000;
 const CONFLICT_MAX = 5;
+
+const ETA_CACHE_TTL_MS = 5 * 60 * 1000;
+const ETA_HISTORY_DAYS = 30;
+const ETA_HISTORY_LIMIT = 400;
+const ETA_MIN_MINUTES = 5;
+
+const ETA_DEFAULTS = {
+  "same-day": { leadMinutes: 85, transitMinutes: 40, speedKmh: 33 },
+  express: { leadMinutes: 120, transitMinutes: 55, speedKmh: 29 },
+  standard: { leadMinutes: 180, transitMinutes: 75, speedKmh: 24 },
+  overall: { leadMinutes: 150, transitMinutes: 60, speedKmh: 26 }
+};
+
+const DAYPART_TRAFFIC_FACTOR = {
+  morning: 1.2,
+  afternoon: 1.0,
+  evening: 1.25,
+  night: 0.85
+};
+
+let etaModelCache = {
+  fetchedAt: 0,
+  model: null
+};
 
 function checkConflictRateLimit(key) {
   const now = Date.now();
@@ -48,6 +73,318 @@ async function ensureParcelAccess(supabase, parcelId, user) {
     return data;
   }
   throw new ApiError("Not permitted to access parcel", 403, "PARCEL_FORBIDDEN");
+}
+
+function parseDate(value) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date;
+}
+
+function elapsedMinutesSince(value, now) {
+  const started = parseDate(value);
+  if (!started) {
+    return 0;
+  }
+  const diffMs = now.getTime() - started.getTime();
+  if (!Number.isFinite(diffMs) || diffMs <= 0) {
+    return 0;
+  }
+  return Math.floor(diffMs / 60000);
+}
+
+function getPriorityKey(priorityValue) {
+  const normalized = (priorityValue || "").toString().trim().toLowerCase();
+  if (normalized === "same-day" || normalized === "sameday") {
+    return "same-day";
+  }
+  if (normalized === "express") {
+    return "express";
+  }
+  return "standard";
+}
+
+function getDayPart(dateValue) {
+  const date = parseDate(dateValue);
+  if (!date) {
+    return "afternoon";
+  }
+  const hour = date.getUTCHours();
+  if (hour >= 5 && hour < 11) return "morning";
+  if (hour >= 11 && hour < 17) return "afternoon";
+  if (hour >= 17 && hour < 22) return "evening";
+  return "night";
+}
+
+function minutesBetween(startValue, endValue) {
+  const start = parseDate(startValue);
+  const end = parseDate(endValue);
+  if (!start || !end) {
+    return null;
+  }
+  const diffMs = end.getTime() - start.getTime();
+  if (!Number.isFinite(diffMs) || diffMs <= 0) {
+    return null;
+  }
+  return diffMs / 60000;
+}
+
+function getDistanceKm(parcel) {
+  const origin = parseWktPoint(parcel.origin_point);
+  const destination = parseWktPoint(parcel.destination_point);
+  const distanceMeters = haversineMeters(origin, destination);
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) {
+    return null;
+  }
+  return distanceMeters / 1000;
+}
+
+function createMetricBucket() {
+  return {
+    count: 0,
+    leadMinutes: 0,
+    transitMinutes: 0,
+    speedKmh: 0
+  };
+}
+
+function addMetricSample(bucket, sample) {
+  bucket.count += 1;
+  bucket.leadMinutes += sample.leadMinutes;
+  bucket.transitMinutes += sample.transitMinutes;
+  bucket.speedKmh += sample.speedKmh;
+}
+
+function averageMetricBucket(bucket) {
+  if (!bucket || bucket.count <= 0) {
+    return null;
+  }
+  return {
+    count: bucket.count,
+    leadMinutes: bucket.leadMinutes / bucket.count,
+    transitMinutes: bucket.transitMinutes / bucket.count,
+    speedKmh: bucket.speedKmh / bucket.count
+  };
+}
+
+function blendWithFallback(observed, fallbackValue) {
+  if (!Number.isFinite(observed) || observed <= 0) {
+    return fallbackValue;
+  }
+  const effectiveSamples = Math.min(1, (observed.count || 0) / 20);
+  return fallbackValue * (1 - effectiveSamples) + observed.value * effectiveSamples;
+}
+
+function buildEtaModel(historyRows) {
+  const overall = createMetricBucket();
+  const byPriority = {};
+  const byDayPart = {};
+  const byPriorityDayPart = {};
+
+  for (const row of historyRows) {
+    const leadMinutes = minutesBetween(row.created_at, row.pickup_verified_at);
+    const transitMinutes = minutesBetween(
+      row.pickup_verified_at,
+      row.dropoff_verified_at
+    );
+    const distanceKm = getDistanceKm(row);
+
+    if (!leadMinutes || !transitMinutes || !distanceKm || distanceKm <= 0.2) {
+      continue;
+    }
+
+    const speedKmh = distanceKm / (transitMinutes / 60);
+    if (!Number.isFinite(speedKmh) || speedKmh <= 4 || speedKmh > 120) {
+      continue;
+    }
+
+    const priorityKey = getPriorityKey(row.priority);
+    const dayPart = getDayPart(row.created_at);
+    const compositeKey = `${priorityKey}:${dayPart}`;
+    const sample = { leadMinutes, transitMinutes, speedKmh };
+
+    if (!byPriority[priorityKey]) {
+      byPriority[priorityKey] = createMetricBucket();
+    }
+    if (!byDayPart[dayPart]) {
+      byDayPart[dayPart] = createMetricBucket();
+    }
+    if (!byPriorityDayPart[compositeKey]) {
+      byPriorityDayPart[compositeKey] = createMetricBucket();
+    }
+
+    addMetricSample(overall, sample);
+    addMetricSample(byPriority[priorityKey], sample);
+    addMetricSample(byDayPart[dayPart], sample);
+    addMetricSample(byPriorityDayPart[compositeKey], sample);
+  }
+
+  const normalizedPriority = Object.fromEntries(
+    Object.entries(byPriority).map(([key, bucket]) => [key, averageMetricBucket(bucket)])
+  );
+  const normalizedDayPart = Object.fromEntries(
+    Object.entries(byDayPart).map(([key, bucket]) => [key, averageMetricBucket(bucket)])
+  );
+  const normalizedPriorityDayPart = Object.fromEntries(
+    Object.entries(byPriorityDayPart).map(([key, bucket]) => [key, averageMetricBucket(bucket)])
+  );
+
+  return {
+    overall: averageMetricBucket(overall),
+    byPriority: normalizedPriority,
+    byDayPart: normalizedDayPart,
+    byPriorityDayPart: normalizedPriorityDayPart
+  };
+}
+
+async function getEtaModel(supabase) {
+  const now = Date.now();
+  if (etaModelCache.model && now - etaModelCache.fetchedAt < ETA_CACHE_TTL_MS) {
+    return etaModelCache.model;
+  }
+
+  const since = new Date(now - ETA_HISTORY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("parcels")
+    .select(
+      "priority,created_at,pickup_verified_at,dropoff_verified_at,origin_point,destination_point"
+    )
+    .gte("dropoff_verified_at", since)
+    .not("pickup_verified_at", "is", null)
+    .not("dropoff_verified_at", "is", null)
+    .order("dropoff_verified_at", { ascending: false })
+    .limit(ETA_HISTORY_LIMIT);
+
+  if (error) {
+    throw new ApiError(error.message, 500, "ETA_HISTORY_FETCH_FAILED");
+  }
+
+  const model = buildEtaModel(data || []);
+  etaModelCache = {
+    fetchedAt: now,
+    model
+  };
+  return model;
+}
+
+function selectMetricSegment(model, priorityKey, dayPart) {
+  const compositeKey = `${priorityKey}:${dayPart}`;
+  return (
+    model.byPriorityDayPart[compositeKey] ||
+    model.byPriority[priorityKey] ||
+    model.byDayPart[dayPart] ||
+    model.overall ||
+    null
+  );
+}
+
+function resolveEtaMetrics(model, priorityKey, dayPart) {
+  const fallback = ETA_DEFAULTS[priorityKey] || ETA_DEFAULTS.overall;
+  const selected = selectMetricSegment(model, priorityKey, dayPart);
+
+  const leadMinutes = blendWithFallback(
+    selected ? { value: selected.leadMinutes, count: selected.count } : null,
+    fallback.leadMinutes
+  );
+  const transitMinutes = blendWithFallback(
+    selected ? { value: selected.transitMinutes, count: selected.count } : null,
+    fallback.transitMinutes
+  );
+  const speedKmh = blendWithFallback(
+    selected ? { value: selected.speedKmh, count: selected.count } : null,
+    fallback.speedKmh
+  );
+
+  return {
+    leadMinutes,
+    transitMinutes,
+    speedKmh,
+    sampleCount: selected?.count || 0
+  };
+}
+
+function etaConfidenceLabel({ sampleCount, hasDistance, status }) {
+  const normalizedStatus = (status || "").toString().toUpperCase();
+  if (normalizedStatus === "COMPLETED") {
+    return "HIGH";
+  }
+  if (hasDistance && sampleCount >= 20) {
+    return "HIGH";
+  }
+  if (hasDistance && sampleCount >= 8) {
+    return "MEDIUM";
+  }
+  return "LOW";
+}
+
+function estimateEta(parcel, model, now = new Date()) {
+  const status = (parcel.status || "").toString().toUpperCase();
+  const priorityKey = getPriorityKey(parcel.priority);
+  const dayPart = getDayPart(parcel.created_at || now.toISOString());
+  const trafficFactor = DAYPART_TRAFFIC_FACTOR[dayPart] || 1.0;
+  const completedAt = parseDate(parcel.dropoff_verified_at);
+  const metrics = resolveEtaMetrics(model, priorityKey, dayPart);
+  const parsedDistanceKm = getDistanceKm(parcel);
+  const distanceKm = parsedDistanceKm || 3;
+  const hasDistance = Number.isFinite(parsedDistanceKm) && parsedDistanceKm > 0;
+
+  if (status === "COMPLETED" || completedAt) {
+    return {
+      etaMinutes: 0,
+      etaAt: (completedAt || now).toISOString(),
+      etaConfidence: etaConfidenceLabel({
+        sampleCount: metrics.sampleCount,
+        hasDistance,
+        status
+      })
+    };
+  }
+
+  const rawTransitByDistance = (distanceKm / Math.max(8, metrics.speedKmh)) * 60;
+  const transitMinutes = Math.max(
+    10,
+    rawTransitByDistance * trafficFactor + 8
+  );
+
+  const rawLeadMinutes = Math.max(
+    15,
+    metrics.leadMinutes * trafficFactor
+  );
+
+  const elapsedMinutes = status === "IN_TRANSIT"
+    ? elapsedMinutesSince(parcel.pickup_verified_at, now)
+    : status === "ASSIGNED" || status === "PINS_SET" || status === "ACCEPTED"
+      ? elapsedMinutesSince(parcel.assigned_at || parcel.created_at, now)
+      : elapsedMinutesSince(parcel.created_at, now);
+
+  const baselineByStatus = {
+    IN_TRANSIT: transitMinutes,
+    ASSIGNED: rawLeadMinutes * 0.45 + transitMinutes,
+    PINS_SET: rawLeadMinutes * 0.45 + transitMinutes,
+    ACCEPTED: rawLeadMinutes * 0.45 + transitMinutes,
+    REQUESTED: rawLeadMinutes + transitMinutes
+  };
+
+  const baseMinutes = baselineByStatus[status] || baselineByStatus.REQUESTED;
+
+  const remainingMinutes = Math.max(
+    ETA_MIN_MINUTES,
+    Math.round(baseMinutes - elapsedMinutes)
+  );
+  return {
+    etaMinutes: remainingMinutes,
+    etaAt: new Date(now.getTime() + remainingMinutes * 60000).toISOString(),
+    etaConfidence: etaConfidenceLabel({
+      sampleCount: metrics.sampleCount,
+      hasDistance,
+      status
+    })
+  };
 }
 
 router.post(
@@ -134,6 +471,73 @@ router.post(
     }
 
     return res.status(201).json({ id: data?.[0]?.id });
+  })
+);
+
+router.get(
+  "/created/me",
+  requireRole("client"),
+  asyncHandler(async (req, res) => {
+    const supabase = getSupabase();
+    const etaModel = await getEtaModel(supabase);
+    const { data, error } = await supabase
+      .from("parcels")
+      .select(
+        "id,status,origin,destination,priority,fragile,created_at,assigned_at,pickup_verified_at,dropoff_verified_at,origin_point,destination_point"
+      )
+      .eq("created_by", req.user?.uid || "")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new ApiError(error.message, 500, "PARCEL_FETCH_FAILED");
+    }
+
+    const now = new Date();
+    const parcels = (data || []).map((parcel) => {
+      const eta = estimateEta(parcel, etaModel, now);
+      return { ...parcel, ...eta };
+    });
+
+    const stats = parcels.reduce(
+      (acc, parcel) => {
+        const status = (parcel.status || "").toString().toUpperCase();
+        acc.total += 1;
+        if (status === "COMPLETED") {
+          acc.completed += 1;
+        } else if (status === "IN_TRANSIT") {
+          acc.inTransit += 1;
+        } else if (status === "ASSIGNED" || status === "PINS_SET" || status === "ACCEPTED") {
+          acc.assigned += 1;
+        } else {
+          acc.pending += 1;
+        }
+        return acc;
+      },
+      {
+        total: 0,
+        pending: 0,
+        assigned: 0,
+        inTransit: 0,
+        completed: 0
+      }
+    );
+
+    const activeParcels = parcels.filter(
+      (parcel) => (parcel.status || "").toString().toUpperCase() !== "COMPLETED"
+    );
+    activeParcels.sort((a, b) => (a.etaMinutes || 0) - (b.etaMinutes || 0));
+    const nextEta = activeParcels.length > 0 ? activeParcels[0] : null;
+
+    return res.json({
+      stats: {
+        ...stats,
+        nextEtaMinutes: nextEta?.etaMinutes ?? null,
+        nextEtaAt: nextEta?.etaAt ?? null,
+        nextEtaParcelId: nextEta?.id ?? null,
+        nextEtaConfidence: nextEta?.etaConfidence ?? null
+      },
+      parcels
+    });
   })
 );
 

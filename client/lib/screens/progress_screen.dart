@@ -7,6 +7,7 @@ import "dart:io";
 
 import "package:image_picker/image_picker.dart";
 import "package:mobile_scanner/mobile_scanner.dart";
+import "package:shared_preferences/shared_preferences.dart";
 
 import "../auth/auth_state.dart";
 
@@ -34,6 +35,95 @@ class _ProgressScreenState extends State<ProgressScreen> {
   bool _dropoffUsed = false;
   Timer? _lockoutTimer;
   int? _lockoutSeconds;
+
+  static const String _prefParcelId = "progress_parcelId";
+  static const String _prefPin = "progress_pin";
+  static const String _prefLat = "progress_lat";
+  static const String _prefLng = "progress_lng";
+  static const String _prefPhotoPath = "progress_photoPath";
+  static const String _prefPickupPin = "progress_pickupPin";
+  static const String _prefDropoffPin = "progress_dropoffPin";
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreFormState();
+    _handleLostData();
+  }
+
+  Future<void> _handleLostData() async {
+    final ImagePicker picker = ImagePicker();
+    final LostDataResponse response = await picker.retrieveLostData();
+    
+    if (response.isEmpty) return;
+    
+    if (response.file != null) {
+      setState(() {
+        _photoPath = response.file!.path;
+      });
+      await _saveFormState();
+    }
+  }
+
+  Future<void> _restoreFormState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      String? savedPhotoPath = prefs.getString(_prefPhotoPath);
+      
+      // Verify photo file actually exists
+      if (savedPhotoPath != null && !File(savedPhotoPath).existsSync()) {
+        savedPhotoPath = null;
+        await prefs.remove(_prefPhotoPath);
+      }
+      
+      setState(() {
+        _parcelIdController.text = prefs.getString(_prefParcelId) ?? "";
+        _pinController.text = prefs.getString(_prefPin) ?? "";
+        _latController.text = prefs.getString(_prefLat) ?? "";
+        _lngController.text = prefs.getString(_prefLng) ?? "";
+        _photoPath = savedPhotoPath;
+        _pickupPin = prefs.getString(_prefPickupPin);
+        _dropoffPin = prefs.getString(_prefDropoffPin);
+      });
+    } catch (e) {
+      // Ignore errors during restoration
+    }
+  }
+
+  Future<void> _saveFormState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await Future.wait([
+        prefs.setString(_prefParcelId, _parcelIdController.text),
+        prefs.setString(_prefPin, _pinController.text),
+        prefs.setString(_prefLat, _latController.text),
+        prefs.setString(_prefLng, _lngController.text),
+        if (_photoPath != null) prefs.setString(_prefPhotoPath, _photoPath!) else prefs.remove(_prefPhotoPath),
+        if (_pickupPin != null) prefs.setString(_prefPickupPin, _pickupPin!) else prefs.remove(_prefPickupPin),
+        if (_dropoffPin != null) prefs.setString(_prefDropoffPin, _dropoffPin!) else prefs.remove(_prefDropoffPin),
+      ]);
+    } catch (e) {
+      // Ignore errors during save
+    }
+  }
+
+  Future<void> _clearFormState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await Future.wait([
+        prefs.remove(_prefParcelId),
+        prefs.remove(_prefPin),
+        prefs.remove(_prefLat),
+        prefs.remove(_prefLng),
+        prefs.remove(_prefPhotoPath),
+        prefs.remove(_prefPickupPin),
+        prefs.remove(_prefDropoffPin),
+      ]);
+    } catch (e) {
+      // Ignore errors during clear
+    }
+  }
 
   @override
   void dispose() {
@@ -94,6 +184,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         _pickupUsed = false;
         _dropoffUsed = false;
       });
+      await _saveFormState();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -144,6 +235,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         _dropoffPin = null;
         _dropoffUsed = true;
       });
+      await _clearFormState();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Dropoff verified.")),
       );
@@ -159,12 +251,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Future<void> _capturePhoto() async {
+    await _saveFormState();
     final picker = ImagePicker();
     final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
     if (photo == null) {
       return;
     }
+    if (!mounted) return;
     setState(() => _photoPath = photo.path);
+    await _saveFormState();
   }
 
   Future<double?> _getAccuracy() async {

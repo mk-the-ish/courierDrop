@@ -135,6 +135,26 @@ router.post(
   })
 );
 
+router.get(
+  "/me",
+  asyncHandler(async (req, res) => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("corridors")
+      .select(
+        "id,start_location,end_location,window_start,window_end,allow_multiple_parcels,created_at"
+      )
+      .eq("created_by", req.user?.uid || "")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new ApiError(error.message, 500, "CORRIDOR_FETCH_FAILED");
+    }
+
+    return res.json({ corridors: data || [] });
+  })
+);
+
 router.post(
   "/:id/line",
   asyncHandler(async (req, res) => {

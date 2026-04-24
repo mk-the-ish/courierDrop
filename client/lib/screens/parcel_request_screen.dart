@@ -3,10 +3,13 @@ import "dart:convert";
 
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
+import "package:google_maps_flutter/google_maps_flutter.dart";
 import "package:uuid/uuid.dart";
+import "package:permission_handler/permission_handler.dart";
 
 import "../auth/auth_state.dart";
 import "../utils/offline_queue.dart";
+import "map_selection_screen.dart";
 
 class _PlaceSuggestion {
   const _PlaceSuggestion({
@@ -112,6 +115,46 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
         _isSearchingOrigin = false;
       });
     });
+  }
+
+  Future<void> _pickPointsFromMap() async {
+    // Before navigating to MapSelectionScreen
+    if (await Permission.location.request().isGranted) {
+      // Navigate to map
+      final result = await Navigator.of(context).push<Map<String, dynamic>>(
+        MaterialPageRoute(
+          builder: (_) => MapSelectionScreen(authState: widget.authState),
+        ),
+      );
+      if (!mounted || result == null) {
+        return;
+      }
+      final origin = result["origin"];
+      final destination = result["destination"];
+      if (origin is! LatLng || destination is! LatLng) {
+        return;
+      }
+
+      final originSuggestion = _PlaceSuggestion(
+        displayName: "Map pin (${origin.latitude.toStringAsFixed(4)}, ${origin.longitude.toStringAsFixed(4)})",
+        latitude: origin.latitude,
+        longitude: origin.longitude,
+      );
+      final destinationSuggestion = _PlaceSuggestion(
+        displayName: "Map pin (${destination.latitude.toStringAsFixed(4)}, ${destination.longitude.toStringAsFixed(4)})",
+        latitude: destination.latitude,
+        longitude: destination.longitude,
+      );
+
+      setState(() {
+        _selectedOrigin = originSuggestion;
+        _selectedDestination = destinationSuggestion;
+        _originController.text = originSuggestion.displayName;
+        _destinationController.text = destinationSuggestion.displayName;
+        _originSuggestions = [];
+        _destinationSuggestions = [];
+      });
+    }
   }
 
   void _onDestinationChanged(String value) {
@@ -226,6 +269,12 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
                   ),
                 ),
               const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: isBusy ? null : _pickPointsFromMap,
+                icon: const Icon(Icons.map),
+                label: const Text("Pick Origin & Destination On Map"),
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _originController,
                 decoration: const InputDecoration(
@@ -239,7 +288,7 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
                     value == null || value.trim().isEmpty
                         ? "Required"
                         : _selectedOrigin == null
-                            ? "Select a suggested location"
+                            ? "Select a suggested location or use map picker"
                             : null,
               ),
               if (_isSearchingOrigin)
@@ -280,7 +329,7 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
                     value == null || value.trim().isEmpty
                         ? "Required"
                         : _selectedDestination == null
-                            ? "Select a suggested location"
+                            ? "Select a suggested location or use map picker"
                             : null,
               ),
               if (_isSearchingDestination)

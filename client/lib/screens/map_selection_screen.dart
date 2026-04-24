@@ -1,4 +1,3 @@
-import "dart:math" as math;
 import "package:flutter/material.dart";
 import "package:google_maps_flutter/google_maps_flutter.dart";
 import "../auth/auth_state.dart";
@@ -18,6 +17,7 @@ class MapSelectionScreen extends StatefulWidget {
 }
 
 class _MapSelectionScreenState extends State<MapSelectionScreen> {
+  final GlobalKey _mapKey = GlobalKey();
   LatLng? _originPoint;
   LatLng? _destinationPoint;
   bool _selectingOrigin = true;
@@ -25,15 +25,15 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
 
   @override
   void dispose() {
+    // Simply dispose the active controller
     _mapController?.dispose();
     super.dispose();
   }
 
   void _onMapCreated(GoogleMapController controller) {
-    // Use setState to ensure the UI knows the controller is ready
-    setState(() {
-      _mapController = controller;
-    });
+    // Dispose any previous instance before replacing the controller.
+    _mapController?.dispose();
+    _mapController = controller;
   }
 
   void _confirmSelection() {
@@ -69,6 +69,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
         children: [
           Expanded(
             child: GoogleMap(
+              key: _mapKey,
               initialCameraPosition: const CameraPosition(
                 target: LatLng(-17.8252, 31.0335), // Harare Coordinates
                 zoom: 12,

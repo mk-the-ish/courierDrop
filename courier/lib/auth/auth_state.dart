@@ -74,12 +74,13 @@ class AuthState extends ChangeNotifier implements ValueListenable<Object?> {
     }
   }
 
-  Future<void> restoreSession() async {
+  Future<bool> restoreSession() async {
     _isBusy = true;
     notifyListeners();
     try {
-      await _authService.restoreSession();
+      final restored = await _authService.restoreSession();
       _scheduleRefresh();
+      return restored;
     } finally {
       _isBusy = false;
       notifyListeners();
