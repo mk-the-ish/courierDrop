@@ -143,7 +143,7 @@ router.post(
     const { data: parcel, error } = await supabase
       .from("parcels")
       .select(
-        "id,pickup_pin_hash,pickup_point,pickup_verified_at,status,created_by,assigned_courier_id,pickup_pin_attempts,pin_locked_until"
+        "id,pickup_pin_hash,pickup_lat,pickup_lng,pickup_verified_at,status,created_by,assigned_courier_id,pickup_pin_attempts,pin_locked_until"
       )
       .eq("id", parcelId)
       .maybeSingle();
@@ -195,10 +195,10 @@ router.post(
       throw new ApiError("Invalid PIN", 401, "HANDSHAKE_INVALID_PIN");
     }
 
-    const pickupPoint = parseWktPoint(parcel.pickup_point);
-    if (!pickupPoint) {
+    if (typeof parcel.pickup_lat !== "number" || typeof parcel.pickup_lng !== "number") {
       throw new ApiError("Pickup location missing", 409, "HANDSHAKE_LOCATION_MISSING");
     }
+    const pickupPoint = { lat: parcel.pickup_lat, lng: parcel.pickup_lng };
     const distance = haversineMeters(pickupPoint, { lat, lng });
     if (distance > GPS_GATE_METERS) {
       await insertEvent(supabase, {

@@ -182,10 +182,32 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      final photoUrl = await widget.authState.apiClient.uploadHandshakePhoto(
-        _photoPath!,
-        parcelId: parcelId,
-      );
+      // Retry upload with exponential backoff
+      String? photoUrl;
+      int retries = 0;
+      const maxRetries = 3;
+      
+      while (retries < maxRetries && photoUrl == null) {
+        try {
+          photoUrl = await widget.authState.apiClient.uploadHandshakePhoto(
+            _photoPath!,
+            parcelId: parcelId,
+          );
+          break;
+        } catch (uploadError) {
+          retries++;
+          if (retries >= maxRetries) {
+            rethrow;
+          }
+          // Exponential backoff: 1s, 2s, 4s
+          await Future.delayed(Duration(seconds: 1 << (retries - 1)));
+        }
+      }
+      
+      if (photoUrl == null) {
+        throw Exception("Failed to upload photo after $maxRetries attempts");
+      }
+      
       await widget.authState.apiClient.pickupHandshake(
         parcelId: parcelId,
         pin: pin,
@@ -245,6 +267,18 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
     } catch (_) {
       // ignore
     }
+    
+    // Handle specific connection errors
+    if (raw.contains("connection reset")) {
+      return "Connection lost. Please check your internet and try again.";
+    }
+    if (raw.contains("SocketException") || raw.contains("ClientException")) {
+      return "Network error. Please check your connection and try again.";
+    }
+    if (raw.contains("TimeoutException")) {
+      return "Request timed out. Please try again.";
+    }
+    
     return "Pickup error: $raw";
   }
 
