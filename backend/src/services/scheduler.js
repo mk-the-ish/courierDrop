@@ -2,6 +2,8 @@ const cron = require("node-cron");
 const { runHeartbeatWatchdog } = require("../jobs/heartbeat_watchdog");
 const { checkAlerts } = require("../jobs/check_alerts");
 const { matchPendingParcels } = require("./matching");
+const { validateTrackingHealth } = require("../jobs/tracking_validation");
+const { cleanupTrackingData } = require("../jobs/cleanup_tracking_data");
 
 class JobScheduler {
   constructor() {
@@ -248,6 +250,26 @@ function initializeDefaultJobs() {
     matchPendingParcels,
     {
       description: "Matches pending parcels with available corridors"
+    }
+  );
+
+  // Tracking validation: runs every 2 minutes
+  scheduler.registerJob(
+    "validate_tracking",
+    "*/2 * * * *", // Every 2 minutes
+    validateTrackingHealth,
+    {
+      description: "Validates courier tracking and detects route deviations"
+    }
+  );
+
+  // Tracking retention cleanup: runs daily at 02:00
+  scheduler.registerJob(
+    "cleanup_tracking_data",
+    "0 2 * * *",
+    cleanupTrackingData,
+    {
+      description: "Cleans up old tracking logs and deviation events per privacy policy"
     }
   );
 }

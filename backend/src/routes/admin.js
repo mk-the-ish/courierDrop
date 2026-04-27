@@ -4,6 +4,7 @@ const ApiError = require("../utils/api_error");
 const asyncHandler = require("../utils/async_handler");
 const { requireRole } = require("../middleware/auth");
 const { getFirebaseAuth } = require("../firebase");
+const { getScheduler } = require("../services/scheduler");
 
 const router = express.Router();
 
@@ -64,6 +65,55 @@ router.post(
     }
     await firebaseAuth.setCustomUserClaims(uid, {});
     return res.json({ status: "ok", uid });
+  })
+);
+
+router.get(
+  "/tracking/observability",
+  requireRole("admin"),
+  asyncHandler(async (_req, res) => {
+    const supabase = getSupabase();
+    const now = new Date();
+    const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000).toISOString();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+    const [inTransitRes, staleRes, alertsRes, trackingRes] = await Promise.all([
+      supabase.from("parcels").select("id", { count: "exact", head: true }).eq("status", "IN_TRANSIT"),
+      supabase
+        .from("parcels")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "IN_TRANSIT")
+        .or(`tracking_last_update.is.null,tracking_last_update.lt.${tenMinutesAgo}`),
+      supabase
+        .from("route_deviation_events")
+        .select("id,deviation_type,created_at")
+        .gte("created_at", twentyFourHoursAgo),
+      supabase
+        .from("courier_tracking_logs")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", twentyFourHoursAgo)
+    ]);
+
+    const aggregateAlerts = {};
+    for (const alert of alertsRes.data || []) {
+      const key = alert.deviation_type || "UNKNOWN";
+      aggregateAlerts[key] = (aggregateAlerts[key] || 0) + 1;
+    }
+
+    const scheduler = getScheduler();
+    const trackingJob = scheduler.getJobStatus("validate_tracking");
+    const cleanupJob = scheduler.getJobStatus("cleanup_tracking_data");
+
+    return res.json({
+      inTransitCount: inTransitRes.count || 0,
+      stalledTrackingCount: staleRes.count || 0,
+      trackingLogsLast24h: trackingRes.count || 0,
+      deviationEventsLast24h: aggregateAlerts,
+      scheduler: {
+        validateTracking: trackingJob,
+        cleanupTrackingData: cleanupJob
+      }
+    });
   })
 );
 

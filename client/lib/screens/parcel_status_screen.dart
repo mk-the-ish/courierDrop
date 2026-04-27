@@ -84,30 +84,52 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      final parcel = await widget.authState.apiClient.getParcelStatus(parcelId);
-      final checkpoints =
-          await widget.authState.apiClient.getCheckpoints(parcelId);
-      try {
-        final events =
-            await widget.authState.apiClient.getHandshakeEvents(parcelId);
-        _mergeEvents(events);
-        if (mounted) {
-          setState(() => _historyUnavailable = false);
-        }
-      } catch (_) {
-        if (mounted) {
-          setState(() => _historyUnavailable = true);
+      // Retry on network failure
+      int retries = 0;
+      const maxRetries = 3;
+      
+      while (retries < maxRetries) {
+        try {
+          final parcel = await widget.authState.apiClient.getParcelStatus(parcelId);
+          final checkpoints =
+              await widget.authState.apiClient.getCheckpoints(parcelId);
+          try {
+            final events =
+                await widget.authState.apiClient.getHandshakeEvents(parcelId);
+            _mergeEvents(events);
+            if (mounted) {
+              setState(() => _historyUnavailable = false);
+            }
+          } catch (_) {
+            if (mounted) {
+              setState(() => _historyUnavailable = true);
+            }
+          }
+          if (!mounted) return;
+          setState(() {
+            _parcel = parcel;
+            _checkpoints = checkpoints;
+          });
+          return; // Success, exit retry loop
+        } catch (error) {
+          retries++;
+          final errorStr = error.toString();
+          // Retry on network errors
+          if ((errorStr.contains("SocketException") || errorStr.contains("host lookup") || errorStr.contains("Connection refused")) && retries < maxRetries) {
+            await Future.delayed(Duration(seconds: 1 << (retries - 1)));
+          } else {
+            rethrow;
+          }
         }
       }
-      if (!mounted) return;
-      setState(() {
-        _parcel = parcel;
-        _checkpoints = checkpoints;
-      });
     } catch (error) {
       if (!mounted) return;
+      String message = "Status error: $error";
+      if (error.toString().contains("host lookup")) {
+        message = "Network error: Cannot reach backend. Check your connection.";
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Status error: $error")),
+        SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -197,7 +219,8 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
     }
     await _subscribeToTopic(parcelId);
     _channel?.sink.close();
-    final uri = Uri.parse("ws://localhost:8080/ws?parcelId=$parcelId");
+    // Use wss:// for production backend URL
+    final uri = Uri.parse("wss://dropcity-backend.onrender.com/ws?parcelId=$parcelId");
     _channel = IOWebSocketChannel.connect(
       uri,
       headers: {"Authorization": "Bearer $token"},
@@ -230,6 +253,19 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
           if (mounted) {
             setState(() {
               _mergeEvents([payload]);
+            });
+          }
+        }
+        if (decoded["type"] == "tracking_update") {
+          final payload = (decoded["payload"] as Map).cast<String, dynamic>();
+          if (mounted) {
+            setState(() {
+              _parcel = {
+                ...?_parcel,
+                "tracking_progress_percent": payload["progress_percent"],
+                "tracking_integrity_status": payload["integrity_status"],
+                "tracking_last_update": payload["tracking_last_update"],
+              };
             });
           }
         }
@@ -292,6 +328,52 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
       default:
         return status;
     }
+  }
+
+  String _trackingIntegrityLabel(String? status) {
+    final value = (status ?? "").toUpperCase();
+    switch (value) {
+      case "ON_CORRIDOR":
+        return "On planned route";
+      case "MOVING_POSITIVELY":
+        return "Off-route but progressing";
+      case "OFF_CORRIDOR_STATIONARY":
+        return "Potential route deviation";
+      case "NOMINAL":
+        return "Tracking nominal";
+      default:
+        return "Tracking pending";
+    }
+  }
+
+  Color _trackingIntegrityColor(String? status) {
+    final value = (status ?? "").toUpperCase();
+    switch (value) {
+      case "ON_CORRIDOR":
+      case "NOMINAL":
+        return Colors.green;
+      case "MOVING_POSITIVELY":
+        return Colors.orange;
+      case "OFF_CORRIDOR_STATIONARY":
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _trackingFreshnessLabel(String? isoTime) {
+    final time = isoTime == null ? null : DateTime.tryParse(isoTime);
+    if (time == null) {
+      return "No recent tracking pulse";
+    }
+    final diff = DateTime.now().difference(time.toLocal());
+    if (diff.inMinutes < 2) {
+      return "Updated just now";
+    }
+    if (diff.inMinutes < 10) {
+      return "Updated ${diff.inMinutes}m ago";
+    }
+    return "Last update ${_formatWhen(time.toIso8601String())}";
   }
 
   String _eventLabel(Map<String, dynamic> event) {
@@ -357,6 +439,12 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
   @override
   Widget build(BuildContext context) {
     final status = _parcel?["status"]?.toString() ?? "-";
+    final trackingProgressRaw = _parcel?["tracking_progress_percent"];
+    final trackingProgress = trackingProgressRaw is num
+        ? trackingProgressRaw.toDouble().clamp(0, 100)
+        : null;
+    final trackingIntegrity = _parcel?["tracking_integrity_status"]?.toString();
+    final trackingLastUpdate = _parcel?["tracking_last_update"]?.toString();
     return Scaffold(
       appBar: AppBar(title: const Text("Parcel Status")),
       body: ListView(
@@ -488,6 +576,61 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
             child: ListTile(
               title: Text(_statusLabel(status)),
               subtitle: Text("Status: $status"),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Delivery Tracking",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (trackingProgress != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: trackingProgress / 100,
+                        minHeight: 8,
+                      ),
+                    ),
+                  if (trackingProgress != null) const SizedBox(height: 8),
+                  Text(
+                    trackingProgress == null
+                        ? "Progress: not available yet"
+                        : "Progress: ${trackingProgress.toStringAsFixed(0)}%",
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.shield,
+                        color: _trackingIntegrityColor(trackingIntegrity),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _trackingIntegrityLabel(trackingIntegrity),
+                          style: TextStyle(
+                            color: _trackingIntegrityColor(trackingIntegrity),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _trackingFreshnessLabel(trackingLastUpdate),
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
             ),
           ),
           if (_parcel != null) ...[

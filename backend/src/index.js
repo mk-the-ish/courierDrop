@@ -17,6 +17,7 @@ const errorLogRoutes = require("./routes/error_logs");
 const handshakeRoutes = require("./routes/handshake");
 const adminRoutes = require("./routes/admin");
 const deviceRoutes = require("./routes/devices");
+const trackingRoutes = require("./routes/tracking");
 const { initWebSocket } = require("./ws");
 const { initializeDefaultJobs, getScheduler } = require("./services/scheduler");
 
@@ -72,6 +73,7 @@ app.use("/heartbeat", requireUser, heartbeatRoutes);
 app.use("/logs", requireUser, errorLogRoutes);
 app.use("/admin", requireUser, adminRoutes);
 app.use("/devices", requireUser, deviceRoutes);
+app.use("/tracking", requireUser, trackingRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({

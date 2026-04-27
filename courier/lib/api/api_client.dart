@@ -418,6 +418,57 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> postTrackingUpdate({
+    required String parcelId,
+    required double lat,
+    required double lng,
+    double? accuracy,
+  }) async {
+    final uri = Uri.parse("$baseUrl/tracking/update");
+    final payload = {
+      "parcelId": parcelId,
+      "lat": lat,
+      "lng": lng,
+      "accuracy": accuracy,
+    };
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Tracking update failed: ${response.body}");
+    }
+    return (jsonDecode(response.body) as Map).cast<String, dynamic>();
+  }
+
+  Future<Map<String, dynamic>> batchSyncTracking({
+    required List<Map<String, dynamic>> updates,
+  }) async {
+    final uri = Uri.parse("$baseUrl/tracking/batch-sync");
+    final payload = {"updates": updates};
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Tracking batch sync failed: ${response.body}");
+    }
+    return (jsonDecode(response.body) as Map).cast<String, dynamic>();
+  }
+
+  Future<List<Map<String, dynamic>>> getMyTrackingAlerts() async {
+    final uri = Uri.parse("$baseUrl/tracking/alerts/me");
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Tracking alerts fetch failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = decoded["alerts"] as List<dynamic>? ?? [];
+    return items.map((e) => (e as Map).cast<String, dynamic>()).toList();
+  }
+
   Future<Map<String, dynamic>> getParcel(String parcelId) async {
     final uri = Uri.parse("$baseUrl/parcels/$parcelId");
     final response = await _client.get(uri, headers: _headers());

@@ -41,6 +41,17 @@ function broadcastHandshakeEvent(parcelId, payload) {
   }
 }
 
+function broadcastTrackingUpdate(parcelId, payload) {
+  const set = subscribers.get(parcelId);
+  if (!set) return;
+  const message = JSON.stringify({ type: "tracking_update", payload });
+  for (const ws of set) {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(message);
+    }
+  }
+}
+
 function hasRole(user, role) {
   const userRole = user?.role || user?.roles || user?.claims?.role || user?.claims?.roles;
   if (!userRole) return false;
@@ -115,5 +126,6 @@ function initWebSocket(server) {
 module.exports = {
   initWebSocket,
   broadcastParcelStatus,
-  broadcastHandshakeEvent
+  broadcastHandshakeEvent,
+  broadcastTrackingUpdate
 };

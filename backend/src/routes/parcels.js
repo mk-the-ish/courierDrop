@@ -553,7 +553,7 @@ router.get(
     const { data, error } = await supabase
       .from("parcels")
       .select(
-        "id,status,pickup_verified_at,dropoff_verified_at,created_at,pickup_photo_url,dropoff_photo_url,assigned_courier_id,assigned_at,created_by,pickup_point"
+        "id,status,pickup_verified_at,dropoff_verified_at,created_at,pickup_photo_url,dropoff_photo_url,assigned_courier_id,assigned_at,created_by,pickup_point,tracking_progress_percent,tracking_integrity_status,tracking_last_update"
       )
       .eq("id", parcelId)
       .maybeSingle();

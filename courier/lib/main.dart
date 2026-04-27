@@ -11,6 +11,7 @@ import "auth/auth_service.dart";
 import "auth/auth_state.dart";
 import "screens/home_screen.dart";
 import "screens/login_screen.dart";
+import "services/courier_tracking_service.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
 
@@ -75,10 +76,14 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
   String? _registeredPushToken;
   StreamSubscription<String>? _tokenRefreshSub;
   Timer? _restoreHintTimer;
+  late final CourierTrackingService _trackingService;
 
   @override
   void initState() {
     super.initState();
+    _trackingService = CourierTrackingService(
+      apiClient: widget.authState.apiClient,
+    );
     widget.authState.addListener(_onAuthChanged);
     widget.offlineQueue.start();
     _restoreHintTimer = Timer(const Duration(seconds: 2), () {
@@ -149,6 +154,15 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
 
   void _onAuthChanged() {
     _tryRegisterPushToken();
+    _syncTrackingService();
+  }
+
+  Future<void> _syncTrackingService() async {
+    if (widget.authState.isAuthenticated) {
+      await _trackingService.start(widget.authState);
+      return;
+    }
+    await _trackingService.stop();
   }
 
   Future<void> _tryRegisterPushToken() async {
@@ -175,6 +189,7 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
     widget.authState.removeListener(_onAuthChanged);
     _tokenRefreshSub?.cancel();
     _restoreHintTimer?.cancel();
+    _trackingService.dispose();
     super.dispose();
   }
 

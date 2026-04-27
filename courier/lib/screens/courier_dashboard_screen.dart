@@ -1,6 +1,9 @@
 import "package:flutter/material.dart";
+import "package:shared_preferences/shared_preferences.dart";
 
 import "../auth/auth_state.dart";
+import "../services/courier_tracking_service.dart";
+import "../services/tracking_outbox.dart";
 import "assigned_parcels_screen.dart";
 import "pickup_mode_screen.dart";
 import "route_declaration_screen.dart";
@@ -22,6 +25,12 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   List<Map<String, dynamic>> _pending = const [];
   List<Map<String, dynamic>> _corridors = const [];
   Map<String, dynamic>? _vehicle;
+  int _trackingQueueCount = 0;
+  int _trackingDeadLetterCount = 0;
+  String? _trackingLastSyncAt;
+  String? _trackingLastError;
+  bool _trackingRunning = false;
+  List<Map<String, dynamic>> _deviationAlerts = const [];
 
   @override
   void initState() {
@@ -42,6 +51,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
       final assigned = await assignedFuture;
       final pending = await pendingFuture;
       final corridors = await corridorsFuture;
+      final alerts = await widget.authState.apiClient.getMyTrackingAlerts();
 
       Map<String, dynamic>? vehicle;
       try {
@@ -58,7 +68,9 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
         _pending = pending;
         _corridors = corridors;
         _vehicle = vehicle;
+        _deviationAlerts = alerts;
       });
+      await _loadTrackingHealth();
     } catch (error) {
       if (!mounted) {
         return;
@@ -68,6 +80,31 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _loadTrackingHealth() async {
+    try {
+      final outbox = TrackingOutbox();
+      final count = await outbox.count();
+      final deadLetterCount = await outbox.deadLetterCount();
+      await outbox.close();
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _trackingQueueCount = count;
+        _trackingDeadLetterCount = deadLetterCount;
+        _trackingLastSyncAt =
+            prefs.getString(CourierTrackingService.prefLastSyncAt);
+        _trackingLastError =
+            prefs.getString(CourierTrackingService.prefLastError);
+        _trackingRunning =
+            prefs.getBool(CourierTrackingService.prefIsRunning) ?? false;
+      });
+    } catch (_) {
+      // Keep dashboard usable even if health read fails.
     }
   }
 
@@ -119,6 +156,35 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
     final h = date.hour.toString().padLeft(2, "0");
     final m = date.minute.toString().padLeft(2, "0");
     return "${date.year}-${date.month.toString().padLeft(2, "0")}-${date.day.toString().padLeft(2, "0")} $h:$m";
+  }
+
+  String _formatTrackingFreshness(String? isoValue) {
+    if (isoValue == null || isoValue.isEmpty) {
+      return "No successful sync yet";
+    }
+    final parsed = DateTime.tryParse(isoValue)?.toLocal();
+    if (parsed == null) {
+      return "No successful sync yet";
+    }
+    final diff = DateTime.now().difference(parsed);
+    if (diff.inSeconds < 60) {
+      return "Synced just now";
+    }
+    if (diff.inMinutes < 60) {
+      return "Synced ${diff.inMinutes}m ago";
+    }
+    return "Synced ${diff.inHours}h ago";
+  }
+
+  String _deviationLabel(String value) {
+    switch (value) {
+      case "OFF_CORRIDOR_PROLONGED":
+        return "Off corridor for too long";
+      case "NO_RECENT_TRACKING":
+        return "No recent tracking pulse";
+      default:
+        return value;
+    }
   }
 
   @override
@@ -246,6 +312,51 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                   title: const Text("Transit Workload"),
                   subtitle: Text(
                     "In transit: $inTransit • Pending approvals: ${_pending.length}",
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: ListTile(
+                  leading: Icon(
+                    _trackingLastError == null ? Icons.health_and_safety : Icons.warning,
+                    color: _trackingLastError == null ? Colors.teal : Colors.orange,
+                  ),
+                  title: const Text("Tracking Health"),
+                  subtitle: Text(
+                    _trackingLastError == null
+                        ? "Service: ${_trackingRunning ? "running" : "paused"} • ${_formatTrackingFreshness(_trackingLastSyncAt)}\nOutbox queue: $_trackingQueueCount • Dead letter: $_trackingDeadLetterCount"
+                        : "Sync issue detected. Outbox queue: $_trackingQueueCount • Dead letter: $_trackingDeadLetterCount\nLast error: $_trackingLastError",
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Route Deviation Alerts (${_deviationAlerts.length})",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_deviationAlerts.isEmpty)
+                        const Text("No recent route deviations."),
+                      ..._deviationAlerts.take(3).map((alert) {
+                        final type = alert["deviation_type"]?.toString() ?? "-";
+                        final parcelId = alert["parcel_id"]?.toString() ?? "-";
+                        final duration = alert["duration_seconds"]?.toString() ?? "0";
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            "• Parcel $parcelId: ${_deviationLabel(type)} (${duration}s)",
+                            style: const TextStyle(color: Colors.orange),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
                 ),
               ),

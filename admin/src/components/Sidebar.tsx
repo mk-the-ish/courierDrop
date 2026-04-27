@@ -2,8 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Home, AlertCircle, Settings, BarChart3, Clock, Truck, LucideIcon } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Home, AlertCircle, Settings, BarChart3, Clock, Truck, LogOut, LucideIcon } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
 
 interface Tab {
   id: string;
@@ -14,6 +15,9 @@ interface Tab {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOutUser, user } = useAuth();
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   const tabs: Tab[] = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/' },
@@ -29,8 +33,19 @@ export default function Sidebar() {
     return pathname.startsWith(href);
   };
 
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOutUser();
+      router.push('/login');
+    } catch (error) {
+      console.error('Sign out failed:', error);
+      setIsSigningOut(false);
+    }
+  };
+
   return (
-    <aside className="w-64 bg-safe-slate text-cloud-white h-screen fixed left-0 top-0 shadow-xl">
+    <aside className="w-64 bg-safe-slate text-cloud-white h-screen fixed left-0 top-0 shadow-xl flex flex-col">
       <div className="p-6 border-b border-gray-600">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <div className="w-8 h-8 bg-transit-teal rounded-lg flex items-center justify-center">
@@ -40,7 +55,7 @@ export default function Sidebar() {
         </h1>
       </div>
 
-      <nav className="mt-6">
+      <nav className="mt-6 flex-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const active = isActive(tab.href);
@@ -59,7 +74,22 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-600">
+      <div className="border-t border-gray-600 p-6 space-y-4">
+        <div className="text-sm text-gray-300">
+          <p className="font-semibold text-cloud-white mb-2">Account</p>
+          <p className="text-xs text-gray-400 mb-3">{user?.email || 'Admin'}</p>
+          <button
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            <LogOut size={16} />
+            <span className="text-sm font-medium">{isSigningOut ? 'Signing out...' : 'Sign Out'}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="px-6 py-4 border-t border-gray-600">
         <div className="text-sm text-gray-300">
           <p className="font-semibold text-cloud-white mb-1">Status</p>
           <div className="flex items-center gap-2">
