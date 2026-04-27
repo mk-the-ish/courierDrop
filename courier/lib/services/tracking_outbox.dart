@@ -102,6 +102,7 @@ class TrackingOutbox {
       "next_attempt_at": DateTime.now().toUtc().toIso8601String(),
       "created_at": DateTime.now().toUtc().toIso8601String(),
     });
+    print("[TrackingOutbox.enqueue] QUEUED: parcelId=$parcelId, lat=$lat, lng=$lng");
     await _trimToLimit(db);
   }
 
@@ -115,6 +116,7 @@ class TrackingOutbox {
       orderBy: "id ASC",
       limit: limit,
     );
+    print("[TrackingOutbox.fetchBatch] FETCHED: ${rows.length} rows (limit=$limit)");
     return rows
         .map((row) => row.map((key, value) => MapEntry(key, value)))
         .toList();
@@ -122,18 +124,23 @@ class TrackingOutbox {
 
   Future<void> deleteByIds(List<int> ids) async {
     if (ids.isEmpty) {
+      print("[TrackingOutbox.deleteByIds] SKIP: empty list");
       return;
     }
     final db = await _database();
     final placeholders = List.filled(ids.length, "?").join(",");
     await db.delete(table, where: "id IN ($placeholders)", whereArgs: ids);
+    print("[TrackingOutbox.deleteByIds] DELETED: ${ids.length} rows");
   }
 
   Future<void> scheduleRetry(List<int> ids, {required String error}) async {
     if (ids.isEmpty) {
+      print("[TrackingOutbox.scheduleRetry] SKIP: empty list");
       return;
     }
+    print("[TrackingOutbox.scheduleRetry] START: ${ids.length} rows, error=$error");
     final db = await _database();
+    int updatedCount = 0;
     for (final id in ids) {
       final rows = await db.query(
         table,
@@ -162,7 +169,9 @@ class TrackingOutbox {
         where: "id = ?",
         whereArgs: [id],
       );
+      updatedCount++;
     }
+    print("[TrackingOutbox.scheduleRetry] COMPLETE: $updatedCount scheduled for retry");
   }
 
   int _delayForRetry(int retryCount) {
@@ -173,8 +182,10 @@ class TrackingOutbox {
 
   Future<void> moveToDeadLetter(List<int> ids, {required String reason}) async {
     if (ids.isEmpty) {
+      print("[TrackingOutbox.moveToDeadLetter] SKIP: empty list");
       return;
     }
+    print("[TrackingOutbox.moveToDeadLetter] START: ${ids.length} rows, reason=$reason");
     final db = await _database();
     final placeholders = List.filled(ids.length, "?").join(",");
     final rows = await db.query(
@@ -197,6 +208,7 @@ class TrackingOutbox {
         });
       }
       await batch.commit(noResult: true);
+      print("[TrackingOutbox.moveToDeadLetter] MOVED: ${rows.length} rows to dead letter");
     }
     await deleteByIds(ids);
   }
@@ -204,13 +216,18 @@ class TrackingOutbox {
   Future<void> removeOlderThan(Duration age) async {
     final db = await _database();
     final cutoff = DateTime.now().toUtc().subtract(age).toIso8601String();
-    await db.delete(table, where: "timestamp < ?", whereArgs: [cutoff]);
+    final count = await db.rawDelete("DELETE FROM $table WHERE timestamp < ?", [cutoff]);
+    if (count > 0) {
+      print("[TrackingOutbox.removeOlderThan] REMOVED: $count rows older than ${age.inHours}h");
+    }
   }
 
   Future<int> count() async {
     final db = await _database();
     final result = await db.rawQuery("SELECT COUNT(*) AS c FROM $table");
-    return (result.first["c"] as int?) ?? 0;
+    final c = (result.first["c"] as int?) ?? 0;
+    print("[TrackingOutbox.count] Total=$c rows in queue");
+    return c;
   }
 
   Future<int> deadLetterCount() async {
@@ -218,7 +235,9 @@ class TrackingOutbox {
     final result = await db.rawQuery(
       "SELECT COUNT(*) AS c FROM $deadLetterTable",
     );
-    return (result.first["c"] as int?) ?? 0;
+    final c = (result.first["c"] as int?) ?? 0;
+    print("[TrackingOutbox.deadLetterCount] Total=$c rows in dead letter");
+    return c;
   }
 
   Future<void> _trimToLimit(Database db) async {
@@ -228,6 +247,7 @@ class TrackingOutbox {
       return;
     }
     final toDelete = count - maxRows;
+    print("[TrackingOutbox._trimToLimit] TRIMMING: removing $toDelete rows (count=$count, limit=$maxRows)");
     await db.execute("""
       DELETE FROM $table
       WHERE id IN (
@@ -239,6 +259,7 @@ class TrackingOutbox {
   }
 
   Future<void> close() async {
+    print("[TrackingOutbox.close] Closing database");
     await _db?.close();
     _db = null;
   }

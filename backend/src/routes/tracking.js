@@ -29,7 +29,10 @@ router.post(
     const { parcelId, lat, lng, accuracy } = req.body || {};
     const courierId = req.user?.uid;
 
+    console.log(`[Tracking.update] START: courierId=${courierId}, parcelId=${parcelId}, lat=${lat}, lng=${lng}, accuracy=${accuracy}`);
+
     if (typeof lat !== "number" || typeof lng !== "number" || !parcelId) {
+      console.warn(`[Tracking.update] INVALID_INPUT: lat type=${typeof lat}, lng type=${typeof lng}, parcelId=${parcelId}`);
       throw new ApiError(
         "parcelId, lat, lng required",
         400,
@@ -49,14 +52,18 @@ router.post(
       .maybeSingle();
 
     if (parcelError) {
+      console.error(`[Tracking.update] PARCEL_FETCH_ERROR: parcelId=${parcelId}, error=${parcelError.message}`);
       throw new ApiError(parcelError.message, 500, "TRACKING_PARCEL_FAILED");
     }
     if (!parcel) {
+      console.warn(`[Tracking.update] PARCEL_NOT_FOUND: parcelId=${parcelId}`);
       throw new ApiError("Parcel not found", 404, "TRACKING_PARCEL_NOT_FOUND");
     }
+    console.log(`[Tracking.update] Parcel found: status=${parcel.status}, assigned_to=${parcel.assigned_courier_id}, pickup_verified=${!!parcel.pickup_verified_at}`);
 
     // Verify courier is assigned
     if (parcel.assigned_courier_id !== courierId) {
+      console.warn(`[Tracking.update] NOT_ASSIGNED: parcel assigned to=${parcel.assigned_courier_id}, requester=${courierId}`);
       throw new ApiError(
         "Not assigned to this parcel",
         403,
@@ -66,8 +73,10 @@ router.post(
 
     // Only track if pickup is verified and delivery not yet complete
     if (!parcel.pickup_verified_at || parcel.status === "COMPLETED") {
+      console.log(`[Tracking.update] IGNORED: parcelId=${parcelId}, reason=pickup_verified:${!!parcel.pickup_verified_at}, status=${parcel.status}`);
       return res.json({ status: "ignored", reason: "parcel_not_in_transit" });
     }
+    console.log(`[Tracking.update] PROCESSING: parcelId=${parcelId}`);
 
     const courierLocation = `POINT(${lng} ${lat})`;
 
@@ -205,7 +214,9 @@ router.post(
       .eq("id", parcelId);
 
     if (updateError) {
-      console.warn(`[Tracking] Error updating progress for parcel ${parcelId}`);
+      console.error(`[Tracking.update] PARCELS_UPDATE_ERROR: parcelId=${parcelId}, progress=${progressPercentage}%, status=${integrityStatus}, error=${updateError.message}`);
+    } else {
+      console.log(`[Tracking.update] PARCELS_UPDATED: parcelId=${parcelId}, progress=${progressPercentage}%, status=${integrityStatus}, distance=${distanceToDestination}m, onCorridor=${isOnCorridor}`);
     }
     broadcastTrackingUpdate(parcelId, {
       parcelId,
@@ -215,6 +226,7 @@ router.post(
       on_corridor: isOnCorridor
     });
 
+    console.log(`[Tracking.update] SUCCESS: parcelId=${parcelId}, response sent`);
     return res.json({
       status: "ok",
       progress_percent: progressPercentage,
@@ -265,7 +277,10 @@ router.post(
     const { updates } = req.body || {};
     const courierId = req.user?.uid;
 
+    console.log(`[Tracking.batch-sync] START: courierId=${courierId}, batchSize=${Array.isArray(updates) ? updates.length : 0}`);
+
     if (!Array.isArray(updates) || updates.length === 0) {
+      console.warn(`[Tracking.batch-sync] INVALID_BATCH: updates type=${typeof updates}, isArray=${Array.isArray(updates)}`);
       throw new ApiError("updates array required", 400, "TRACKING_INVALID_BATCH");
     }
 
@@ -275,10 +290,11 @@ router.post(
 
     for (const update of updates) {
       const { parcelId, lat, lng, accuracy, timestamp } = update;
-
+      console.log(`[Tracking.batch-sync] Processing: parcelId=${parcelId}, lat=${lat}, lng=${lng}, age=${Date.now() - new Date(timestamp).getTime()}ms`);
       try {
         // Use same validation as single update endpoint
         if (typeof lat !== "number" || typeof lng !== "number" || !parcelId) {
+          console.warn(`[Tracking.batch-sync] SKIPPED invalid_coordinates: parcelId=${parcelId}, lat type=${typeof lat}, lng type=${typeof lng}`);
           results.push({
             parcelId,
             status: "skipped",
@@ -290,6 +306,7 @@ router.post(
         // Check if update is too old (>24 hours)
         const updateAge = Date.now() - new Date(timestamp).getTime();
         if (updateAge > BATCH_SYNC_MAX_AGE_MS) {
+          console.warn(`[Tracking.batch-sync] SKIPPED too_old: parcelId=${parcelId}, age=${updateAge}ms`);
           results.push({
             parcelId,
             status: "skipped",
@@ -306,6 +323,7 @@ router.post(
           .maybeSingle();
 
         if (parcelError || !parcel || parcel.assigned_courier_id !== courierId) {
+          console.warn(`[Tracking.batch-sync] SKIPPED unauthorized: parcelId=${parcelId}`);
           results.push({
             parcelId,
             status: "skipped",
@@ -327,12 +345,14 @@ router.post(
           });
 
         if (logError) {
+          console.error(`[Tracking.batch-sync] LOG_ERROR: parcelId=${parcelId}, error=${logError.message}`);
           results.push({
             parcelId,
             status: "failed",
             reason: logError.message
           });
         } else {
+          console.log(`[Tracking.batch-sync] SYNCED: parcelId=${parcelId}`);
           results.push({
             parcelId,
             status: "synced"
@@ -340,6 +360,7 @@ router.post(
           successCount++;
         }
       } catch (err) {
+        console.error(`[Tracking.batch-sync] EXCEPTION: parcelId=${parcelId}, error=${err.message}`);
         results.push({
           parcelId,
           status: "error",
@@ -348,6 +369,7 @@ router.post(
       }
     }
 
+    console.log(`[Tracking.batch-sync] COMPLETE: total=${updates.length}, synced=${successCount}`);
     return res.json({
       status: "ok",
       total: updates.length,

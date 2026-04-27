@@ -117,15 +117,17 @@ class CourierTrackingService {
       _activeParcelIds
         ..clear()
         ..addAll(nextIds);
+      debugPrint("[Tracking.refreshActiveParcels] Updated active parcels: ${nextIds.length} parcels (${nextIds.toList()})");
       if (nextIds.isNotEmpty) {
         await flush();
       }
     } catch (error) {
-      debugPrint("[Tracking] Failed to refresh active parcels: $error");
+      debugPrint("[Tracking.refreshActiveParcels] Failed to refresh active parcels: $error");
     }
   }
 
   void _startPositionStream() {
+    debugPrint("[Tracking.startPositionStream] Starting position stream");
     _positionSub?.cancel();
     final locationSettings = Platform.isAndroid
         ? AndroidSettings(
@@ -149,7 +151,10 @@ class CourierTrackingService {
       if (!_isRunning || _activeParcelIds.isEmpty) {
         return;
       }
+      debugPrint("[Tracking.positionStream] Location update: lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m");
       final timestamp = DateTime.now().toUtc().toIso8601String();
+      int sentCount = 0;
+      int queuedCount = 0;
       for (final parcelId in _activeParcelIds) {
         final sent = await _sendLiveUpdate(
           parcelId: parcelId,
@@ -165,8 +170,12 @@ class CourierTrackingService {
             accuracy: position.accuracy,
             timestampIso: timestamp,
           );
+          queuedCount++;
+        } else {
+          sentCount++;
         }
       }
+      debugPrint("[Tracking.positionStream] Processed location: sent=$sentCount, queued=$queuedCount, activeCount=${_activeParcelIds.length}");
       await flush();
     });
   }
@@ -182,8 +191,10 @@ class CourierTrackingService {
       final hasNetwork =
           connectivity.any((item) => item != ConnectivityResult.none);
       if (!hasNetwork) {
+        debugPrint("[Tracking.sendLiveUpdate] NO_NETWORK: parcelId=$parcelId");
         return false;
       }
+      debugPrint("[Tracking.sendLiveUpdate] SENDING: parcelId=$parcelId, lat=$lat, lng=$lng");
       await _apiClient
           .postTrackingUpdate(
             parcelId: parcelId,
@@ -192,17 +203,21 @@ class CourierTrackingService {
             accuracy: accuracy,
           )
           .timeout(const Duration(seconds: 5));
+      debugPrint("[Tracking.sendLiveUpdate] SUCCESS: parcelId=$parcelId");
       return true;
-    } catch (_) {
+    } catch (error) {
+      debugPrint("[Tracking.sendLiveUpdate] ERROR: parcelId=$parcelId, error=$error");
       return false;
     }
   }
 
   Future<void> flush() async {
     if (_isFlushing) {
+      debugPrint("[Tracking.flush] Already flushing, skipping");
       return;
     }
     _isFlushing = true;
+    debugPrint("[Tracking.flush] START");
     await _setHealth(lastAttemptAtIso: DateTime.now().toUtc().toIso8601String());
     try {
       await _outbox.removeOlderThan(_maxOutboxAge);
@@ -210,14 +225,20 @@ class CourierTrackingService {
       final hasNetwork =
           connectivity.any((item) => item != ConnectivityResult.none);
       if (!hasNetwork) {
+        debugPrint("[Tracking.flush] NO_NETWORK, aborting");
         return;
       }
 
+      debugPrint("[Tracking.flush] NETWORK_OK, processing queue");
+      int batchesProcessed = 0;
+      int totalRowsProcessed = 0;
       while (true) {
         final batch = await _outbox.fetchBatch(limit: _batchSize);
         if (batch.isEmpty) {
+          debugPrint("[Tracking.flush] Queue empty, ending flush");
           break;
         }
+        debugPrint("[Tracking.flush] Processing batch ${batchesProcessed + 1}: ${batch.length} rows");
         final payload = batch.map((row) {
           return {
             "parcelId": row["parcel_id"],
@@ -237,6 +258,7 @@ class CourierTrackingService {
         final idsToRetry = <int>[];
         final idsToDeadLetter = <int>[];
         var retryReason = "sync_failed";
+        int deletedCount = 0, retryCount = 0, deadLetterCount = 0;
         for (var i = 0; i < batch.length; i++) {
           final row = batch[i];
           final id = row["id"] as int?;
@@ -246,7 +268,7 @@ class CourierTrackingService {
           final result = i < results.length ? results[i] : const <String, dynamic>{};
           final status = result["status"]?.toString().toLowerCase() ?? "";
           final reason = result["reason"]?.toString().toLowerCase() ?? "";
-          final retryCount = (row["retry_count"] as int?) ?? 0;
+          final retries = (row["retry_count"] as int?) ?? 0;
 
           final shouldDrop = status == "synced" ||
               status == "skipped" ||
@@ -255,10 +277,13 @@ class CourierTrackingService {
               reason == "invalid_coordinates";
           if (shouldDrop) {
             idsToDelete.add(id);
-          } else if (retryCount >= _maxRetryAttempts) {
+            deletedCount++;
+          } else if (retries >= _maxRetryAttempts) {
             idsToDeadLetter.add(id);
+            deadLetterCount++;
           } else {
             idsToRetry.add(id);
+            retryCount++;
             if (reason.isNotEmpty) {
               retryReason = reason;
             }
@@ -272,16 +297,22 @@ class CourierTrackingService {
           reason: "max_retries_exceeded",
         );
 
+        debugPrint("[Tracking.flush] Batch result: deleted=$deletedCount, retry=$retryCount, deadLetter=$deadLetterCount");
+        totalRowsProcessed += batch.length;
+        batchesProcessed++;
+
         if (batch.length < _batchSize) {
+          debugPrint("[Tracking.flush] Final batch processed, ending flush");
           break;
         }
       }
+      debugPrint("[Tracking.flush] COMPLETE: ${batchesProcessed} batches, $totalRowsProcessed rows");
       await _setHealth(
         lastSyncAtIso: DateTime.now().toUtc().toIso8601String(),
         clearError: true,
       );
     } catch (error) {
-      debugPrint("[Tracking] Flush failed: $error");
+      debugPrint("[Tracking.flush] FAILED: $error");
       await _setHealth(lastError: error.toString());
     } finally {
       _isFlushing = false;
