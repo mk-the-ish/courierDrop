@@ -70,7 +70,7 @@ async function matchPendingParcels() {
           {
             p_origin: parcel.origin_point,
             p_destination: parcel.destination_point,
-            p_max_detour_m: 50000 // 50km default
+            p_max_detour_m: 500 // 500m default
           }
         );
 

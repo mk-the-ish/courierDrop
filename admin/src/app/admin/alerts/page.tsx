@@ -30,7 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/page-header';
 import { useToast } from '@/hooks/use-toast';
 
-const baseUrl = 'http://localhost:8080';
+const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://dropcity-backend.onrender.com';
 
 type AlertRule = {
   id: string;

@@ -716,11 +716,14 @@ router.post(
       throw new ApiError("No corridors found for this courier", 403, "NO_CORRIDORS");
     }
 
+    // Get the BEST queue entry (lowest rank = best match) for this parcel in our corridors
     const { data: queueEntry, error: queueError } = await supabase
       .from("parcel_assignment_queue")
-      .select("corridor_id,status")
+      .select("corridor_id,status,rank")
       .eq("parcel_id", parcelId)
       .in("corridor_id", corridorIds)
+      .order("rank", { ascending: true })
+      .limit(1)
       .maybeSingle();
 
     if (queueError) {

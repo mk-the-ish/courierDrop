@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import StatCard from '@/components/StatCard';
 import { PageHeader } from '@/components/page-header';
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://dropcity-backend.onrender.com';
 
 type Vehicle = {
   id: string;

@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 import Sidebar from './Sidebar.tsx';
 import ProtectedRoute from './protected-route';
 
@@ -9,11 +10,21 @@ const publicPages = ['/login', '/forgot-password', '/reset-password'];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { loading } = useAuth();
   const isPublicPage = publicPages.includes(pathname);
 
   // For auth pages, render without sidebar
   if (isPublicPage) {
     return <>{children}</>;
+  }
+
+  // Show minimal loading state for protected pages during auth check
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500"></div>
+      </div>
+    );
   }
 
   // For protected pages, wrap with ProtectedRoute and show sidebar

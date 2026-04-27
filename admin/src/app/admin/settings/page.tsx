@@ -27,8 +27,8 @@ export default function SettingsPage() {
             <Label htmlFor="api-url">API Base URL</Label>
             <Input
               id="api-url"
-              placeholder="http://localhost:8080"
-              defaultValue="http://localhost:8080"
+              placeholder="https://dropcity-backend.onrender.com"
+              defaultValue="https://dropcity-backend.onrender.com"
             />
           </div>
 

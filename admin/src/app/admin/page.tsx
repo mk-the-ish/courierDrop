@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import StatCard from '@/components/StatCard';
 import { PageHeader } from '@/components/page-header';
 
-const baseUrl = 'http://localhost:8080';
+const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://dropcity-backend.onrender.com';
 
 type HealthStatus = {
   status?: 'ok' | 'error' | string;
