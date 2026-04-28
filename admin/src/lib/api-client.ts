@@ -44,7 +44,7 @@ class ApiClient {
 
   // Health & System
   async getHealth() {
-    return this.request('/health');
+    return this.request('/');
   }
 
   async getHeartbeats() {
@@ -55,14 +55,9 @@ class ApiClient {
     return this.request('/health/status');
   }
 
-  // Auth
-  async getAuthStatus() {
-    return this.request('/auth/status');
-  }
-
   // Admin routes
   async getJobs() {
-    return this.request('/admin/jobs');
+    return this.request('/health/jobs');
   }
 
   async getCouriers() {
@@ -70,12 +65,7 @@ class ApiClient {
   }
 
   async getAlerts() {
-    return this.request('/admin/alerts');
-  }
-
-  // Job matching
-  async getMatchingStatus(jobId: string) {
-    return this.request(`/matching/status/${jobId}`);
+    return this.request('/admin/alerts/rules');
   }
 }
 

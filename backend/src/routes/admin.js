@@ -565,4 +565,32 @@ router.delete(
   })
 );
 
+// Couriers endpoint - list all couriers with their status
+router.get(
+  "/couriers",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const supabase = getSupabase();
+    const { limit = 100, offset = 0 } = req.query || {};
+
+    const { data, error, count } = await supabase
+      .from("users")
+      .select("id,email,display_name,phone_number,role,created_at,updated_at", { count: "exact" })
+      .eq("role", "COURIER")
+      .order("created_at", { ascending: false })
+      .range(Number(offset), Number(offset) + Number(limit) - 1);
+
+    if (error) {
+      throw new ApiError(error.message, 500, "COURIER_FETCH_FAILED");
+    }
+
+    return res.json({
+      total: count || 0,
+      limit: Number(limit),
+      offset: Number(offset),
+      couriers: data || []
+    });
+  })
+);
+
 module.exports = router;

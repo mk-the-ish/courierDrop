@@ -2,9 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { Home, AlertCircle, Settings, BarChart3, Clock, Truck, LogOut, LucideIcon } from 'lucide-react';
-import { useAuth } from '@/lib/auth-context';
+import { usePathname } from 'next/navigation';
+import { Home, AlertCircle, Settings, BarChart3, Clock, Truck, LucideIcon } from 'lucide-react';
 
 interface Tab {
   id: string;
@@ -15,9 +14,6 @@ interface Tab {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { signOutUser, user } = useAuth();
-  const [isSigningOut, setIsSigningOut] = React.useState(false);
 
   const tabs: Tab[] = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/' },
@@ -31,17 +27,6 @@ export default function Sidebar() {
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
-  };
-
-  const handleSignOut = async () => {
-    setIsSigningOut(true);
-    try {
-      await signOutUser();
-      router.push('/login');
-    } catch (error) {
-      console.error('Sign out failed:', error);
-      setIsSigningOut(false);
-    }
   };
 
   return (
@@ -73,21 +58,6 @@ export default function Sidebar() {
           );
         })}
       </nav>
-
-      <div className="border-t border-gray-600 p-6 space-y-4">
-        <div className="text-sm text-gray-300">
-          <p className="font-semibold text-cloud-white mb-2">Account</p>
-          <p className="text-xs text-gray-400 mb-3">{user?.email || 'Admin'}</p>
-          <button
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            <LogOut size={16} />
-            <span className="text-sm font-medium">{isSigningOut ? 'Signing out...' : 'Sign Out'}</span>
-          </button>
-        </div>
-      </div>
 
       <div className="px-6 py-4 border-t border-gray-600">
         <div className="text-sm text-gray-300">
