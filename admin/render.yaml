@@ -4,7 +4,8 @@ services:
     env: node
     repo: YOUR_GITHUB_REPO_URL
     branch: main
-    buildCommand: npm run build
+    rootDir: admin
+    buildCommand: npm install && npm run build
     startCommand: npm start
     
     envVars:
