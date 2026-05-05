@@ -5,8 +5,46 @@ const asyncHandler = require("../utils/async_handler");
 const { requireRole } = require("../middleware/auth");
 const { getFirebaseAuth } = require("../firebase");
 const { getScheduler } = require("../services/scheduler");
+const { matchPendingParcels } = require("../services/matching");
 
 const router = express.Router();
+
+router.get(
+  "/health/heartbeats",
+  requireRole("admin"),
+  asyncHandler(async (_req, res) => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("job_heartbeats")
+      .select("job_name,last_heartbeat_at,expected_frequency_sec,status")
+      .order("job_name", { ascending: true });
+    if (error) {
+      throw new ApiError(error.message, 500, "HEARTBEAT_FETCH_FAILED");
+    }
+    return res.json({ heartbeats: data || [] });
+  })
+);
+
+router.get(
+  "/jobs/active",
+  requireRole("admin"),
+  asyncHandler(async (_req, res) => {
+    const scheduler = getScheduler();
+    return res.json({
+      schedulerRunning: scheduler.isRunning(),
+      jobs: scheduler.getAllJobsStatus()
+    });
+  })
+);
+
+router.post(
+  "/jobs/trigger-match-corridors",
+  requireRole("admin"),
+  asyncHandler(async (_req, res) => {
+    await matchPendingParcels();
+    return res.json({ status: "ok", triggered: "match_corridors" });
+  })
+);
 
 router.post(
   "/handshake/cleanup",
@@ -65,6 +103,98 @@ router.post(
     }
     await firebaseAuth.setCustomUserClaims(uid, {});
     return res.json({ status: "ok", uid });
+  })
+);
+
+router.get(
+  "/vehicles/pending",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    req.query.status = "unverified";
+    const supabase = getSupabase();
+    const { limit = 50, offset = 0 } = req.query || {};
+    const { data, error, count } = await supabase
+      .from("vehicles")
+      .select(
+        `
+        id,courier_id,vehicle_type,make,model,year,color,license_plate,max_capacity_kg,current_utilization_kg,is_active,verification_status,created_at,updated_at,
+        users:courier_id(id,email,display_name,phone_number,role)
+        `,
+        { count: "exact" }
+      )
+      .eq("verification_status", "unverified")
+      .order("created_at", { ascending: false })
+      .range(Number(offset), Number(offset) + Number(limit) - 1);
+    if (error) {
+      throw new ApiError(error.message, 500, "VEHICLE_FETCH_FAILED");
+    }
+    return res.json({ total: count || 0, vehicles: data || [] });
+  })
+);
+
+router.post(
+  "/vehicles/:id/verify",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { approved, verified } = req.body || {};
+    const isApproved = typeof approved === "boolean" ? approved : Boolean(verified);
+    const supabase = getSupabase();
+    const status = isApproved ? "verified" : "rejected";
+    const { data, error } = await supabase
+      .from("vehicles")
+      .update({
+        verification_status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) {
+      throw new ApiError(error.message, 500, "VEHICLE_VERIFY_FAILED");
+    }
+    return res.json({ status: "ok", vehicle: data });
+  })
+);
+
+router.get(
+  "/settings",
+  requireRole("admin"),
+  asyncHandler(async (_req, res) => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("system_settings")
+      .select("key,value,updated_at,updated_by")
+      .order("key", { ascending: true });
+    if (error) {
+      throw new ApiError(error.message, 500, "SETTINGS_FETCH_FAILED");
+    }
+    return res.json({ settings: data || [] });
+  })
+);
+
+router.post(
+  "/settings",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const updates = req.body?.settings;
+    if (!Array.isArray(updates)) {
+      throw new ApiError("settings array required", 400, "SETTINGS_INVALID_INPUT");
+    }
+    const supabase = getSupabase();
+    const payload = updates.map((item) => ({
+      key: item.key,
+      value: item.value,
+      updated_by: req.user?.uid || null,
+      updated_at: new Date().toISOString()
+    }));
+    const { error } = await supabase
+      .from("system_settings")
+      .upsert(payload, { onConflict: "key" });
+    if (error) {
+      throw new ApiError(error.message, 500, "SETTINGS_UPDATE_FAILED");
+    }
+    return res.json({ status: "ok" });
   })
 );
 

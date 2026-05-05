@@ -31,6 +31,9 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   String? _trackingLastError;
   bool _trackingRunning = false;
   List<Map<String, dynamic>> _deviationAlerts = const [];
+  String _serviceState = "OFFLINE";
+  String? _activeRouteId;
+  String? _selectedRouteId;
 
   @override
   void initState() {
@@ -52,6 +55,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
       final pending = await pendingFuture;
       final corridors = await corridorsFuture;
       final alerts = await widget.authState.apiClient.getMyTrackingAlerts();
+      final serviceState = await widget.authState.apiClient.getCourierServiceState();
 
       Map<String, dynamic>? vehicle;
       try {
@@ -69,6 +73,9 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
         _corridors = corridors;
         _vehicle = vehicle;
         _deviationAlerts = alerts;
+        _serviceState = serviceState["state"]?.toString() ?? "OFFLINE";
+        _activeRouteId = serviceState["current_route_id"]?.toString();
+        _selectedRouteId ??= _corridors.isNotEmpty ? _corridors.first["id"]?.toString() : null;
       });
       await _loadTrackingHealth();
     } catch (error) {
@@ -187,6 +194,49 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
     }
   }
 
+  Future<void> _toggleOnline(bool online) async {
+    try {
+      await widget.authState.apiClient.setCourierOnline(online);
+      await _loadDashboard();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Availability update failed: $error")),
+      );
+    }
+  }
+
+  Future<void> _startTravel() async {
+    final routeId = _selectedRouteId;
+    if (routeId == null || routeId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Select a route before starting travel")),
+      );
+      return;
+    }
+    try {
+      await widget.authState.apiClient.startCourierTravel(routeId);
+      await _loadDashboard();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Start route failed: $error")),
+      );
+    }
+  }
+
+  Future<void> _endTravel() async {
+    try {
+      await widget.authState.apiClient.endCourierTravel();
+      await _loadDashboard();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("End route failed: $error")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final inTransit = _countByStatus(_assigned, "IN_TRANSIT");
@@ -302,6 +352,86 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                       color: vehicleType == null ? Colors.orange : Colors.green,
                       fontWeight: FontWeight.bold,
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Service State",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text("Current state: $_serviceState"),
+                      if (_activeRouteId != null && _activeRouteId!.isNotEmpty)
+                        Text("Active route: $_activeRouteId"),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _serviceState == "ONLINE"
+                                  ? () => _toggleOnline(false)
+                                  : null,
+                              child: const Text("Go OFFLINE"),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _serviceState == "OFFLINE"
+                                  ? () => _toggleOnline(true)
+                                  : null,
+                              child: const Text("Go ONLINE"),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _selectedRouteId,
+                        decoration: const InputDecoration(
+                          labelText: "Selected route to travel",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _corridors
+                            .map(
+                              (route) => DropdownMenuItem<String>(
+                                value: route["id"]?.toString(),
+                                child: Text(
+                                  "${route["start_location"] ?? "-"} → ${route["end_location"] ?? "-"}",
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (_serviceState == "ONLINE" || _serviceState == "OFFLINE")
+                            ? (value) => setState(() => _selectedRouteId = value)
+                            : null,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _serviceState == "ONLINE" ? _startTravel : null,
+                              child: const Text("Start Route"),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _serviceState == "TRAVELLING" ? _endTravel : null,
+                              child: const Text("End Route"),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),

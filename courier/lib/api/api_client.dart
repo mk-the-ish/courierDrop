@@ -527,4 +527,48 @@ class ApiClient {
 
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
+
+  Future<Map<String, dynamic>> getCourierServiceState() async {
+    final uri = Uri.parse("$baseUrl/couriers/state");
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Courier state failed: ${response.body}");
+    }
+    return (jsonDecode(response.body) as Map).cast<String, dynamic>();
+  }
+
+  Future<Map<String, dynamic>> setCourierOnline(bool online) async {
+    final uri = Uri.parse("$baseUrl/couriers/set-online");
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({"online": online}),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Courier availability update failed: ${response.body}");
+    }
+    return (jsonDecode(response.body) as Map).cast<String, dynamic>();
+  }
+
+  Future<Map<String, dynamic>> startCourierTravel(String corridorId) async {
+    final uri = Uri.parse("$baseUrl/couriers/start-travel");
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({"corridorId": corridorId}),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Start travel failed: ${response.body}");
+    }
+    return (jsonDecode(response.body) as Map).cast<String, dynamic>();
+  }
+
+  Future<Map<String, dynamic>> endCourierTravel() async {
+    final uri = Uri.parse("$baseUrl/couriers/end-travel");
+    final response = await _client.post(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("End travel failed: ${response.body}");
+    }
+    return (jsonDecode(response.body) as Map).cast<String, dynamic>();
+  }
 }

@@ -68,7 +68,8 @@ class DropCityCourierApp extends StatefulWidget {
   State<DropCityCourierApp> createState() => _DropCityCourierAppState();
 }
 
-class _DropCityCourierAppState extends State<DropCityCourierApp> {
+class _DropCityCourierAppState extends State<DropCityCourierApp>
+    with WidgetsBindingObserver {
   bool _restoring = true;
   bool _showContinueOption = false;
   String? _restoreHint;
@@ -76,11 +77,14 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
   String? _registeredPushToken;
   StreamSubscription<String>? _tokenRefreshSub;
   Timer? _restoreHintTimer;
+  Timer? _trackingStateTimer;
   late final CourierTrackingService _trackingService;
+  bool _trackingExpected = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _trackingService = CourierTrackingService(
       apiClient: widget.authState.apiClient,
     );
@@ -94,6 +98,10 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
     });
     _restoreSession();
     _initPushNotifications();
+    _trackingStateTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _syncTrackingService(),
+    );
   }
 
   Future<void> _restoreSession() async {
@@ -158,11 +166,33 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
   }
 
   Future<void> _syncTrackingService() async {
-    if (widget.authState.isAuthenticated) {
-      await _trackingService.start(widget.authState);
+    if (!widget.authState.isAuthenticated) {
+      _trackingExpected = false;
+      await _trackingService.stop();
       return;
     }
-    await _trackingService.stop();
+    try {
+      final state = await widget.authState.apiClient.getCourierServiceState();
+      final shouldRun = (state["state"]?.toString() ?? "") == "TRAVELLING";
+      if (shouldRun == _trackingExpected) {
+        return;
+      }
+      _trackingExpected = shouldRun;
+      if (shouldRun) {
+        await _trackingService.start(widget.authState);
+      } else {
+        await _trackingService.stop();
+      }
+    } catch (_) {
+      // Keep app usable on intermittent state fetch failures.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncTrackingService();
+    }
   }
 
   Future<void> _tryRegisterPushToken() async {
@@ -186,9 +216,11 @@ class _DropCityCourierAppState extends State<DropCityCourierApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.authState.removeListener(_onAuthChanged);
     _tokenRefreshSub?.cancel();
     _restoreHintTimer?.cancel();
+    _trackingStateTimer?.cancel();
     _trackingService.dispose();
     super.dispose();
   }

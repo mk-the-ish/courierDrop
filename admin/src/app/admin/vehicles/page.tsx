@@ -57,9 +57,13 @@ export default function VehicleVerificationPage() {
   const fetchVehicles = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('admin_token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
+      const endpoint =
+        filter === "unverified"
+          ? `${baseUrl}/admin/vehicles/pending?limit=20&offset=${offset}`
+          : `${baseUrl}/admin/vehicles?status=${filter}&limit=20&offset=${offset}`;
       const response = await fetch(
-        `${baseUrl}/admin/vehicles?status=${filter}&limit=20&offset=${offset}`,
+        endpoint,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -81,7 +85,7 @@ export default function VehicleVerificationPage() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('admin_token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
       const statuses = ['unverified', 'verified', 'rejected'];
       const newStats = { total: 0, unverified: 0, verified: 0, rejected: 0 };
 
@@ -113,15 +117,15 @@ export default function VehicleVerificationPage() {
   const handleVerify = async (vehicleId: string, approved: boolean) => {
     try {
       setVerifying(vehicleId);
-      const token = localStorage.getItem('admin_token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('adminToken');
       const response = await fetch(`${baseUrl}/admin/vehicles/${vehicleId}/verify`, {
-        method: 'PATCH',
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          verified: approved,
+          approved,
           notes: '',
         }),
       });

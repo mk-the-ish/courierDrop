@@ -53,6 +53,7 @@ class CourierTrackingService {
     await _setHealth(isRunning: true);
     _isRunning = true;
     await _refreshActiveParcels();
+    await _sendImmediatePulseIfPossible();
     _startPositionStream();
     _refreshActiveParcelsTimer = Timer.periodic(
       _refreshActiveParcelsEvery,
@@ -62,6 +63,37 @@ class CourierTrackingService {
       flush();
     });
     await flush();
+  }
+
+  Future<void> _sendImmediatePulseIfPossible() async {
+    if (_activeParcelIds.isEmpty) {
+      return;
+    }
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      );
+      final timestamp = DateTime.now().toUtc().toIso8601String();
+      for (final parcelId in _activeParcelIds) {
+        final sent = await _sendLiveUpdate(
+          parcelId: parcelId,
+          lat: position.latitude,
+          lng: position.longitude,
+          accuracy: position.accuracy,
+        );
+        if (!sent) {
+          await _outbox.enqueue(
+            parcelId: parcelId,
+            lat: position.latitude,
+            lng: position.longitude,
+            accuracy: position.accuracy,
+            timestampIso: timestamp,
+          );
+        }
+      }
+    } catch (_) {
+      // Fall back to stream-based updates.
+    }
   }
 
   Future<bool> _ensureLocationPermission() async {

@@ -74,6 +74,22 @@ router.post(
     }
 
     const supabase = getSupabase();
+    const { data: courierProfile, error: courierError } = await supabase
+      .from("users")
+      .select("current_route_id")
+      .eq("id", req.user?.uid || "")
+      .maybeSingle();
+    if (courierError) {
+      throw new ApiError(courierError.message, 500, "HANDSHAKE_COURIER_LOOKUP_FAILED");
+    }
+    if (!courierProfile?.current_route_id) {
+      throw new ApiError(
+        "Route not started",
+        409,
+        "ERROR_ROUTE_NOT_STARTED"
+      );
+    }
+
     const { data: parcel, error } = await supabase
       .from("parcels")
       .select("id, created_by")
@@ -156,6 +172,19 @@ router.post(
     }
     if (parcel.assigned_courier_id && parcel.assigned_courier_id !== req.user?.uid) {
       throw new ApiError("Not assigned to this courier", 403, "HANDSHAKE_NOT_ASSIGNED");
+    }
+    const { data: assignedQueue } = await supabase
+      .from("parcel_assignment_queue")
+      .select("corridor_id,status")
+      .eq("parcel_id", parcelId)
+      .eq("status", "ASSIGNED")
+      .maybeSingle();
+    if (assignedQueue?.corridor_id && assignedQueue.corridor_id !== courierProfile.current_route_id) {
+      throw new ApiError(
+        "Active route does not match assigned corridor",
+        409,
+        "ERROR_ROUTE_NOT_STARTED"
+      );
     }
     if (!parcel.pickup_pin_hash) {
       throw new ApiError("Pickup PIN not initialized", 409, "HANDSHAKE_NOT_READY");

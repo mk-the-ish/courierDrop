@@ -260,6 +260,9 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
           }
           return "Outside GPS gate.";
         }
+        if (decoded["code"] == "ERROR_ROUTE_NOT_STARTED") {
+          return "Start a route first from the dashboard before verifying pickup.";
+        }
         if (decoded["error"] != null) {
           return decoded["error"].toString();
         }
