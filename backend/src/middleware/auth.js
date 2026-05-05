@@ -2,6 +2,37 @@ const { getFirebaseAuth } = require("../firebase");
 const { getSupabase } = require("../supabase");
 const config = require("../config");
 
+async function attachRoleFromUsersTable(req, uid) {
+  const supabase = getSupabase();
+  if (!supabase || !uid) return;
+  const { data: userData, error } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", uid)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`[Auth] Error loading role for ${uid}:`, error.message);
+    return;
+  }
+  if (userData?.role) {
+    req.user.role = userData.role;
+  }
+}
+
+async function verifySupabaseToken(token) {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user) return null;
+  return {
+    uid: data.user.id,
+    email: data.user.email,
+    provider: "supabase",
+    raw: data.user,
+  };
+}
+
 async function authMiddleware(req, res, next) {
   if (!config.requireAuth) {
     return next();
@@ -16,40 +47,35 @@ async function authMiddleware(req, res, next) {
     });
   }
 
-  const firebaseAuth = getFirebaseAuth();
-  if (!firebaseAuth) {
-    return res.status(500).json({
-      error: "Firebase admin not configured",
-      code: "AUTH_SERVER_MISCONFIGURED"
-    });
-  }
-
   try {
-    const decoded = await firebaseAuth.verifyIdToken(token);
-    req.user = decoded;
-    
-    // Enhance user object with role from Supabase users table
-    const supabase = getSupabase();
-    if (supabase && decoded.uid) {
-      const { data: userData, error: roleError } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", decoded.uid)
-        .maybeSingle();
-      
-      if (roleError) {
-        console.error(`[Auth] Error loading user role for ${decoded.uid}:`, roleError.message);
-      } else if (userData?.role) {
-        req.user.role = userData.role;
-        console.log(`[Auth] Loaded role for ${decoded.uid}: ${userData.role}`);
-      } else {
-        console.warn(`[Auth] No role found in DB for ${decoded.uid}. Data:`, userData);
+    const firebaseAuth = getFirebaseAuth();
+    if (firebaseAuth) {
+      try {
+        const decoded = await firebaseAuth.verifyIdToken(token);
+        req.user = decoded;
+        await attachRoleFromUsersTable(req, decoded.uid);
+        return next();
+      } catch (_) {
+        // Fall through to Supabase token verification.
       }
-    } else {
-      console.warn(`[Auth] Supabase not available or decoded.uid missing`);
     }
-    
-    return next();
+
+    const supabaseUser = await verifySupabaseToken(token);
+    if (supabaseUser) {
+      req.user = {
+        uid: supabaseUser.uid,
+        email: supabaseUser.email,
+        auth_provider: supabaseUser.provider,
+        claims: {},
+      };
+      await attachRoleFromUsersTable(req, supabaseUser.uid);
+      return next();
+    }
+
+    return res.status(401).json({
+      error: "Invalid token",
+      code: "AUTH_INVALID_TOKEN"
+    });
   } catch (error) {
     return res.status(401).json({
       error: "Invalid token",

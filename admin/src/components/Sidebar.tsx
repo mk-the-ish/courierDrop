@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, AlertCircle, Settings, BarChart3, Clock, Truck, LucideIcon } from 'lucide-react';
+import { useAdminAuth } from '@/lib/admin-auth';
 
 interface Tab {
   id: string;
@@ -14,18 +15,19 @@ interface Tab {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { signOut } = useAdminAuth();
 
   const tabs: Tab[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/' },
-    { id: 'alerts', label: 'Alert Rules', icon: AlertCircle, href: '/alerts' },
-    { id: 'vehicles', label: 'Vehicle Verification', icon: Truck, href: '/vehicles' },
-    { id: 'health', label: 'System Health', icon: BarChart3, href: '/health' },
-    { id: 'scheduler', label: 'Scheduler', icon: Clock, href: '/scheduler' },
-    { id: 'settings', label: 'Settings', icon: Settings, href: '/settings' },
+    { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/admin' },
+    { id: 'alerts', label: 'Alert Rules', icon: AlertCircle, href: '/admin/alerts' },
+    { id: 'vehicles', label: 'Vehicle Verification', icon: Truck, href: '/admin/vehicles' },
+    { id: 'health', label: 'System Health', icon: BarChart3, href: '/admin/health' },
+    { id: 'scheduler', label: 'Scheduler', icon: Clock, href: '/admin/scheduler' },
+    { id: 'settings', label: 'Settings', icon: Settings, href: '/admin/settings' },
   ];
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/';
+    if (href === '/admin') return pathname === '/admin';
     return pathname.startsWith(href);
   };
 
@@ -66,6 +68,13 @@ export default function Sidebar() {
             <div className="w-2 h-2 bg-heartbeat-active rounded-full animate-pulse"></div>
             <span>Connected</span>
           </div>
+          <button
+            type="button"
+            onClick={() => signOut()}
+            className="mt-3 text-xs text-red-300 hover:text-red-200"
+          >
+            Sign out
+          </button>
         </div>
       </div>
     </aside>

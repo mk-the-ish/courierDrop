@@ -29,10 +29,7 @@ export default function HealthPage() {
     const run = async () => {
       try {
         const token = adminToken();
-        const res = await fetch(`${baseUrl}/admin/health/heartbeats`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const res = await fetch(`${baseUrl}/health/heartbeats`, {
           cache: "no-store",
         });
         const data = await res.json();
