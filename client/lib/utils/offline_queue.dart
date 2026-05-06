@@ -2,9 +2,8 @@ import "dart:async";
 import "dart:convert";
 
 import "package:connectivity_plus/connectivity_plus.dart";
+import "package:dropcity_client/api/api_client.dart";
 import "package:shared_preferences/shared_preferences.dart";
-
-import "../api/api_client.dart";
 
 class OfflineQueue {
   OfflineQueue._({required ApiClient apiClient}) : _apiClient = apiClient;
@@ -17,7 +16,7 @@ class OfflineQueue {
   }
 
   final ApiClient _apiClient;
-  StreamSubscription<List<ConnectivityResult>>? _subscription;
+  StreamSubscription<List<ConnectivityResult>>? subscription;
   bool _isFlushing = false;
 
   static const _queueKey = "client_offline_queue";
@@ -27,7 +26,7 @@ class OfflineQueue {
 
   Future<void> start() async {
     await flush();
-    _subscription = Connectivity().onConnectivityChanged.listen((_) {
+    subscription = Connectivity().onConnectivityChanged.listen((_) {
       flush();
     });
   }

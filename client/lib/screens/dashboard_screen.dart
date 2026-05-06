@@ -137,7 +137,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: widget.authState.signOut,
             child: const Text(
               "Sign out",
-              style: TextStyle(color: Colors.white),
             ),
           ),
         ],
@@ -248,7 +247,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const Card(
                   child: Padding(
                     padding: EdgeInsets.all(16),
-                    child: Text("No parcels yet. Request your first parcel below."),
+                    child: Text(
+                        "No parcels yet. Request your first parcel below."),
                   ),
                 ),
               ..._parcels.take(5).map((parcel) {
@@ -256,7 +256,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final id = parcel["id"]?.toString() ?? "-";
                 final origin = parcel["origin"]?.toString() ?? "-";
                 final destination = parcel["destination"]?.toString() ?? "-";
-                final status = _friendlyStatus(parcel["status"]?.toString() ?? "-");
+                final status =
+                    _friendlyStatus(parcel["status"]?.toString() ?? "-");
                 final canOpenStatus = id != "-";
                 return Card(
                   child: InkWell(
@@ -289,7 +290,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Expanded(
                                 child: Text("ETA: ${_formatEta(etaMinutes)}"),
                               ),
-                              _confidenceBadge(parcel["etaConfidence"]?.toString()),
+                              _confidenceBadge(
+                                  parcel["etaConfidence"]?.toString()),
                             ],
                           ),
                           Text("From: $origin"),
@@ -413,9 +415,9 @@ class _ConfidenceBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.35)),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Text(
         label,

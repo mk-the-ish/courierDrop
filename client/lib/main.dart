@@ -13,6 +13,7 @@ import "screens/dashboard_screen.dart";
 import "screens/login_screen.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
+import "firebase_options.dart";
 
 Future<void> main() async {
   // 1. Initialize bindings first
@@ -21,7 +22,8 @@ Future<void> main() async {
   // 2. Wrap EVERYTHING in runZonedGuarded
   runZonedGuarded(() async {
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform);
       final apiClient = ApiClient();
       final authState = AuthState(AuthService(apiClient: apiClient));
       final errorReporter =
@@ -35,7 +37,8 @@ Future<void> main() async {
         return true;
       };
 
-      runApp(DropCityClientApp(authState: authState, offlineQueue: offlineQueue));
+      runApp(
+          DropCityClientApp(authState: authState, offlineQueue: offlineQueue));
     } catch (e, stack) {
       debugPrint("Failed to initialize app: $e");
       debugPrintStack(stackTrace: stack);
@@ -103,7 +106,8 @@ class _DropCityClientAppState extends State<DropCityClientApp> {
     } on TimeoutException {
       if (mounted) {
         setState(() {
-          _restoreHint = "We are taking longer than expected. You can continue now.";
+          _restoreHint =
+              "We are taking longer than expected. You can continue now.";
           _showContinueOption = true;
         });
       }
@@ -234,8 +238,8 @@ class _LaunchScreen extends StatelessWidget {
                 Text(
                   "DropCity",
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
