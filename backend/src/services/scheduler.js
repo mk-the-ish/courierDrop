@@ -4,6 +4,7 @@ const { checkAlerts } = require("../jobs/check_alerts");
 const { matchPendingParcels } = require("./matching");
 const { validateTrackingHealth } = require("../jobs/tracking_validation");
 const { cleanupTrackingData } = require("../jobs/cleanup_tracking_data");
+const axios = require("axios");
 
 class JobScheduler {
   constructor() {
@@ -129,6 +130,9 @@ class JobScheduler {
       jobData.status = "RUNNING";
       const duration = Date.now() - startTime;
       console.log(`[Scheduler] ✓ ${jobName} completed in ${duration}ms`);
+      
+      // Send heartbeat after successful execution
+      await this._sendHeartbeat(jobName, jobData, "ACTIVE");
     } catch (error) {
       jobData.failureCount++;
       jobData.status = "ERROR";
@@ -137,14 +141,47 @@ class JobScheduler {
         error: error.message,
         stack: error.stack
       });
-      // Keep only last 10 errors
       if (jobData.errors.length > 10) {
         jobData.errors.shift();
       }
       console.error(`[Scheduler] ✗ ${jobName} failed:`, error.message);
+      
+      // Send heartbeat after failure
+      await this._sendHeartbeat(jobName, jobData, "ERROR");
     }
 
     this._updateNextRun(jobName);
+  }
+
+  /**
+   * Send heartbeat to backend
+   */
+  async _sendHeartbeat(jobName, jobData, status) {
+    try {
+      await axios.post("http://localhost:8080/heartbeats", {
+        jobName,
+        expectedFrequencySec: jobData.cronExpression ? this._cronToSeconds(jobData.cronExpression) : 300,
+        status
+      });
+    } catch (error) {
+      // Silently fail - heartbeat is not critical
+      console.debug(`[Scheduler] Failed to send heartbeat for ${jobName}:`, error.message);
+    }
+  }
+
+  /**
+   * Convert cron expression to approximate frequency in seconds
+   */
+  _cronToSeconds(cronExpression) {
+    const parts = cronExpression.split(" ");
+    const minute = parts[0];
+    
+    if (minute === "*") return 60; // Every minute
+    if (minute.startsWith("*/")) {
+      const interval = parseInt(minute.substring(2));
+      return interval * 60;
+    }
+    return 300; // Default 5 minutes
   }
 
   /**
