@@ -1,10 +1,10 @@
 const cron = require("node-cron");
+const { getSupabase } = require("../supabase");
 const { runHeartbeatWatchdog } = require("../jobs/heartbeat_watchdog");
 const { checkAlerts } = require("../jobs/check_alerts");
 const { matchPendingParcels } = require("./matching");
 const { validateTrackingHealth } = require("../jobs/tracking_validation");
 const { cleanupTrackingData } = require("../jobs/cleanup_tracking_data");
-const axios = require("axios");
 
 class JobScheduler {
   constructor() {
@@ -154,23 +154,39 @@ class JobScheduler {
   }
 
   /**
-   * Send heartbeat to backend
+   * Send heartbeat to database
    */
   async _sendHeartbeat(jobName, jobData, status) {
     try {
-      const baseUrl = process.env.BACKEND_URL || "http://localhost:8080";
-      const response = await axios.post(`${baseUrl}/heartbeat`, {
-        jobName,
-        expectedFrequencySec: jobData.cronExpression ? this._cronToSeconds(jobData.cronExpression) : 300,
-        status
-      }, {
-        timeout: 5000
-      });
-      console.log(`[Scheduler] ✓ Heartbeat sent for ${jobName} to ${baseUrl}`);
+      const supabase = getSupabase();
+      if (!supabase) {
+        console.warn(`[Scheduler] Supabase not configured, skipping heartbeat for ${jobName}`);
+        return;
+      }
+
+      const expectedFrequencySec = jobData.cronExpression ? this._cronToSeconds(jobData.cronExpression) : 300;
+      const payload = {
+        job_name: jobName,
+        expected_frequency_sec: expectedFrequencySec,
+        status: status || "ACTIVE",
+        last_heartbeat_at: new Date().toISOString(),
+        last_status_change_at: new Date().toISOString(),
+        created_by: null,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from("job_heartbeats")
+        .upsert(payload);
+
+      if (error) {
+        console.error(`[Scheduler] ✗ Failed to write heartbeat for ${jobName}: ${error.message}`);
+        return;
+      }
+
+      console.log(`[Scheduler] ✓ Heartbeat recorded for ${jobName} (status: ${status})`);
     } catch (error) {
-      // Log with more details for debugging
-      const errorMsg = error.response?.data?.message || error.message;
-      console.error(`[Scheduler] ✗ Failed to send heartbeat for ${jobName}: ${errorMsg} (URL: ${process.env.BACKEND_URL || "http://localhost:8080"})`);
+      console.error(`[Scheduler] ✗ Heartbeat error for ${jobName}:`, error.message);
     }
   }
 
