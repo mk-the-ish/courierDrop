@@ -9,7 +9,7 @@ import "package:permission_handler/permission_handler.dart";
 
 import "../auth/auth_state.dart";
 import "../utils/offline_queue.dart";
-import "map_selection_screen.dart";
+import "delivery_picker.dart";
 
 class _PlaceSuggestion {
   const _PlaceSuggestion({
@@ -118,30 +118,36 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
   }
 
   Future<void> _pickPointsFromMap() async {
-    // Before navigating to MapSelectionScreen
+    // Request location permission before opening the delivery picker map
     if (await Permission.location.request().isGranted) {
       // Navigate to map
       final result = await Navigator.of(context).push<Map<String, dynamic>>(
         MaterialPageRoute(
-          builder: (_) => MapSelectionScreen(authState: widget.authState),
+          builder: (_) => const DeliveryPickerScreen(),
         ),
       );
       if (!mounted || result == null) {
         return;
       }
-      final origin = result["origin"];
-      final destination = result["destination"];
+      final origin = result["pickup"];
+      final destination = result["dropoff"];
+      final pickupAddress = result["pickupAddress"]?.toString();
+      final dropoffAddress = result["dropoffAddress"]?.toString();
       if (origin is! LatLng || destination is! LatLng) {
         return;
       }
 
       final originSuggestion = _PlaceSuggestion(
-        displayName: "Map pin (${origin.latitude.toStringAsFixed(4)}, ${origin.longitude.toStringAsFixed(4)})",
+        displayName: pickupAddress?.isNotEmpty == true
+            ? pickupAddress!
+            : "Map pin (${origin.latitude.toStringAsFixed(4)}, ${origin.longitude.toStringAsFixed(4)})",
         latitude: origin.latitude,
         longitude: origin.longitude,
       );
       final destinationSuggestion = _PlaceSuggestion(
-        displayName: "Map pin (${destination.latitude.toStringAsFixed(4)}, ${destination.longitude.toStringAsFixed(4)})",
+        displayName: dropoffAddress?.isNotEmpty == true
+            ? dropoffAddress!
+            : "Map pin (${destination.latitude.toStringAsFixed(4)}, ${destination.longitude.toStringAsFixed(4)})",
         latitude: destination.latitude,
         longitude: destination.longitude,
       );

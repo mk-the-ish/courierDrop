@@ -1,9 +1,109 @@
+import "dart:async";
+import "dart:convert";
+
 import "package:flutter/material.dart";
-import "package:google_maps_flutter/google_maps_flutter.dart";
 import "package:geolocator/geolocator.dart";
+import "package:google_maps_flutter/google_maps_flutter.dart";
+import "package:http/http.dart" as http;
 import "package:shared_preferences/shared_preferences.dart";
 
 import "../auth/auth_state.dart";
+
+/// API key is injected at build time:
+/// flutter run --dart-define=MAPS_API_KEY=your_key_here
+const String googleApiKey = String.fromEnvironment("MAPS_API_KEY");
+
+class RouteInfo {
+  RouteInfo({
+    required this.points,
+    required this.distance,
+    required this.duration,
+  });
+
+  final List<LatLng> points;
+  final String distance;
+  final String duration;
+}
+
+class DirectionsService {
+  static Future<RouteInfo> getRoute(
+    LatLng origin,
+    LatLng destination,
+  ) async {
+    if (googleApiKey.isEmpty) {
+      throw Exception("Missing MAPS_API_KEY");
+    }
+
+    final url =
+        "https://maps.googleapis.com/maps/api/directions/json?"
+        "origin=${origin.latitude},${origin.longitude}"
+        "&destination=${destination.latitude},${destination.longitude}"
+        "&mode=driving"
+        "&departure_time=now"
+        "&key=$googleApiKey";
+
+    final res = await http.get(Uri.parse(url));
+
+    if (res.statusCode != 200) {
+      throw Exception("Directions API failed");
+    }
+
+    final data = json.decode(res.body) as Map<String, dynamic>;
+
+    if ((data["routes"] as List<dynamic>? ?? const []).isEmpty) {
+      throw Exception("No route found");
+    }
+
+    final route = (data["routes"] as List<dynamic>).first as Map<String, dynamic>;
+    final leg = (route["legs"] as List<dynamic>).first as Map<String, dynamic>;
+
+    return RouteInfo(
+      points: _decodePolyline(
+        ((route["overview_polyline"] as Map<String, dynamic>)["points"] ?? "")
+            .toString(),
+      ),
+      distance: ((leg["distance"] as Map<String, dynamic>)["text"] ?? "").toString(),
+      duration: (((leg["duration_in_traffic"] ?? leg["duration"]) as Map<String, dynamic>)["text"] ?? "")
+          .toString(),
+    );
+  }
+
+  static List<LatLng> _decodePolyline(String encoded) {
+    final poly = <LatLng>[];
+    int index = 0;
+    int lat = 0;
+    int lng = 0;
+
+    while (index < encoded.length) {
+      int shift = 0;
+      int result = 0;
+      int b;
+
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1F) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+
+      lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+
+      shift = 0;
+      result = 0;
+
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1F) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+
+      lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+
+      poly.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+
+    return poly;
+  }
+}
 
 class MapRouteDeclarationScreen extends StatefulWidget {
   const MapRouteDeclarationScreen({
@@ -21,42 +121,59 @@ class MapRouteDeclarationScreen extends StatefulWidget {
 }
 
 class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
-  static const _cameraLatKey = "courier_map_camera_lat";
-  static const _cameraLngKey = "courier_map_camera_lng";
-  static const _cameraZoomKey = "courier_map_camera_zoom";
+  GoogleMapController? _controller;
 
-  final List<LatLng> _polylinePoints = [];
-  GoogleMapController? _mapController;
+  final List<LatLng> _points = [];
+  final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
+
+  RouteInfo? _routeInfo;
+
+  bool _isLoadingRoute = false;
   bool _isLocating = false;
-  final GlobalKey _mapKey = GlobalKey();
 
-  CameraPosition _cameraPosition = const CameraPosition(
-    target: LatLng(-17.8252, 31.0335), // Harare Coordinates
+  CameraPosition _camera = const CameraPosition(
+    target: LatLng(-17.8252, 31.0335),
     zoom: 15,
   );
+
+  Timer? _cameraDebounce;
+  Timer? _routeDebounce;
+
+  static const int _maxPoints = 50;
+  static const String _latKey = "courier_map_camera_lat";
+  static const String _lngKey = "courier_map_camera_lng";
+  static const String _zoomKey = "courier_map_camera_zoom";
 
   @override
   void initState() {
     super.initState();
-    _loadSavedCamera();
+    _loadCamera();
   }
 
-  void _onMapCreated(GoogleMapController controller) {
-    // Use setState to ensure the UI knows the controller is ready
-    setState(() {
-      key: _mapKey;
-      _mapController = controller;
+  void _onMapCreated(GoogleMapController c) {
+    _controller = c;
+  }
+
+  void _onCameraMove(CameraPosition pos) {
+    _camera = pos;
+
+    _cameraDebounce?.cancel();
+    _cameraDebounce = Timer(const Duration(milliseconds: 500), () {
+      _saveCamera(pos);
     });
   }
 
-  Future<void> _loadSavedCamera() async {
+  Future<void> _loadCamera() async {
     final prefs = await SharedPreferences.getInstance();
-    final lat = prefs.getDouble(_cameraLatKey);
-    final lng = prefs.getDouble(_cameraLngKey);
-    final zoom = prefs.getDouble(_cameraZoomKey);
-    if (lat != null && lng != null && zoom != null) {
+
+    final lat = prefs.getDouble(_latKey);
+    final lng = prefs.getDouble(_lngKey);
+    final zoom = prefs.getDouble(_zoomKey);
+
+    if (lat != null && lng != null && zoom != null && mounted) {
       setState(() {
-        _cameraPosition = CameraPosition(
+        _camera = CameraPosition(
           target: LatLng(lat, lng),
           zoom: zoom,
         );
@@ -64,234 +181,294 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
     }
   }
 
-  Future<void> _saveCamera(CameraPosition position) async {
+  Future<void> _saveCamera(CameraPosition pos) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_cameraLatKey, position.target.latitude);
-    await prefs.setDouble(_cameraLngKey, position.target.longitude);
-    await prefs.setDouble(_cameraZoomKey, position.zoom);
+    await prefs.setDouble(_latKey, pos.target.latitude);
+    await prefs.setDouble(_lngKey, pos.target.longitude);
+    await prefs.setDouble(_zoomKey, pos.zoom);
   }
 
-  Future<void> _useCurrentLocation() async {
-    setState(() => _isLocating = true);
-    try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Location permission denied.")),
-        );
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      if (!mounted) return;
-
-      await _mapController?.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(position.latitude, position.longitude),
-          15,
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
+  void _addPoint(LatLng point) {
+    if (_points.length >= _maxPoints) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Location error: $error")),
-      );
-    } finally {
-      if (mounted) setState(() => _isLocating = false);
-    }
-  }
-
-  void _confirmSelection() {
-    if (_polylinePoints.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please add at least one route point.")),
+        const SnackBar(content: Text("Max points reached")),
       );
       return;
     }
 
-    if (widget.onPolylineSelected != null) {
-      widget.onPolylineSelected!(_polylinePoints);
+    _points.add(point);
+
+    _markers.add(
+      Marker(
+        markerId: MarkerId("p${_points.length}"),
+        position: point,
+      ),
+    );
+
+    _scheduleRouteUpdate();
+
+    setState(() {});
+  }
+
+  void _scheduleRouteUpdate() {
+    _routeDebounce?.cancel();
+    _routeDebounce = Timer(const Duration(milliseconds: 400), _updateRoute);
+  }
+
+  Future<void> _updateRoute() async {
+    if (_points.length < 2) {
+      return;
     }
-    Navigator.of(context).pop(_polylinePoints);
+
+    setState(() => _isLoadingRoute = true);
+
+    try {
+      final result = await DirectionsService.getRoute(
+        _points.first,
+        _points.last,
+      );
+
+      _polylines
+        ..clear()
+        ..add(
+          Polyline(
+            polylineId: const PolylineId("route"),
+            points: result.points,
+            width: 5,
+            color: Colors.teal,
+          ),
+        );
+
+      _routeInfo = result;
+    } catch (e) {
+      debugPrint("Route error: $e");
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingRoute = false);
+      }
+    }
+  }
+
+  Future<void> _addCurrentLocation() async {
+    setState(() => _isLocating = true);
+
+    try {
+      var permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition();
+
+      final latLng = LatLng(pos.latitude, pos.longitude);
+
+      await _controller?.animateCamera(
+        CameraUpdate.newLatLngZoom(latLng, 16),
+      );
+
+      _addPoint(latLng);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Location failed")),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLocating = false);
+      }
+    }
+  }
+
+  void _undo() {
+    if (_points.isEmpty) {
+      return;
+    }
+
+    _points.removeLast();
+    _markers.removeWhere((m) => m.markerId.value == "p${_points.length + 1}");
+
+    _polylines.clear();
+    _routeInfo = null;
+
+    _scheduleRouteUpdate();
+
+    setState(() {});
+  }
+
+  void _clear() {
+    _points.clear();
+    _markers.clear();
+    _polylines.clear();
+    _routeInfo = null;
+    setState(() {});
+  }
+
+  void _confirm() {
+    if (_points.length < 2) {
+      return;
+    }
+
+    widget.onPolylineSelected?.call(_points);
+    Navigator.pop(context, _points);
   }
 
   @override
   void dispose() {
-    _mapController?.dispose();
+    _controller?.dispose();
+    _cameraDebounce?.cancel();
+    _routeDebounce?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Draw Route"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: Column(
+      appBar: AppBar(title: const Text("Draw Route")),
+      body: Stack(
         children: [
-          Expanded(
-            child: GoogleMap(
-              initialCameraPosition: _cameraPosition,
-              myLocationEnabled: false,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              // Aggressive memory optimizations
-              tiltGesturesEnabled: false,
-              rotateGesturesEnabled: false,
-              scrollGesturesEnabled: true,
-              zoomGesturesEnabled: true,
-              onMapCreated: _onMapCreated,
-              onCameraMove: (position) {
-                _cameraPosition = position;
-                _saveCamera(position);
-              },
-              onTap: (point) {
-                setState(() {
-                  _polylinePoints.add(point);
-                });
-              },
-              markers: {
-                for (int i = 0; i < _polylinePoints.length; i++)
-                  Marker(
-                    markerId: MarkerId("point_$i"),
-                    position: _polylinePoints[i],
-                    infoWindow: InfoWindow(title: "Point ${i + 1}"),
-                    icon: i == 0
-                        ? BitmapDescriptor.defaultMarkerWithHue(
-                            BitmapDescriptor.hueGreen,
-                          )
-                        : i == _polylinePoints.length - 1
-                            ? BitmapDescriptor.defaultMarkerWithHue(
-                                BitmapDescriptor.hueRed,
-                              )
-                            : BitmapDescriptor.defaultMarkerWithHue(
-                                BitmapDescriptor.hueBlue,
-                              ),
-                  ),
-              },
-              polylines: {
-                if (_polylinePoints.length > 1)
-                  Polyline(
-                    polylineId: const PolylineId("route"),
-                    points: _polylinePoints,
-                    color: Colors.blue,
-                    width: 4,
-                  ),
-              },
-            ),
+          GoogleMap(
+            initialCameraPosition: _camera,
+            onMapCreated: _onMapCreated,
+            onCameraMove: _onCameraMove,
+            onTap: _addPoint,
+            markers: _markers,
+            polylines: _polylines,
+            zoomControlsEnabled: false,
+            tiltGesturesEnabled: false,
+            rotateGesturesEnabled: false,
           ),
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "Points added: ${_polylinePoints.length}",
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (_polylinePoints.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: _polylinePoints.asMap().entries.map((entry) {
-                          final idx = entry.key;
-                          final point = entry.value;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Chip(
-                              label: Text(
-                                "P${idx + 1}: ${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}",
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                              onDeleted: () {
-                                setState(() {
-                                  _polylinePoints.removeAt(idx);
-                                });
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _isLocating ? null : _useCurrentLocation,
-                        icon: const Icon(Icons.my_location),
-                        label: Text(
-                          _isLocating ? "Locating..." : "Add Current",
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _polylinePoints.isEmpty
-                            ? null
-                            : () {
-                                setState(() {
-                                  _polylinePoints.removeLast();
-                                });
-                              },
-                        child: const Text("Undo"),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _polylinePoints.isEmpty
-                            ? null
-                            : () {
-                                setState(() {
-                                  _polylinePoints.clear();
-                                });
-                              },
-                        child: const Text("Clear"),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _polylinePoints.isEmpty ? null : _confirmSelection,
-                  child: const SizedBox(
-                    width: double.infinity,
-                    child: Center(
-                      child: Text("Use This Route"),
-                    ),
-                  ),
-                ),
-              ],
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: _Controls(
+              count: _points.length,
+              isLocating: _isLocating,
+              isLoadingRoute: _isLoadingRoute,
+              routeInfo: _routeInfo,
+              onAddCurrent: _addCurrentLocation,
+              onUndo: _undo,
+              onClear: _clear,
+              onConfirm: _confirm,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _Controls extends StatelessWidget {
+  const _Controls({
+    required this.count,
+    required this.isLocating,
+    required this.isLoadingRoute,
+    required this.routeInfo,
+    required this.onAddCurrent,
+    required this.onUndo,
+    required this.onClear,
+    required this.onConfirm,
+  });
+
+  final int count;
+  final bool isLocating;
+  final bool isLoadingRoute;
+  final RouteInfo? routeInfo;
+
+  final VoidCallback onAddCurrent;
+  final VoidCallback onUndo;
+  final VoidCallback onClear;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoadingRoute) const LinearProgressIndicator(),
+            if (routeInfo != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _Info(icon: Icons.route, text: routeInfo!.distance),
+                    _Info(icon: Icons.access_time, text: routeInfo!.duration),
+                  ],
+                ),
+              ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: isLocating ? null : onAddCurrent,
+                    icon: const Icon(Icons.my_location),
+                    label: Text(isLocating ? "Locating..." : "Add Current"),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: count > 0 ? onUndo : null,
+                    child: const Text("Undo"),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: count > 0 ? onClear : null,
+                    child: const Text("Clear"),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: count >= 2 ? onConfirm : null,
+                    child: const Text("Confirm Route"),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Info extends StatelessWidget {
+  const _Info({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.teal),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 }

@@ -623,7 +623,6 @@ router.get(
           email,
           display_name,
           phone_number,
-          phone_number,
           role
         )
         `
