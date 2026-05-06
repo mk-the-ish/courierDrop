@@ -70,7 +70,7 @@ app.use("/corridors", requireUser, corridorRoutes);
 app.use("/parcels", requireUser, parcelRoutes);
 app.use("/matches", requireUser, matchingRoutes);
 app.use("/handshake", requireUser, handshakeRoutes);
-app.use("/heartbeat", requireUser, heartbeatRoutes);
+app.use("/heartbeat", heartbeatRoutes);
 app.use("/logs", requireUser, errorLogRoutes);
 app.use("/admin", requireUser, adminRoutes);
 app.use("/devices", requireUser, deviceRoutes);

@@ -158,7 +158,8 @@ class JobScheduler {
    */
   async _sendHeartbeat(jobName, jobData, status) {
     try {
-      await axios.post("http://localhost:8080/heartbeats", {
+      const baseUrl = process.env.BACKEND_URL || "http://localhost:8080";
+      await axios.post(`${baseUrl}/heartbeat`, {
         jobName,
         expectedFrequencySec: jobData.cronExpression ? this._cronToSeconds(jobData.cronExpression) : 300,
         status
