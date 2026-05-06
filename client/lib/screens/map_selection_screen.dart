@@ -134,3 +134,94 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
     );
   }
 }
+
+class _BottomPanel extends StatelessWidget {
+  const _BottomPanel({
+    required this.origin,
+    required this.destination,
+    required this.selectingOrigin,
+    required this.onClear,
+    required this.onConfirm,
+  });
+
+  final LatLng? origin;
+  final LatLng? destination;
+  final bool selectingOrigin;
+  final VoidCallback onClear;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            selectingOrigin ? 'Tap map to select ORIGIN' : 'Tap map to select DESTINATION',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
+          if (origin != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.green, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Origin: ${origin!.latitude.toStringAsFixed(4)}, ${origin!.longitude.toStringAsFixed(4)}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          if (destination != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.red, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Destination: ${destination!.latitude.toStringAsFixed(4)}, ${destination!.longitude.toStringAsFixed(4)}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onClear,
+                  child: const Text('Clear'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: origin != null && destination != null ? onConfirm : null,
+                  child: const Text('Confirm'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

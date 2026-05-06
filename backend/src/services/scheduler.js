@@ -159,14 +159,18 @@ class JobScheduler {
   async _sendHeartbeat(jobName, jobData, status) {
     try {
       const baseUrl = process.env.BACKEND_URL || "http://localhost:8080";
-      await axios.post(`${baseUrl}/heartbeat`, {
+      const response = await axios.post(`${baseUrl}/heartbeat`, {
         jobName,
         expectedFrequencySec: jobData.cronExpression ? this._cronToSeconds(jobData.cronExpression) : 300,
         status
+      }, {
+        timeout: 5000
       });
+      console.log(`[Scheduler] ✓ Heartbeat sent for ${jobName} to ${baseUrl}`);
     } catch (error) {
-      // Silently fail - heartbeat is not critical
-      console.debug(`[Scheduler] Failed to send heartbeat for ${jobName}:`, error.message);
+      // Log with more details for debugging
+      const errorMsg = error.response?.data?.message || error.message;
+      console.error(`[Scheduler] ✗ Failed to send heartbeat for ${jobName}: ${errorMsg} (URL: ${process.env.BACKEND_URL || "http://localhost:8080"})`);
     }
   }
 
