@@ -26,7 +26,7 @@ router.post(
   "/update",
   requireRole("courier"),
   asyncHandler(async (req, res) => {
-    const { parcelId, lat, lng, accuracy } = req.body || {};
+    const { parcelId, lat, lng, accuracy, viaBatchSync } = req.body || {};
     const courierId = req.user?.uid;
 
     console.log(`[Tracking.update] START: courierId=${courierId}, parcelId=${parcelId}, lat=${lat}, lng=${lng}, accuracy=${accuracy}`);
@@ -171,6 +171,7 @@ router.post(
         progress_index: progressIndex,
         current_distance_m: distanceToDestination,
         movement_direction: isMovingPositively ? "TOWARD_DESTINATION" : null,
+        via_batch_sync: Boolean(viaBatchSync),
         created_at: new Date().toISOString()
       });
 
@@ -306,6 +307,16 @@ router.post(
         // Check if update is too old (>24 hours)
         const updateAge = Date.now() - new Date(timestamp).getTime();
         if (updateAge > BATCH_SYNC_MAX_AGE_MS) {
+          await supabase.from("connectivity_audit").insert({
+            courier_id: courierId,
+            parcel_id: parcelId || null,
+            lat,
+            lng,
+            source: "batch_sync_failure",
+            reason: "too_old",
+            age_ms: updateAge,
+            created_at: new Date().toISOString()
+          });
           console.warn(`[Tracking.batch-sync] SKIPPED too_old: parcelId=${parcelId}, age=${updateAge}ms`);
           results.push({
             parcelId,
@@ -323,6 +334,16 @@ router.post(
           .maybeSingle();
 
         if (parcelError || !parcel || parcel.assigned_courier_id !== courierId) {
+          await supabase.from("connectivity_audit").insert({
+            courier_id: courierId,
+            parcel_id: parcelId,
+            lat,
+            lng,
+            source: "batch_sync_failure",
+            reason: "unauthorized",
+            age_ms: updateAge,
+            created_at: new Date().toISOString()
+          });
           console.warn(`[Tracking.batch-sync] SKIPPED unauthorized: parcelId=${parcelId}`);
           results.push({
             parcelId,
@@ -341,10 +362,21 @@ router.post(
             courier_id: courierId,
             raw_location: courierLocation,
             is_on_corridor: false, // Conservative default for batch
+            via_batch_sync: true,
             created_at: new Date(timestamp).toISOString()
           });
 
         if (logError) {
+          await supabase.from("connectivity_audit").insert({
+            courier_id: courierId,
+            parcel_id: parcelId,
+            lat,
+            lng,
+            source: "batch_sync_failure",
+            reason: "log_failed",
+            age_ms: updateAge,
+            created_at: new Date().toISOString()
+          });
           console.error(`[Tracking.batch-sync] LOG_ERROR: parcelId=${parcelId}, error=${logError.message}`);
           results.push({
             parcelId,

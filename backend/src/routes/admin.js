@@ -6,6 +6,7 @@ const { requireRole } = require("../middleware/auth");
 const { getFirebaseAuth } = require("../firebase");
 const { getScheduler } = require("../services/scheduler");
 const { matchPendingParcels } = require("../services/matching");
+const { parseWktPoint, haversineMeters } = require("../utils/geo");
 
 const router = express.Router();
 
@@ -704,8 +705,8 @@ router.get(
 
     const { data, error, count } = await supabase
       .from("users")
-      .select("id,email,display_name,phone_number,role,created_at,updated_at", { count: "exact" })
-      .eq("role", "COURIER")
+      .select("id,email,display_name,phone_number,role,is_active,current_route_id,created_at,updated_at", { count: "exact" })
+      .in("role", ["courier", "COURIER"])
       .order("created_at", { ascending: false })
       .range(Number(offset), Number(offset) + Number(limit) - 1);
 
@@ -718,6 +719,180 @@ router.get(
       limit: Number(limit),
       offset: Number(offset),
       couriers: data || []
+    });
+  })
+);
+
+router.get(
+  "/logs",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { limit = 100, days = 7 } = req.query || {};
+    const supabase = getSupabase();
+    const since = new Date();
+    since.setDate(since.getDate() - Number(days));
+
+    const [errorRes, handshakeRes] = await Promise.all([
+      supabase
+        .from("error_logs")
+        .select("id,stack_trace,device_model,os_version,occurred_at")
+        .gte("occurred_at", since.toISOString())
+        .order("occurred_at", { ascending: false })
+        .limit(Number(limit)),
+      supabase
+        .from("handshake_events")
+        .select("id,parcel_id,step,status,lat,lng,accuracy_m,created_at")
+        .gte("created_at", since.toISOString())
+        .order("created_at", { ascending: false })
+        .limit(Number(limit))
+    ]);
+
+    if (errorRes.error) {
+      throw new ApiError(errorRes.error.message, 500, "ERROR_LOG_FETCH_FAILED");
+    }
+    if (handshakeRes.error) {
+      throw new ApiError(handshakeRes.error.message, 500, "HANDSHAKE_LOG_FETCH_FAILED");
+    }
+
+    const parcelIds = Array.from(
+      new Set((handshakeRes.data || []).map((event) => event.parcel_id).filter(Boolean))
+    );
+
+    const parcelLocationsById = {};
+    if (parcelIds.length > 0) {
+      const { data: parcels, error: parcelError } = await supabase
+        .from("parcels")
+        .select("id,pickup_point,dropoff_point")
+        .in("id", parcelIds);
+      if (parcelError) {
+        throw new ApiError(parcelError.message, 500, "PARCEL_LOOKUP_FAILED");
+      }
+      for (const parcel of parcels || []) {
+        parcelLocationsById[parcel.id] = parcel;
+      }
+    }
+
+    const handshakeEvents = (handshakeRes.data || []).map((event) => {
+      const parcel = parcelLocationsById[event.parcel_id];
+      const step = (event.step || "").toString().toUpperCase();
+      const gatePoint = step === "DROPOFF"
+        ? parseWktPoint(parcel?.dropoff_point)
+        : parseWktPoint(parcel?.pickup_point);
+
+      const spatialGateDistanceM =
+        gatePoint && typeof event.lat === "number" && typeof event.lng === "number"
+          ? Math.round(haversineMeters(gatePoint, { lat: event.lat, lng: event.lng }))
+          : null;
+
+      const rawStatus = (event.status || "").toString().toUpperCase();
+      const hashVerificationStatus = rawStatus.includes("FAILED_PIN")
+        ? "FAILED"
+        : rawStatus === "SUCCESS"
+          ? "VERIFIED"
+          : "UNKNOWN";
+
+      return {
+        ...event,
+        spatial_gate_distance_m: spatialGateDistanceM,
+        hash_verification_status: hashVerificationStatus
+      };
+    });
+
+    const errorLogs = (errorRes.data || []).map((log) => {
+      const trace = (log.stack_trace || "").toString();
+      const firstLine = trace.split("\n").find((line) => line.trim().length > 0) || "Unknown error";
+      return {
+        id: log.id,
+        level: "ERROR",
+        message: firstLine.slice(0, 300),
+        device: [log.device_model, log.os_version].filter(Boolean).join(" / ") || "Unknown device",
+        timestamp: log.occurred_at
+      };
+    });
+
+    return res.json({
+      error_logs: errorLogs,
+      handshake_events: handshakeEvents
+    });
+  })
+);
+
+router.get(
+  "/spatial-analytics",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { days = 7 } = req.query || {};
+    const supabase = getSupabase();
+    const since = new Date();
+    since.setDate(since.getDate() - Number(days));
+
+    const [corridorsRes, auditRes] = await Promise.all([
+      supabase
+        .from("corridors")
+        .select("id,start_location,end_location,start_point,end_point,created_by,created_at")
+        .order("created_at", { ascending: false })
+        .limit(300),
+      supabase
+        .from("connectivity_audit")
+        .select("id,lat,lng,source,reason,created_at")
+        .eq("source", "batch_sync_failure")
+        .gte("created_at", since.toISOString())
+    ]);
+
+    if (corridorsRes.error) {
+      throw new ApiError(corridorsRes.error.message, 500, "CORRIDOR_FETCH_FAILED");
+    }
+    if (auditRes.error) {
+      throw new ApiError(auditRes.error.message, 500, "CONNECTIVITY_AUDIT_FETCH_FAILED");
+    }
+
+    const activeRouteIds = new Set();
+    const { data: activeUsers } = await supabase
+      .from("users")
+      .select("current_route_id")
+      .eq("is_active", true)
+      .not("current_route_id", "is", null);
+    for (const row of activeUsers || []) {
+      if (row.current_route_id) {
+        activeRouteIds.add(row.current_route_id);
+      }
+    }
+
+    const activeCorridors = (corridorsRes.data || [])
+      .filter((corridor) => activeRouteIds.has(corridor.id))
+      .map((corridor) => ({
+        ...corridor,
+        start_point: parseWktPoint(corridor.start_point),
+        end_point: parseWktPoint(corridor.end_point)
+      }));
+
+    const clusterBuckets = new Map();
+    for (const row of auditRes.data || []) {
+      if (typeof row.lat !== "number" || typeof row.lng !== "number") {
+        continue;
+      }
+      const latBucket = Number(row.lat.toFixed(3));
+      const lngBucket = Number(row.lng.toFixed(3));
+      const key = `${latBucket},${lngBucket}`;
+      const current = clusterBuckets.get(key) || {
+        lat: latBucket,
+        lng: lngBucket,
+        count: 0,
+        reasons: {}
+      };
+      current.count += 1;
+      current.reasons[row.reason || "unknown"] =
+        (current.reasons[row.reason || "unknown"] || 0) + 1;
+      clusterBuckets.set(key, current);
+    }
+
+    const deadZoneClusters = Array.from(clusterBuckets.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 200);
+
+    return res.json({
+      active_corridors: activeCorridors,
+      dead_zone_clusters: deadZoneClusters
     });
   })
 );

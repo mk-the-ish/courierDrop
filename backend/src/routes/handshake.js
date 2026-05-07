@@ -74,25 +74,10 @@ router.post(
     }
 
     const supabase = getSupabase();
-    const { data: courierProfile, error: courierError } = await supabase
-      .from("users")
-      .select("current_route_id")
-      .eq("id", req.user?.uid || "")
-      .maybeSingle();
-    if (courierError) {
-      throw new ApiError(courierError.message, 500, "HANDSHAKE_COURIER_LOOKUP_FAILED");
-    }
-    if (!courierProfile?.current_route_id) {
-      throw new ApiError(
-        "Route not started",
-        409,
-        "ERROR_ROUTE_NOT_STARTED"
-      );
-    }
 
     const { data: parcel, error } = await supabase
       .from("parcels")
-      .select("id, created_by")
+      .select("id, created_by, assigned_courier_id")
       .eq("id", parcelId)
       .maybeSingle();
 
@@ -101,6 +86,28 @@ router.post(
     }
     if (!parcel) {
       throw new ApiError("Parcel not found", 404, "HANDSHAKE_NOT_FOUND");
+    }
+    if (parcel.created_by && parcel.created_by !== req.user?.uid) {
+      throw new ApiError("Not permitted to initialize this parcel", 403, "HANDSHAKE_FORBIDDEN");
+    }
+    if (!parcel.assigned_courier_id) {
+      throw new ApiError("Courier not assigned yet", 409, "HANDSHAKE_COURIER_NOT_ASSIGNED");
+    }
+
+    const { data: courierProfile, error: courierError } = await supabase
+      .from("users")
+      .select("current_route_id,is_active")
+      .eq("id", parcel.assigned_courier_id)
+      .maybeSingle();
+    if (courierError) {
+      throw new ApiError(courierError.message, 500, "HANDSHAKE_COURIER_LOOKUP_FAILED");
+    }
+    if (!courierProfile?.current_route_id || courierProfile.is_active === false) {
+      throw new ApiError(
+        "Route not started",
+        409,
+        "ERROR_ROUTE_NOT_STARTED"
+      );
     }
 
     const pickupPin = generatePin();
@@ -172,6 +179,21 @@ router.post(
     }
     if (parcel.assigned_courier_id && parcel.assigned_courier_id !== req.user?.uid) {
       throw new ApiError("Not assigned to this courier", 403, "HANDSHAKE_NOT_ASSIGNED");
+    }
+    const { data: courierProfile, error: courierError } = await supabase
+      .from("users")
+      .select("current_route_id,is_active")
+      .eq("id", req.user?.uid || "")
+      .maybeSingle();
+    if (courierError) {
+      throw new ApiError(courierError.message, 500, "HANDSHAKE_COURIER_LOOKUP_FAILED");
+    }
+    if (!courierProfile?.current_route_id || courierProfile.is_active === false) {
+      throw new ApiError(
+        "Route not started",
+        409,
+        "ERROR_ROUTE_NOT_STARTED"
+      );
     }
     const { data: assignedQueue } = await supabase
       .from("parcel_assignment_queue")

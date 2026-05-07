@@ -417,6 +417,26 @@ class ApiClient {
     );
   }
 
+  Future<void> rateParcel({
+    required String parcelId,
+    required int rating,
+    String? feedback,
+  }) async {
+    final uri = Uri.parse("$baseUrl/parcels/$parcelId/rate");
+    final payload = <String, dynamic>{
+      "rating": rating,
+      "feedback": feedback ?? "",
+    };
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Rating submit failed: ${response.body}");
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getHandshakeEvents(String parcelId) async {
     final uri = Uri.parse("$baseUrl/parcels/$parcelId/events");
     final response = await _client.get(uri, headers: _headers());

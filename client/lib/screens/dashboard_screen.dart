@@ -1,4 +1,5 @@
 import "package:flutter/material.dart";
+import "dart:async";
 import "../auth/auth_state.dart";
 import "parcel_request_screen.dart";
 import "progress_screen.dart";
@@ -18,11 +19,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _error;
   Map<String, dynamic> _stats = const {};
   List<Map<String, dynamic>> _parcels = const [];
+  Timer? _activeParcelsTimer;
+  bool _ratingSheetOpen = false;
+  final Set<String> _ratingInProgress = {};
 
   @override
   void initState() {
     super.initState();
     _loadDashboard();
+    _activeParcelsTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _loadDashboard(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _activeParcelsTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadDashboard() async {
@@ -39,6 +53,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _stats = data.stats;
         _parcels = data.parcels;
       });
+      _checkForPendingRating();
     } catch (error) {
       if (!mounted) {
         return;
@@ -48,6 +63,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  void _checkForPendingRating() {
+    if (!mounted || _ratingSheetOpen) {
+      return;
+    }
+    final pending = _parcels.firstWhere(
+      (parcel) {
+        final status = (parcel["status"]?.toString() ?? "").toUpperCase();
+        final delivered = status == "DELIVERED" || status == "COMPLETED";
+        final submitted = parcel["rating_submitted"] == true;
+        final id = parcel["id"]?.toString() ?? "";
+        return delivered && !submitted && id.isNotEmpty && !_ratingInProgress.contains(id);
+      },
+      orElse: () => const {},
+    );
+    if (pending.isEmpty) {
+      return;
+    }
+    final parcelId = pending["id"]?.toString() ?? "";
+    if (parcelId.isEmpty) {
+      return;
+    }
+    _showRatingSheet(parcelId);
+  }
+
+  Future<void> _showRatingSheet(String parcelId) async {
+    _ratingSheetOpen = true;
+    _ratingInProgress.add(parcelId);
+    final result = await showModalBottomSheet<_RatingPayload>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _RatingBottomSheet(parcelId: parcelId),
+    );
+    _ratingSheetOpen = false;
+    if (result == null) {
+      _ratingInProgress.remove(parcelId);
+      return;
+    }
+    try {
+      await widget.authState.apiClient.rateParcel(
+        parcelId: parcelId,
+        rating: result.stars,
+        feedback: result.feedback,
+      );
+      await _loadDashboard();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to submit rating: $error")),
+      );
+    } finally {
+      _ratingInProgress.remove(parcelId);
     }
   }
 
@@ -126,7 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("DropCity Client"),
+        title: const Text("DropCity Dashboard"),
         actions: [
           IconButton(
             onPressed: _isLoading ? null : _loadDashboard,
@@ -148,7 +219,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               const Text(
-                "Parcel Delivery Management",
+                "Parcel Management",
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -239,7 +310,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                "Recent Parcels",
+                "Your Parcels",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -326,7 +397,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 );
               },
               icon: const Icon(Icons.add_circle),
-              label: const Text("Request Parcel"),
+              label: const Text("New Parcel"),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
               ),
@@ -345,7 +416,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       );
                     },
                     icon: const Icon(Icons.navigation),
-                    label: const Text("Progress"),
+                    label: const Text("Pickup/Dropoff"),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -364,6 +435,98 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RatingPayload {
+  const _RatingPayload({
+    required this.stars,
+    required this.feedback,
+  });
+
+  final int stars;
+  final String feedback;
+}
+
+class _RatingBottomSheet extends StatefulWidget {
+  const _RatingBottomSheet({required this.parcelId});
+
+  final String parcelId;
+
+  @override
+  State<_RatingBottomSheet> createState() => _RatingBottomSheetState();
+}
+
+class _RatingBottomSheetState extends State<_RatingBottomSheet> {
+  final TextEditingController _feedbackController = TextEditingController();
+  int _stars = 5;
+
+  @override
+  void dispose() {
+    _feedbackController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Rate Delivery",
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            Text("Parcel ${widget.parcelId} was delivered. How was your experience?"),
+            const SizedBox(height: 12),
+            Row(
+              children: List.generate(5, (index) {
+                final star = index + 1;
+                return IconButton(
+                  onPressed: () => setState(() => _stars = star),
+                  icon: Icon(
+                    star <= _stars ? Icons.star : Icons.star_border,
+                    color: Colors.amber,
+                  ),
+                );
+              }),
+            ),
+            TextField(
+              controller: _feedbackController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: "Feedback (optional)",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(
+                    _RatingPayload(
+                      stars: _stars,
+                      feedback: _feedbackController.text.trim(),
+                    ),
+                  );
+                },
+                child: const Text("Submit Rating"),
+              ),
             ),
           ],
         ),

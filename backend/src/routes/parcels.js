@@ -486,7 +486,7 @@ router.get(
     const { data, error } = await supabase
       .from("parcels")
       .select(
-        "id,status,origin,destination,priority,fragile,created_at,assigned_at,pickup_verified_at,dropoff_verified_at,origin_point,destination_point"
+        "id,status,origin,destination,priority,fragile,created_at,assigned_at,pickup_verified_at,dropoff_verified_at,origin_point,destination_point,rating_submitted,rating_value,rating_feedback,rated_at"
       )
       .eq("created_by", req.user?.uid || "")
       .order("created_at", { ascending: false });
@@ -541,6 +541,63 @@ router.get(
       },
       parcels
     });
+  })
+);
+
+router.post(
+  "/:id/rate",
+  requireRole("client"),
+  asyncHandler(async (req, res) => {
+    const parcelId = req.params.id;
+    const { rating, feedback } = req.body || {};
+    const normalizedRating = Number(rating);
+
+    if (!Number.isInteger(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) {
+      throw new ApiError("rating must be an integer between 1 and 5", 400, "RATING_INVALID_INPUT");
+    }
+
+    const supabase = getSupabase();
+    const { data: parcel, error: parcelError } = await supabase
+      .from("parcels")
+      .select("id,created_by,status,rating_submitted")
+      .eq("id", parcelId)
+      .maybeSingle();
+
+    if (parcelError) {
+      throw new ApiError(parcelError.message, 500, "PARCEL_LOOKUP_FAILED");
+    }
+    if (!parcel) {
+      throw new ApiError("Parcel not found", 404, "PARCEL_NOT_FOUND");
+    }
+    if (parcel.created_by !== req.user?.uid) {
+      throw new ApiError("Not permitted to rate this parcel", 403, "PARCEL_FORBIDDEN");
+    }
+    if (parcel.rating_submitted) {
+      return res.json({ status: "already_rated", parcelId });
+    }
+
+    const status = (parcel.status || "").toString().toUpperCase();
+    if (status !== "DELIVERED" && status !== "COMPLETED") {
+      throw new ApiError("Parcel is not delivered yet", 409, "RATING_NOT_ALLOWED");
+    }
+
+    const { error: updateError } = await supabase
+      .from("parcels")
+      .update({
+        rating_submitted: true,
+        rating_value: normalizedRating,
+        rating_feedback: typeof feedback === "string" && feedback.trim().length > 0
+          ? feedback.trim()
+          : null,
+        rated_at: new Date().toISOString()
+      })
+      .eq("id", parcelId);
+
+    if (updateError) {
+      throw new ApiError(updateError.message, 500, "RATING_SAVE_FAILED");
+    }
+
+    return res.json({ status: "ok", parcelId, rating: normalizedRating });
   })
 );
 
