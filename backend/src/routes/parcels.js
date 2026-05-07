@@ -4,6 +4,8 @@ const ApiError = require("../utils/api_error");
 const asyncHandler = require("../utils/async_handler");
 const { requireRole } = require("../middleware/auth");
 const { parseWktPoint, haversineMeters } = require("../utils/geo");
+const { enqueueNotification } = require("../services/notification_service");
+const { NOTIFICATION_EVENT_TYPES } = require("../services/notification_events");
 
 const router = express.Router();
 const conflictAttempts = new Map();
@@ -712,15 +714,27 @@ router.post(
       .select("created_by")
       .eq("id", parcelId)
       .maybeSingle();
-    const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
+    const { sendToParcelTopic } = require("../utils/notifications");
     if (parcel?.created_by) {
-      sendToUser(parcel.created_by, "Courier assigned", "A courier has been assigned.", {
-        parcelId
+      await enqueueNotification({
+        type: NOTIFICATION_EVENT_TYPES.COURIER_ASSIGNED,
+        title: "Courier assigned",
+        body: "A courier has been assigned.",
+        recipients: [parcel.created_by],
+        entityType: "parcel",
+        entityId: parcelId,
+        payload: { parcelId, status: "ASSIGNED" }
       });
     }
     if (corridor.created_by) {
-      sendToUser(corridor.created_by, "New delivery request", "You have a new parcel request.", {
-        parcelId
+      await enqueueNotification({
+        type: NOTIFICATION_EVENT_TYPES.COURIER_ASSIGNED,
+        title: "New delivery request",
+        body: "You have a new parcel request.",
+        recipients: [corridor.created_by],
+        entityType: "parcel",
+        entityId: parcelId,
+        payload: { parcelId, status: "ASSIGNED" }
       });
     }
     sendToParcelTopic(parcelId, "Courier assigned", "A courier has been assigned.", {
@@ -822,10 +836,16 @@ router.post(
       .eq("id", parcelId)
       .maybeSingle();
 
-    const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
+    const { sendToParcelTopic } = require("../utils/notifications");
     if (parcelInfo?.created_by) {
-      await sendToUser(parcelInfo.created_by, "Courier accepted", "Your courier accepted the delivery.", {
-        parcelId
+      await enqueueNotification({
+        type: NOTIFICATION_EVENT_TYPES.COURIER_ACCEPTED,
+        title: "Courier accepted",
+        body: "Your courier accepted the delivery.",
+        recipients: [parcelInfo.created_by],
+        entityType: "parcel",
+        entityId: parcelId,
+        payload: { parcelId, status: "ASSIGNED" }
       });
     }
     await sendToParcelTopic(parcelId, "Courier accepted", "Your courier accepted the delivery.", {
@@ -894,6 +914,11 @@ router.post(
         .maybeSingle();
 
       if (nextCorridor?.created_by) {
+        const { data: parcelOwner } = await supabase
+          .from("parcels")
+          .select("created_by")
+          .eq("id", parcelId)
+          .maybeSingle();
         const { error: assignError } = await supabase
           .from("parcels")
           .update({
@@ -917,10 +942,27 @@ router.post(
             reassigned: true
           });
 
-          const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
+          const { sendToParcelTopic } = require("../utils/notifications");
           if (nextCorridor?.created_by) {
-            await sendToUser(nextCorridor.created_by, "New delivery request", "You have a new parcel request.", {
-              parcelId
+            await enqueueNotification({
+              type: NOTIFICATION_EVENT_TYPES.COURIER_REASSIGNED,
+              title: "New delivery request",
+              body: "You have a new parcel request.",
+              recipients: [nextCorridor.created_by],
+              entityType: "parcel",
+              entityId: parcelId,
+              payload: { parcelId, status: "ASSIGNED", reassigned: true }
+            });
+          }
+          if (parcelOwner?.created_by) {
+            await enqueueNotification({
+              type: NOTIFICATION_EVENT_TYPES.COURIER_REASSIGNED,
+              title: "Courier reassigned",
+              body: "A new courier is being assigned to your parcel.",
+              recipients: [parcelOwner.created_by],
+              entityType: "parcel",
+              entityId: parcelId,
+              payload: { parcelId, status: "ASSIGNED", reassigned: true }
             });
           }
           await sendToParcelTopic(parcelId, "Courier reassigned", "Finding a new courier.", {

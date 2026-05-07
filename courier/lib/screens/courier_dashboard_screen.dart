@@ -34,6 +34,8 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   String _serviceState = "OFFLINE";
   String? _activeRouteId;
   String? _selectedRouteId;
+  List<Map<String, dynamic>> _notifications = const [];
+  int _unreadNotifications = 0;
 
   @override
   void initState() {
@@ -56,6 +58,8 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
       final corridors = await corridorsFuture;
       final alerts = await widget.authState.apiClient.getMyTrackingAlerts();
       final serviceState = await widget.authState.apiClient.getCourierServiceState();
+      final notifications =
+          await widget.authState.apiClient.getMyNotifications(limit: 30);
 
       Map<String, dynamic>? vehicle;
       try {
@@ -76,6 +80,10 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
         _serviceState = serviceState["state"]?.toString() ?? "OFFLINE";
         _activeRouteId = serviceState["current_route_id"]?.toString();
         _selectedRouteId ??= _corridors.isNotEmpty ? _corridors.first["id"]?.toString() : null;
+        _notifications = notifications;
+        _unreadNotifications = notifications
+            .where((item) => (item["status"]?.toString() ?? "") == "unread")
+            .length;
       });
       await _loadTrackingHealth();
     } catch (error) {
@@ -88,6 +96,71 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _openNotifications() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Notifications",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await widget.authState.apiClient
+                            .markAllNotificationsRead();
+                        if (mounted) Navigator.of(context).pop();
+                        await _loadDashboard();
+                      },
+                      child: const Text("Mark all read"),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: _notifications
+                        .map(
+                          (item) => ListTile(
+                            title: Text(item["title"]?.toString() ?? "-"),
+                            subtitle: Text(item["body"]?.toString() ?? "-"),
+                            trailing: (item["status"]?.toString() ?? "") == "unread"
+                                ? TextButton(
+                                    onPressed: () async {
+                                      final id = item["id"]?.toString();
+                                      if (id == null || id.isEmpty) return;
+                                      await widget.authState.apiClient
+                                          .markNotificationRead(id);
+                                      if (mounted) Navigator.of(context).pop();
+                                      await _loadDashboard();
+                                    },
+                                    child: const Text("Read"),
+                                  )
+                                : const Icon(Icons.done, size: 16),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _loadTrackingHealth() async {
@@ -251,6 +324,15 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
       appBar: AppBar(
         title: const Text("DropCity Courier"),
         actions: [
+          IconButton(
+            tooltip: "Notifications",
+            onPressed: _openNotifications,
+            icon: Badge.count(
+              count: _unreadNotifications,
+              isLabelVisible: _unreadNotifications > 0,
+              child: const Icon(Icons.notifications_none),
+            ),
+          ),
           IconButton(
             tooltip: "Refresh",
             onPressed: _isLoading ? null : _loadDashboard,

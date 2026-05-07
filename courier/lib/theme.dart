@@ -3,7 +3,7 @@ import "package:flutter/material.dart";
 const Color dropCityTransitTeal = Color(0xFF008080);
 const Color dropCityActiveMint = Color(0xFF26A69A);
 const Color dropCitySafeSlate = Color(0xFF2F4F4F);
-const Color dropCityObsidianDeep = Color(0xFF1A2A2A);
+const Color dropCityObsidianDeep = Color(0xFF06030C);
 const Color dropCityCloudWhite = Color(0xFFF8F9FA);
 
 final ThemeData dropCityLightTheme = ThemeData(

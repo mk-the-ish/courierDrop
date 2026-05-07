@@ -8,6 +8,8 @@ const { parseWktPoint, haversineMeters } = require("../utils/geo");
 const { broadcastParcelStatus, broadcastHandshakeEvent } = require("../ws");
 const config = require("../config");
 const { requireRole, requireAnyRole } = require("../middleware/auth");
+const { enqueueNotification } = require("../services/notification_service");
+const { NOTIFICATION_EVENT_TYPES } = require("../services/notification_events");
 
 const router = express.Router();
 const GPS_GATE_METERS = 50;
@@ -130,6 +132,17 @@ router.post(
       parcelId
     });
     const { sendToParcelTopic } = require("../utils/notifications");
+    if (parcel.created_by) {
+      await enqueueNotification({
+        type: NOTIFICATION_EVENT_TYPES.HANDSHAKE_PIN_READY,
+        title: "PINs ready",
+        body: "Pickup and dropoff PINs have been set.",
+        recipients: [parcel.created_by],
+        entityType: "parcel",
+        entityId: parcelId,
+        payload: { parcelId, status: "PINS_SET" }
+      });
+    }
     await sendToParcelTopic(parcelId, "PINs ready", "Pickup and dropoff PINs have been set.", {
       parcelId,
       status: "PINS_SET"
@@ -297,10 +310,16 @@ router.post(
       .select("created_by")
       .eq("id", parcelId)
       .maybeSingle();
-    const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
+    const { sendToParcelTopic } = require("../utils/notifications");
     if (parcelOwner?.created_by) {
-      await sendToUser(parcelOwner.created_by, "Pickup complete", "Parcel is in transit.", {
-        parcelId
+      await enqueueNotification({
+        type: NOTIFICATION_EVENT_TYPES.HANDSHAKE_PICKUP_COMPLETE,
+        title: "Pickup complete",
+        body: "Parcel is in transit.",
+        recipients: [parcelOwner.created_by],
+        entityType: "parcel",
+        entityId: parcelId,
+        payload: { parcelId, status: "IN_TRANSIT" }
       });
     }
     await sendToParcelTopic(parcelId, "Pickup complete", "Parcel is in transit.", {
@@ -445,10 +464,16 @@ router.post(
       .select("created_by")
       .eq("id", parcelId)
       .maybeSingle();
-    const { sendToUser, sendToParcelTopic } = require("../utils/notifications");
+    const { sendToParcelTopic } = require("../utils/notifications");
     if (parcelOwner?.created_by) {
-      await sendToUser(parcelOwner.created_by, "Delivery complete", "Parcel delivered.", {
-        parcelId
+      await enqueueNotification({
+        type: NOTIFICATION_EVENT_TYPES.HANDSHAKE_DELIVERY_COMPLETE,
+        title: "Delivery complete",
+        body: "Parcel delivered.",
+        recipients: [parcelOwner.created_by],
+        entityType: "parcel",
+        entityId: parcelId,
+        payload: { parcelId, status: "COMPLETED" }
       });
     }
     await sendToParcelTopic(parcelId, "Delivery complete", "Parcel delivered.", {

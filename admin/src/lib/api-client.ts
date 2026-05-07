@@ -67,6 +67,29 @@ class ApiClient {
   async getAlerts() {
     return this.request('/admin/alerts/rules');
   }
+
+  async getMyNotifications(status?: "read" | "unread", limit = 20, offset = 0) {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    if (status) {
+      params.set("status", status);
+    }
+    return this.request(`/notifications/me?${params.toString()}`);
+  }
+
+  async markNotificationRead(notificationId: string) {
+    return this.request(`/notifications/${notificationId}/read`, {
+      method: "POST",
+    });
+  }
+
+  async markAllNotificationsRead() {
+    return this.request(`/notifications/read-all`, {
+      method: "POST",
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

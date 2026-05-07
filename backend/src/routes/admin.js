@@ -11,6 +11,39 @@ const { parseWktPoint, haversineMeters } = require("../utils/geo");
 const router = express.Router();
 
 router.get(
+  "/notifications/health",
+  requireRole("admin"),
+  asyncHandler(async (_req, res) => {
+    const supabase = getSupabase();
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const [backlogRes, failedRes, processedRes] = await Promise.all([
+      supabase
+        .from("notification_outbox")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["pending", "retry"]),
+      supabase
+        .from("notification_outbox")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "dead_letter"),
+      supabase
+        .from("notification_outbox")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "processed")
+        .gte("processed_at", since24h)
+    ]);
+    const firstError = backlogRes.error || failedRes.error || processedRes.error;
+    if (firstError) {
+      throw new ApiError(firstError.message, 500, "NOTIFICATION_HEALTH_FAILED");
+    }
+    return res.json({
+      outboxBacklogSize: backlogRes.count || 0,
+      failedAttemptsCount: failedRes.count || 0,
+      processedLast24h: processedRes.count || 0
+    });
+  })
+);
+
+router.get(
   "/health/heartbeats",
   requireRole("admin"),
   asyncHandler(async (_req, res) => {
@@ -204,47 +237,66 @@ router.get(
   requireRole("admin"),
   asyncHandler(async (_req, res) => {
     const supabase = getSupabase();
+    if (!supabase) {
+      throw new ApiError("Database connection unavailable", 503, "DATABASE_UNAVAILABLE");
+    }
+
     const now = new Date();
     const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000).toISOString();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
-    const [inTransitRes, staleRes, alertsRes, trackingRes] = await Promise.all([
-      supabase.from("parcels").select("id", { count: "exact", head: true }).eq("status", "IN_TRANSIT"),
-      supabase
-        .from("parcels")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "IN_TRANSIT")
-        .or(`tracking_last_update.is.null,tracking_last_update.lt.${tenMinutesAgo}`),
-      supabase
-        .from("route_deviation_events")
-        .select("id,deviation_type,created_at")
-        .gte("created_at", twentyFourHoursAgo),
-      supabase
-        .from("courier_tracking_logs")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", twentyFourHoursAgo)
-    ]);
+    try {
+      const [inTransitRes, staleRes, alertsRes, trackingRes] = await Promise.all([
+        supabase.from("parcels").select("id", { count: "exact", head: true }).eq("status", "IN_TRANSIT"),
+        supabase
+          .from("parcels")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "IN_TRANSIT")
+          .or(`tracking_last_update.is.null,tracking_last_update.lt.${tenMinutesAgo}`),
+        supabase
+          .from("route_deviation_events")
+          .select("id,deviation_type,created_at")
+          .gte("created_at", twentyFourHoursAgo),
+        supabase
+          .from("courier_tracking_logs")
+          .select("id", { count: "exact", head: true })
+          .gte("created_at", twentyFourHoursAgo)
+      ]);
 
-    const aggregateAlerts = {};
-    for (const alert of alertsRes.data || []) {
-      const key = alert.deviation_type || "UNKNOWN";
-      aggregateAlerts[key] = (aggregateAlerts[key] || 0) + 1;
-    }
-
-    const scheduler = getScheduler();
-    const trackingJob = scheduler.getJobStatus("validate_tracking");
-    const cleanupJob = scheduler.getJobStatus("cleanup_tracking_data");
-
-    return res.json({
-      inTransitCount: inTransitRes.count || 0,
-      stalledTrackingCount: staleRes.count || 0,
-      trackingLogsLast24h: trackingRes.count || 0,
-      deviationEventsLast24h: aggregateAlerts,
-      scheduler: {
-        validateTracking: trackingJob,
-        cleanupTrackingData: cleanupJob
+      // Check for errors in responses
+      if (inTransitRes.error || staleRes.error || alertsRes.error || trackingRes.error) {
+        const firstError = inTransitRes.error || staleRes.error || alertsRes.error || trackingRes.error;
+        throw new ApiError(firstError.message, 500, "TRACKING_OBSERVABILITY_FAILED");
       }
-    });
+
+      const aggregateAlerts = {};
+      for (const alert of alertsRes.data || []) {
+        const key = alert.deviation_type || "UNKNOWN";
+        aggregateAlerts[key] = (aggregateAlerts[key] || 0) + 1;
+      }
+
+      const scheduler = getScheduler();
+      const trackingJob = scheduler.getJobStatus("validate_tracking");
+      const cleanupJob = scheduler.getJobStatus("cleanup_tracking_data");
+
+      return res.json({
+        inTransitCount: inTransitRes.count || 0,
+        stalledTrackingCount: staleRes.count || 0,
+        trackingLogsLast24h: trackingRes.count || 0,
+        deviationEventsLast24h: aggregateAlerts,
+        scheduler: {
+          validateTracking: trackingJob,
+          cleanupTrackingData: cleanupJob
+        }
+      });
+    } catch (error) {
+      console.error("[Tracking Observability] Error:", error.message);
+      throw new ApiError(
+        `Tracking observability error: ${error.message}`,
+        500,
+        "TRACKING_OBSERVABILITY_ERROR"
+      );
+    }
   })
 );
 

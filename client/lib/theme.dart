@@ -29,7 +29,7 @@ final ThemeData dropCityLightTheme = ThemeData(
 
 final ThemeData dropCityDarkTheme = ThemeData(
   brightness: Brightness.dark,
-  scaffoldBackgroundColor: dropCityObsidianDeep,
+  scaffoldBackgroundColor: const Color.fromARGB(255, 0, 14, 14),
   primaryColor: dropCityTransitTeal,
   cardColor: dropCitySafeSlate,
   colorScheme: const ColorScheme.dark(

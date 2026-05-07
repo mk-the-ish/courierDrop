@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from './Sidebar.tsx';
 import { useAdminAuth } from "@/lib/admin-auth";
+import NotificationBell from "./NotificationBell";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -42,6 +43,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <Sidebar />
       <main className="flex-1 ml-64 p-8">
         <div className="max-w-7xl mx-auto">
+          <div className="mb-4 flex justify-end">
+            <NotificationBell />
+          </div>
           {children}
         </div>
       </main>

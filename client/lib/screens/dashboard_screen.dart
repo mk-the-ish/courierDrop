@@ -22,6 +22,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _activeParcelsTimer;
   bool _ratingSheetOpen = false;
   final Set<String> _ratingInProgress = {};
+  List<Map<String, dynamic>> _notifications = const [];
+  int _unreadNotifications = 0;
 
   @override
   void initState() {
@@ -46,12 +48,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
     try {
       final data = await widget.authState.apiClient.getClientDashboard();
+      final notifications =
+          await widget.authState.apiClient.getMyNotifications(limit: 30);
       if (!mounted) {
         return;
       }
       setState(() {
         _stats = data.stats;
         _parcels = data.parcels;
+        _notifications = notifications;
+        _unreadNotifications = notifications
+            .where((item) => (item["status"]?.toString() ?? "") == "unread")
+            .length;
       });
       _checkForPendingRating();
     } catch (error) {
@@ -64,6 +72,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _openNotifications() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Notifications",
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await widget.authState.apiClient
+                            .markAllNotificationsRead();
+                        if (mounted) Navigator.of(context).pop();
+                        await _loadDashboard();
+                      },
+                      child: const Text("Mark all read"),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: _notifications
+                        .map(
+                          (item) => ListTile(
+                            title: Text(item["title"]?.toString() ?? "-"),
+                            subtitle: Text(item["body"]?.toString() ?? "-"),
+                            trailing: (item["status"]?.toString() ?? "") == "unread"
+                                ? TextButton(
+                                    onPressed: () async {
+                                      final id = item["id"]?.toString();
+                                      if (id == null || id.isEmpty) return;
+                                      await widget.authState.apiClient
+                                          .markNotificationRead(id);
+                                      if (mounted) Navigator.of(context).pop();
+                                      await _loadDashboard();
+                                    },
+                                    child: const Text("Read"),
+                                  )
+                                : const Icon(Icons.done, size: 16),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _checkForPendingRating() {
@@ -199,6 +272,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text("DropCity Dashboard"),
         actions: [
+          IconButton(
+            onPressed: _openNotifications,
+            icon: Badge.count(
+              count: _unreadNotifications,
+              isLabelVisible: _unreadNotifications > 0,
+              child: const Icon(Icons.notifications_none),
+            ),
+            tooltip: "Notifications",
+          ),
           IconButton(
             onPressed: _isLoading ? null : _loadDashboard,
             icon: const Icon(Icons.refresh),

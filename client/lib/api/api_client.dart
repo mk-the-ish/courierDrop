@@ -506,4 +506,40 @@ class ApiClient {
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     return decoded["url"] as String;
   }
+
+  Future<List<Map<String, dynamic>>> getMyNotifications({
+    String? status,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final query = <String, dynamic>{
+      "limit": limit.toString(),
+      "offset": offset.toString(),
+      if (status != null && status.isNotEmpty) "status": status,
+    };
+    final uri = Uri.parse("$baseUrl/notifications/me").replace(queryParameters: query);
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Notification fetch failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = decoded["notifications"] as List<dynamic>? ?? [];
+    return rows.map((item) => (item as Map).cast<String, dynamic>()).toList();
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    final uri = Uri.parse("$baseUrl/notifications/$notificationId/read");
+    final response = await _client.post(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Mark notification read failed: ${response.body}");
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final uri = Uri.parse("$baseUrl/notifications/read-all");
+    final response = await _client.post(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Mark all notifications read failed: ${response.body}");
+    }
+  }
 }

@@ -19,6 +19,7 @@ const adminRoutes = require("./routes/admin");
 const deviceRoutes = require("./routes/devices");
 const courierRoutes = require("./routes/couriers");
 const trackingRoutes = require("./routes/tracking");
+const notificationRoutes = require("./routes/notifications");
 const { initWebSocket } = require("./ws");
 const { initializeDefaultJobs, getScheduler } = require("./services/scheduler");
 
@@ -76,6 +77,7 @@ app.use("/admin", requireUser, adminRoutes);
 app.use("/devices", requireUser, deviceRoutes);
 app.use("/couriers", requireUser, courierRoutes);
 app.use("/tracking", requireUser, trackingRoutes);
+app.use("/notifications", requireUser, notificationRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({

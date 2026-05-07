@@ -39,7 +39,16 @@ function getFirebaseMessaging() {
   return admin.messaging();
 }
 
+function getFirestore() {
+  const initialized = initializeFirebase();
+  if (!initialized) {
+    return null;
+  }
+  return admin.firestore();
+}
+
 module.exports = {
   getFirebaseAuth,
-  getFirebaseMessaging
+  getFirebaseMessaging,
+  getFirestore
 };

@@ -4,6 +4,8 @@
  */
 
 const { getSupabase } = require("../supabase");
+const { enqueueNotification } = require("../services/notification_service");
+const { NOTIFICATION_EVENT_TYPES } = require("../services/notification_events");
 
 const OFF_CORRIDOR_ALERT_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
 const STALLED_PROGRESS_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
@@ -109,6 +111,21 @@ async function validateTrackingHealth() {
 
             if (!alertError) {
               alertsRaised++;
+              if (parcel.assigned_courier_id) {
+                await enqueueNotification({
+                  type: NOTIFICATION_EVENT_TYPES.TRACKING_DEVIATION_CRITICAL,
+                  title: "Route deviation alert",
+                  body: "You have been off-corridor for too long.",
+                  recipients: [parcel.assigned_courier_id],
+                  entityType: "parcel",
+                  entityId: parcel.id,
+                  payload: {
+                    parcelId: parcel.id,
+                    deviationType: "OFF_CORRIDOR_PROLONGED",
+                    durationSeconds: Math.floor(timeOffCorridor / 1000)
+                  }
+                });
+              }
               console.log(
                 `[TrackingValidation] ⚠️ Route deviation alert for parcel ${parcel.id}: OFF_CORRIDOR for ${Math.floor(timeOffCorridor / 1000)}s`
               );
@@ -154,6 +171,21 @@ async function validateTrackingHealth() {
 
             if (!alertError) {
               alertsRaised++;
+              if (parcel.assigned_courier_id) {
+                await enqueueNotification({
+                  type: NOTIFICATION_EVENT_TYPES.TRACKING_DEVIATION_CRITICAL,
+                  title: "Tracking stalled",
+                  body: "No recent tracking updates detected.",
+                  recipients: [parcel.assigned_courier_id],
+                  entityType: "parcel",
+                  entityId: parcel.id,
+                  payload: {
+                    parcelId: parcel.id,
+                    deviationType: "NO_RECENT_TRACKING",
+                    durationSeconds: Math.floor(timeSinceLastUpdate / 1000)
+                  }
+                });
+              }
               console.log(
                 `[TrackingValidation] ⚠️ Tracking stalled for parcel ${parcel.id}: No update for ${Math.floor(timeSinceLastUpdate / 1000)}s`
               );

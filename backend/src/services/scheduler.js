@@ -5,6 +5,7 @@ const { checkAlerts } = require("../jobs/check_alerts");
 const { matchPendingParcels } = require("./matching");
 const { validateTrackingHealth } = require("../jobs/tracking_validation");
 const { cleanupTrackingData } = require("../jobs/cleanup_tracking_data");
+const { runNotificationOutboxJob } = require("../jobs/process_notification_outbox");
 
 class JobScheduler {
   constructor() {
@@ -328,6 +329,16 @@ function initializeDefaultJobs() {
     cleanupTrackingData,
     {
       description: "Cleans up old tracking logs and deviation events per privacy policy"
+    }
+  );
+
+  // Notification outbox processor: runs every 30 seconds
+  scheduler.registerJob(
+    "process_notification_outbox",
+    "*/30 * * * * *",
+    runNotificationOutboxJob,
+    {
+      description: "Processes notification outbox and retries failed deliveries"
     }
   );
 }
