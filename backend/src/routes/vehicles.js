@@ -131,14 +131,9 @@ router.get(
       throw new ApiError(error.message, 500, "VEHICLE_LOOKUP_FAILED");
     }
 
-    if (!data) {
-      return res.status(404).json({
-        error: "Vehicle not found",
-        code: "VEHICLE_NOT_FOUND"
-      });
-    }
-
-    return res.json(data);
+    // Return empty object or null if no vehicle found (don't 404)
+    // This allows app to show "no vehicle" state without throwing error
+    return res.json(data || {});
   })
 );
 

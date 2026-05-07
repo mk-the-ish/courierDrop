@@ -539,7 +539,7 @@ router.get(
   "/vehicles",
   requireRole("admin"),
   asyncHandler(async (req, res) => {
-    const { status = "unverified", limit = 50, offset = 0 } = req.query || {};
+    const { status, limit = 50, offset = 0 } = req.query || {};
     const supabase = getSupabase();
 
     let query = supabase
