@@ -89,18 +89,23 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
       return [];
     }
     final decoded = jsonDecode(response.body) as List<dynamic>;
-    return decoded.map((item) {
-      final map = item as Map<String, dynamic>;
-      return _PlaceSuggestion(
-        displayName: map["display_name"]?.toString() ?? "Unknown location",
-        latitude: double.tryParse(map["lat"]?.toString() ?? "") ?? 0,
-        longitude: double.tryParse(map["lon"]?.toString() ?? "") ?? 0,
-      );
-    }).where((suggestion) => suggestion.latitude != 0 || suggestion.longitude != 0).toList();
+    return decoded
+        .map((item) {
+          final map = item as Map<String, dynamic>;
+          return _PlaceSuggestion(
+            displayName: map["display_name"]?.toString() ?? "Unknown location",
+            latitude: double.tryParse(map["lat"]?.toString() ?? "") ?? 0,
+            longitude: double.tryParse(map["lon"]?.toString() ?? "") ?? 0,
+          );
+        })
+        .where((suggestion) =>
+            suggestion.latitude != 0 || suggestion.longitude != 0)
+        .toList();
   }
 
   void _onOriginChanged(String value) {
-    if (_selectedOrigin != null && value.trim() != _selectedOrigin!.displayName) {
+    if (_selectedOrigin != null &&
+        value.trim() != _selectedOrigin!.displayName) {
       _selectedOrigin = null;
     }
     _originDebounce?.cancel();
@@ -188,10 +193,10 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
     }
 
     setState(() => _isSubmitting = true);
-    final originValue = _selectedOrigin?.coordString ??
-        _originController.text.trim();
-    final destinationValue = _selectedDestination?.coordString ??
-        _destinationController.text.trim();
+    final originValue =
+        _selectedOrigin?.coordString ?? _originController.text.trim();
+    final destinationValue =
+        _selectedDestination?.coordString ?? _destinationController.text.trim();
     final payload = {
       "clientId": const Uuid().v4(),
       "origin": originValue,
@@ -236,7 +241,8 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Queued offline. Will retry on reconnect.")),
+        const SnackBar(
+            content: Text("Queued offline. Will retry on reconnect.")),
       );
     } finally {
       if (mounted) {
@@ -271,7 +277,8 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     "Last Parcel ID: $_lastParcelId",
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.teal),
                   ),
                 ),
               const SizedBox(height: 16),
@@ -290,12 +297,11 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
                   prefixIcon: Icon(Icons.location_on),
                 ),
                 onChanged: _onOriginChanged,
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? "Required"
-                        : _selectedOrigin == null
-                            ? "Select a suggested location or use map picker"
-                            : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? "Required"
+                    : _selectedOrigin == null
+                        ? "Select a suggested location or use map picker"
+                        : null,
               ),
               if (_isSearchingOrigin)
                 const Padding(
@@ -331,12 +337,11 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
                   prefixIcon: Icon(Icons.location_on),
                 ),
                 onChanged: _onDestinationChanged,
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? "Required"
-                        : _selectedDestination == null
-                            ? "Select a suggested location or use map picker"
-                            : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? "Required"
+                    : _selectedDestination == null
+                        ? "Select a suggested location or use map picker"
+                        : null,
               ),
               if (_isSearchingDestination)
                 const Padding(
@@ -385,14 +390,17 @@ class _ParcelRequestScreenState extends State<ParcelRequestScreen> {
                   DropdownMenuItem(value: "Express", child: Text("Express")),
                   DropdownMenuItem(value: "Same-day", child: Text("Same-day")),
                 ],
-                onChanged: isBusy ? null : (value) => setState(() => _priority = value!),
+                onChanged: isBusy
+                    ? null
+                    : (value) => setState(() => _priority = value!),
               ),
               const SizedBox(height: 12),
               SwitchListTile(
                 title: const Text("Fragile item"),
                 subtitle: const Text("Couriers will handle with care"),
                 value: _fragile,
-                onChanged: isBusy ? null : (value) => setState(() => _fragile = value),
+                onChanged:
+                    isBusy ? null : (value) => setState(() => _fragile = value),
               ),
               const SizedBox(height: 8),
               TextFormField(

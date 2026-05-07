@@ -18,7 +18,7 @@ class ErrorReporter {
 
   final ApiClient _apiClient;
   final AuthState _authState;
-  StreamSubscription<List<ConnectivityResult>>? _subscription;
+  StreamSubscription<List<ConnectivityResult>>? subscription;
   bool _isFlushing = false;
 
   static const _queueKey = "error_log_queue";
@@ -26,7 +26,7 @@ class ErrorReporter {
 
   Future<void> start() async {
     await _flushQueue();
-    _subscription = Connectivity().onConnectivityChanged.listen((_) {
+    subscription = Connectivity().onConnectivityChanged.listen((_) {
       _flushQueue();
     });
   }
@@ -72,15 +72,15 @@ class ErrorReporter {
     if (Platform.isAndroid) {
       final android = await info.androidInfo;
       return {
-        "deviceModel": android.model ?? "Android",
-        "osVersion": android.version.release ?? Platform.operatingSystemVersion
+        "deviceModel": android.model,
+        "osVersion": android.version.release
       };
     }
     if (Platform.isIOS) {
       final ios = await info.iosInfo;
       return {
-        "deviceModel": ios.utsname.machine ?? "iOS",
-        "osVersion": ios.systemVersion ?? Platform.operatingSystemVersion
+        "deviceModel": ios.utsname.machine,
+        "osVersion": ios.systemVersion
       };
     }
     return {
