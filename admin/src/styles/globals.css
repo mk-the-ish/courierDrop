@@ -39,11 +39,11 @@
     --sidebar-ring: 0 128 128; /* Transit Teal */
   }
   .dark {
-    --background: 15 23 42; /* Dark variant */
-    --foreground: 248 249 250;
-    --card: 30 41 59;
+    --background: 26 42 42; /* Obsidian Deep */
+    --foreground: 248 249 250; /* Cloud White text */
+    --card: 47 79 79; /* Safe Slate surfaces */
     --card-foreground: 248 249 250;
-    --popover: 30 41 59;
+    --popover: 47 79 79;
     --popover-foreground: 248 249 250;
     --primary: 0 128 128; /* Transit Teal */
     --primary-foreground: 248 249 250;
@@ -55,8 +55,8 @@
     --accent-foreground: 15 23 42;
     --destructive: 239 68 68;
     --destructive-foreground: 248 249 250;
-    --border: 71 85 105;
-    --input: 71 85 105;
+    --border: 61 90 90; /* Soft slate divider lines */
+    --input: 61 90 90;
     --ring: 0 128 128; /* Transit Teal */
     --chart-1: 0 128 128; /* Transit Teal */
     --chart-2: 34 197 94; /* Success Green */

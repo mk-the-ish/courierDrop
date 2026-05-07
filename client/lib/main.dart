@@ -14,6 +14,7 @@ import "screens/login_screen.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
 import "firebase_options.dart";
+import "theme.dart";
 
 Future<void> main() async {
   // 1. Initialize bindings first
@@ -185,10 +186,9 @@ class _DropCityClientAppState extends State<DropCityClientApp> {
         return MaterialApp(
           title: "DropCity Client",
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-            useMaterial3: true,
-          ),
+          theme: dropCityLightTheme,
+          darkTheme: dropCityDarkTheme,
+          themeMode: ThemeMode.system,
           home: _restoring
               ? _LaunchScreen(
                   hint: _restoreHint,

@@ -14,6 +14,7 @@ import "screens/login_screen.dart";
 import "services/courier_tracking_service.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
+import "theme.dart";
 
 void main() {
   // MUST be the first call - before any async/zone operations
@@ -233,10 +234,9 @@ class _DropCityCourierAppState extends State<DropCityCourierApp>
         return MaterialApp(
           title: "DropCity Courier",
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-            useMaterial3: true,
-          ),
+          theme: dropCityLightTheme,
+          darkTheme: dropCityDarkTheme,
+          themeMode: ThemeMode.system,
           home: _restoring
               ? _LaunchScreen(
                   hint: _restoreHint,
