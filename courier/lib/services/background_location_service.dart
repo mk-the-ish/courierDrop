@@ -1,0 +1,305 @@
+import 'package:background_geolocation/background_geolocation.dart' as bg;
+
+/**
+ * Background Location Service
+ * Manages flutter_background_geolocation plugin initialization, state, and position updates
+ * 
+ * Usage:
+ *   final service = BackgroundLocationService();
+ *   await service.initialize(onLocation: (location) => uploadToBackend(location));
+ *   await service.startTracking();
+ *   // ... tracking happens in background
+ *   await service.stopTracking();
+ */
+
+class BackgroundLocationService {
+  static final BackgroundLocationService _instance = BackgroundLocationService._internal();
+
+  factory BackgroundLocationService() {
+    return _instance;
+  }
+
+  BackgroundLocationService._internal();
+
+  bool _isInitialized = false;
+  bool _isTracking = false;
+  Function(bg.Location)? _onLocation;
+
+  bool get isInitialized => _isInitialized;
+  bool get isTracking => _isTracking;
+
+  /**
+   * Initialize the background geolocation plugin
+   * Must be called before startTracking()
+   * 
+   * Configuration:
+   * - desiredAccuracy: 0 = high accuracy (30m), 10 = cell-level accuracy
+   * - distanceFilter: Minimum distance in meters before update (default 50m)
+   * - stopOnTerminate: Continue tracking when app is terminated
+   * - startOnBoot: Auto-start tracking when device boots
+   * - foregroundService: Show persistent notification while tracking
+   */
+  Future<void> initialize({
+    required Function(bg.Location location) onLocation,
+  }) async {
+    if (_isInitialized) return;
+
+    _onLocation = onLocation;
+
+    try {
+      // Configuration
+      await bg.BackgroundGeolocation.ready(bg.Config(
+        // Accuracy & distance
+        desiredAccuracy: bg.Config.DESIRED_ACCURACY_NAVIGATION, // High accuracy, ~10m
+        distanceFilter: 25.0, // Update every 25m (avoid excessive updates)
+        stationaryRadius: 50.0, // Consider stationary if within 50m for 5 min
+        
+        // Activity tracking
+        activityType: bg.Config.ACTIVITY_TYPE_OTHER_NAVIGATION,
+        activityRecognitionInterval: 5000, // Check activity every 5s
+        
+        // Stop conditions
+        stopOnTerminate: false, // Keep tracking when app closes
+        startOnBoot: true, // Auto-start on device reboot
+        
+        // Geofencing
+        geofenceInitialTriggerEntry: true,
+        geofenceProximityRadius: 200.0, // Proximity detection radius
+        
+        // Notifications & UI
+        foregroundService: true, // Persistent notification
+        notificationTitle: "DropCity Delivery Tracking",
+        notificationText: "Tracking your delivery in progress",
+        notificationSmallIcon: "ic_launcher", // Android notification icon
+        notificationLargeIcon: "ic_launcher",
+        notificationColor: "#00aced0",
+        
+        // HTTP logging (useful for debugging)
+        logLevel: bg.Config.LOG_LEVEL_VERBOSE,
+        debug: false, // Set to false for production
+        
+        // Geofence options
+        maxRecordsToPersist: 500,
+        locationsOrderDirection: 'DESC',
+      ));
+
+      // Register listeners
+      _registerLocationCallback();
+      _registerGeofenceCallback();
+
+      _isInitialized = true;
+      print('[BackgroundLocation] Initialized successfully');
+    } catch (e) {
+      print('[BackgroundLocation] Initialization failed: $e');
+      rethrow;
+    }
+  }
+
+  /**
+   * Register callback for location updates
+   */
+  void _registerLocationCallback() {
+    bg.BackgroundGeolocation.onLocation((bg.Location location) {
+      print('[BackgroundLocation] Location: ${location.latitude}, ${location.longitude}, accuracy: ${location.accuracy}m');
+      
+      // Call the provided callback
+      if (_onLocation != null) {
+        _onLocation!(location);
+      }
+    });
+
+    // Handle errors
+    bg.BackgroundGeolocation.onLocationError((int error) {
+      print('[BackgroundLocation] Location error code: $error');
+    });
+  }
+
+  /**
+   * Register callback for geofence violations
+   */
+  void _registerGeofenceCallback() {
+    bg.BackgroundGeolocation.onGeofence((bg.GeofenceEvent event) {
+      print('[BackgroundLocation] Geofence: ${event.identifier}, action: ${event.action}');
+      
+      // Can trigger checkpoint verification when entering delivery zone
+      if (event.action == 'ENTER') {
+        print('[BackgroundLocation] Entered checkpoint zone: ${event.identifier}');
+      } else if (event.action == 'EXIT') {
+        print('[BackgroundLocation] Exited checkpoint zone: ${event.identifier}');
+      } else if (event.action == 'DWELL') {
+        print('[BackgroundLocation] Dwelling in zone: ${event.identifier}');
+      }
+    });
+  }
+
+  /**
+   * Start background location tracking
+   */
+  Future<void> startTracking() async {
+    if (!_isInitialized) {
+      throw Exception('BackgroundLocationService not initialized. Call initialize() first.');
+    }
+
+    if (_isTracking) return;
+
+    try {
+      final state = await bg.BackgroundGeolocation.start();
+      _isTracking = state;
+      print('[BackgroundLocation] Tracking started. Motion state: ${state}');
+    } catch (e) {
+      print('[BackgroundLocation] Failed to start tracking: $e');
+      rethrow;
+    }
+  }
+
+  /**
+   * Stop background location tracking
+   */
+  Future<void> stopTracking() async {
+    if (!_isTracking) return;
+
+    try {
+      await bg.BackgroundGeolocation.stop();
+      _isTracking = false;
+      print('[BackgroundLocation] Tracking stopped');
+    } catch (e) {
+      print('[BackgroundLocation] Failed to stop tracking: $e');
+      rethrow;
+    }
+  }
+
+  /**
+   * Get current location immediately
+   * Useful for GPS gate verification at pickup/dropoff
+   */
+  Future<bg.Location> getCurrentLocation() async {
+    try {
+      final location = await bg.BackgroundGeolocation.getCurrentPosition(
+        samples: 3, // Take 3 samples for accuracy
+        timeout: 30, // 30 second timeout
+        maximumAge: 5000, // Use cache if < 5 seconds old
+      );
+      return location;
+    } catch (e) {
+      print('[BackgroundLocation] Failed to get current location: $e');
+      rethrow;
+    }
+  }
+
+  /**
+   * Add geofence for checkpoint
+   * Triggers callback when courier enters/exits zone
+   */
+  Future<void> addCheckpointGeofence({
+    required String checkpointId,
+    required double latitude,
+    required double longitude,
+    required double radiusMeters,
+  }) async {
+    if (!_isInitialized) return;
+
+    try {
+      await bg.BackgroundGeolocation.addGeofence(bg.Geofence(
+        identifier: checkpointId,
+        latitude: latitude,
+        longitude: longitude,
+        radius: radiusMeters,
+        notifyOnEntry: true,
+        notifyOnExit: true,
+        loiteringDelay: 30000, // 30 second dwell time before DWELL event
+      ));
+      print('[BackgroundLocation] Geofence added: $checkpointId (${radiusMeters}m)');
+    } catch (e) {
+      print('[BackgroundLocation] Failed to add geofence: $e');
+    }
+  }
+
+  /**
+   * Remove geofence
+   */
+  Future<void> removeCheckpointGeofence(String checkpointId) async {
+    if (!_isInitialized) return;
+
+    try {
+      await bg.BackgroundGeolocation.removeGeofence(checkpointId);
+      print('[BackgroundLocation] Geofence removed: $checkpointId');
+    } catch (e) {
+      print('[BackgroundLocation] Failed to remove geofence: $e');
+    }
+  }
+
+  /**
+   * Get list of currently tracked geofences
+   */
+  Future<List<bg.Geofence>> getGeofences() async {
+    if (!_isInitialized) return [];
+
+    try {
+      final geofences = await bg.BackgroundGeolocation.geofences;
+      return geofences;
+    } catch (e) {
+      print('[BackgroundLocation] Failed to get geofences: $e');
+      return [];
+    }
+  }
+
+  /**
+   * Enable/disable location accuracy filter
+   * When enabled, poor accuracy locations are ignored
+   */
+  Future<void> setDesiredAccuracy(int accuracy) async {
+    if (!_isInitialized) return;
+
+    try {
+      await bg.BackgroundGeolocation.setDesiredAccuracy(accuracy);
+      print('[BackgroundLocation] Desired accuracy set to: $accuracy');
+    } catch (e) {
+      print('[BackgroundLocation] Failed to set desired accuracy: $e');
+    }
+  }
+
+  /**
+   * Enable motion activity recognition
+   * Intelligently pauses tracking when stationary
+   */
+  Future<void> enableMotionActivityRecognition() async {
+    if (!_isInitialized) return;
+
+    try {
+      await bg.BackgroundGeolocation.startActivityRecognition();
+      print('[BackgroundLocation] Motion activity recognition enabled');
+    } catch (e) {
+      print('[BackgroundLocation] Failed to enable motion recognition: $e');
+    }
+  }
+
+  /**
+   * Check permission and request if needed
+   */
+  Future<bool> checkAndRequestPermission() async {
+    try {
+      final permission = await bg.BackgroundGeolocation.checkStatus();
+      
+      if (!permission.hasPermission) {
+        final requestResult = await bg.BackgroundGeolocation.requestPermission();
+        return requestResult;
+      }
+      
+      return true;
+    } catch (e) {
+      print('[BackgroundLocation] Permission check failed: $e');
+      return false;
+    }
+  }
+
+  /**
+   * Cleanup: Stop tracking and reset state
+   */
+  Future<void> dispose() async {
+    if (_isTracking) {
+      await stopTracking();
+    }
+    _isInitialized = false;
+    print('[BackgroundLocation] Disposed');
+  }
+}

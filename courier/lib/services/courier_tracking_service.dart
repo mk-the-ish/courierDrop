@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:io";
 
 import "package:connectivity_plus/connectivity_plus.dart";
+import "package:device_info_plus/device_info_plus.dart";
 import "package:flutter/foundation.dart";
 import "package:geolocator/geolocator.dart";
 import "package:shared_preferences/shared_preferences.dart";
@@ -37,6 +38,49 @@ class CourierTrackingService {
   final Set<String> _activeParcelIds = <String>{};
   bool _isRunning = false;
   bool _isFlushing = false;
+  Map<String, dynamic>? _deviceInfoCache;
+
+  Future<Map<String, dynamic>> _telemetrySnapshot() async {
+    try {
+      _deviceInfoCache ??= await _loadDeviceInfo();
+      final connectivity = await Connectivity().checkConnectivity();
+      return {
+        "deviceInfo": _deviceInfoCache,
+        "networkInfo": {
+          "types": connectivity.map((e) => e.name).toList(),
+        },
+      };
+    } catch (_) {
+      return {
+        "deviceInfo": _deviceInfoCache ?? const <String, dynamic>{},
+        "networkInfo": const <String, dynamic>{},
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> _loadDeviceInfo() async {
+    final plugin = DeviceInfoPlugin();
+    if (Platform.isAndroid) {
+      final a = await plugin.androidInfo;
+      return {
+        "brand": a.brand,
+        "model": a.model,
+        "manufacturer": a.manufacturer,
+        "os": "android",
+        "sdkInt": a.version.sdkInt,
+      };
+    }
+    if (Platform.isIOS) {
+      final ios = await plugin.iosInfo;
+      return {
+        "model": ios.model,
+        "name": ios.name,
+        "os": "ios",
+        "systemVersion": ios.systemVersion,
+      };
+    }
+    return {"os": Platform.operatingSystem};
+  }
 
   Future<void> start(AuthState authState) async {
     if (_isRunning) {
@@ -227,12 +271,15 @@ class CourierTrackingService {
         return false;
       }
       debugPrint("[Tracking.sendLiveUpdate] SENDING: parcelId=$parcelId, lat=$lat, lng=$lng");
+      final telemetry = await _telemetrySnapshot();
       await _apiClient
           .postTrackingUpdate(
             parcelId: parcelId,
             lat: lat,
             lng: lng,
             accuracy: accuracy,
+            deviceInfo: telemetry["deviceInfo"] as Map<String, dynamic>?,
+            networkInfo: telemetry["networkInfo"] as Map<String, dynamic>?,
           )
           .timeout(const Duration(seconds: 5));
       debugPrint("[Tracking.sendLiveUpdate] SUCCESS: parcelId=$parcelId");

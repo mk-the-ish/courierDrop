@@ -3,6 +3,13 @@ const { getSupabase } = require("../supabase");
 const config = require("../config");
 
 async function attachRoleFromUsersTable(req, uid) {
+  // First check if role is already in Firebase custom claims
+  if (req.user?.role || req.user?.roles || req.user?.claims?.role) {
+    // Role already present from Firebase claims
+    return;
+  }
+
+  // Fall back to Supabase users table
   const supabase = getSupabase();
   if (!supabase || !uid) return;
   const { data: userData, error } = await supabase
@@ -52,10 +59,21 @@ async function authMiddleware(req, res, next) {
     if (firebaseAuth) {
       try {
         const decoded = await firebaseAuth.verifyIdToken(token);
-        req.user = decoded;
+        // Firebase custom claims are included in the decoded token
+        req.user = {
+          uid: decoded.uid,
+          email: decoded.email,
+          name: decoded.name,
+          // Include custom claims for role-based access
+          role: decoded.role,
+          roles: decoded.roles,
+          claims: decoded
+        };
+        // Try to load additional role info from Supabase if not in claims
         await attachRoleFromUsersTable(req, decoded.uid);
         return next();
-      } catch (_) {
+      } catch (firebaseError) {
+        console.debug("[Auth] Firebase verification failed:", firebaseError.message);
         // Fall through to Supabase token verification.
       }
     }
@@ -77,9 +95,10 @@ async function authMiddleware(req, res, next) {
       code: "AUTH_INVALID_TOKEN"
     });
   } catch (error) {
+    console.error("[Auth] Authentication error:", error.message);
     return res.status(401).json({
-      error: "Invalid token",
-      code: "AUTH_INVALID_TOKEN"
+      error: "Authentication error",
+      code: "AUTH_ERROR"
     });
   }
 }

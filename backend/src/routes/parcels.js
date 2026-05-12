@@ -6,6 +6,9 @@ const { requireRole } = require("../middleware/auth");
 const { parseWktPoint, haversineMeters } = require("../utils/geo");
 const { enqueueNotification } = require("../services/notification_service");
 const { NOTIFICATION_EVENT_TYPES } = require("../services/notification_events");
+const { getRecommendedPrice, validateUserPrice } = require("../services/price_recommendation");
+const { aggregateCourierRating, submitParcelRating } = require("../services/rating_aggregator");
+const { parcelClientRecipients } = require("../services/parcel_stakeholders");
 
 const router = express.Router();
 const conflictAttempts = new Map();
@@ -58,7 +61,7 @@ function hasRole(user, role) {
 async function ensureParcelAccess(supabase, parcelId, user) {
   const { data, error } = await supabase
     .from("parcels")
-    .select("created_by,assigned_courier_id")
+    .select("created_by,assigned_courier_id,recipient_id")
     .eq("id", parcelId)
     .maybeSingle();
   if (error) {
@@ -71,7 +74,11 @@ async function ensureParcelAccess(supabase, parcelId, user) {
   if (hasRole(user, "admin")) {
     return data;
   }
-  if (data.created_by === uid || data.assigned_courier_id === uid) {
+  if (
+    data.created_by === uid ||
+    data.assigned_courier_id === uid ||
+    data.recipient_id === uid
+  ) {
     return data;
   }
   throw new ApiError("Not permitted to access parcel", 403, "PARCEL_FORBIDDEN");
@@ -392,8 +399,20 @@ function estimateEta(parcel, model, now = new Date()) {
 router.post(
   "/",
   asyncHandler(async (req, res) => {
-  const { origin, destination, size, priority, fragile, notes, clientId } =
-    req.body || {};
+  const {
+    origin,
+    destination,
+    size,
+    priority,
+    fragile,
+    notes,
+    clientId,
+    recipientId,
+    dualTracking,
+    weightKg,
+    clientEtaMinutes,
+    userPrice
+  } = req.body || {};
 
     if (!origin || !destination || !priority) {
       throw new ApiError("Missing required fields", 400, "PARCEL_INVALID_INPUT");
@@ -449,6 +468,24 @@ router.post(
     throw new ApiError("Invalid destination coordinates format. Expected 'latitude, longitude'", 400, "PARCEL_INVALID_DESTINATION");
   }
 
+  let resolvedRecipientId = null;
+  let resolvedDual = Boolean(dualTracking);
+  if (recipientId && typeof recipientId === "string" && recipientId.trim().length > 0) {
+    const { data: recipientUser, error: recipientLookupError } = await supabase
+      .from("users")
+      .select("id,role")
+      .eq("id", recipientId.trim())
+      .maybeSingle();
+    if (recipientLookupError) {
+      throw new ApiError(recipientLookupError.message, 500, "RECIPIENT_LOOKUP_FAILED");
+    }
+    if (!recipientUser) {
+      throw new ApiError("Recipient user not found", 404, "RECIPIENT_NOT_FOUND");
+    }
+    resolvedRecipientId = recipientUser.id;
+    resolvedDual = true;
+  }
+
   const payload = {
     ...(clientId ? { id: clientId } : {}),
     origin,
@@ -459,23 +496,65 @@ router.post(
     pickup_lat: originCoords.lat,
     pickup_lng: originCoords.lng,
     size: size || null,
+    size_code: size || 'M',
     priority,
     fragile: Boolean(fragile),
     notes: notes || null,
     created_by: req.user?.uid || null,
-    request_id: req.requestId || null
+    request_id: req.requestId || null,
+    recipient_id: resolvedRecipientId,
+    dual_tracking: resolvedDual,
+    weight_kg: typeof weightKg === "number" && Number.isFinite(weightKg) ? weightKg : null,
+    client_eta_minutes:
+      typeof clientEtaMinutes === "number" && Number.isFinite(clientEtaMinutes)
+        ? Math.round(clientEtaMinutes)
+        : null,
+    user_price: typeof userPrice === "number" && Number.isFinite(userPrice) ? userPrice : null
   };
+
+  // Calculate recommended price
+  try {
+    const priceRec = await getRecommendedPrice(
+      originCoords.lat,
+      originCoords.lng,
+      destCoords.lat,
+      destCoords.lng,
+      size || 'M',
+      typeof weightKg === "number" ? weightKg : null
+    );
+    payload.recommended_price = priceRec.recommendedPrice;
+    
+    // If user provided a price, validate it and set final price
+    if (typeof userPrice === "number" && Number.isFinite(userPrice)) {
+      const validation = validateUserPrice(priceRec.recommendedPrice, userPrice);
+      payload.final_price = userPrice;
+      // Could add flag: payload.price_deviation = validation.deviation;
+    } else {
+      // Use recommended as final if user didn't specify
+      payload.final_price = priceRec.recommendedPrice;
+    }
+  } catch (priceError) {
+    console.error("[Parcels] Price calculation error:", priceError.message);
+    // Continue without price if calculation fails
+    payload.recommended_price = null;
+    payload.final_price = userPrice || null;
+  }
 
   const { data, error } = await supabase
     .from("parcels")
     .upsert(payload, { onConflict: "id" })
-    .select("id");
+    .select("id,recommended_price,final_price,size_code");
 
     if (error) {
       throw new ApiError(error.message, 500, "PARCEL_INSERT_FAILED");
     }
 
-    return res.status(201).json({ id: data?.[0]?.id });
+    return res.status(201).json({ 
+      id: data?.[0]?.id,
+      recommendedPrice: data?.[0]?.recommended_price,
+      finalPrice: data?.[0]?.final_price,
+      sizeCode: data?.[0]?.size_code
+    });
   })
 );
 
@@ -604,6 +683,25 @@ router.post(
 );
 
 router.get(
+  "/recipient/me",
+  requireRole("client"),
+  asyncHandler(async (req, res) => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("parcels")
+      .select(
+        "id,status,origin,destination,priority,fragile,created_at,dual_tracking,recipient_id,assigned_courier_id"
+      )
+      .eq("recipient_id", req.user?.uid || "")
+      .order("created_at", { ascending: false });
+    if (error) {
+      throw new ApiError(error.message, 500, "PARCEL_FETCH_FAILED");
+    }
+    return res.json({ parcels: data || [] });
+  })
+);
+
+router.get(
   "/:id",
   asyncHandler(async (req, res) => {
     const parcelId = req.params.id;
@@ -612,7 +710,7 @@ router.get(
     const { data, error } = await supabase
       .from("parcels")
       .select(
-        "id,status,pickup_verified_at,dropoff_verified_at,created_at,pickup_photo_url,dropoff_photo_url,assigned_courier_id,assigned_at,created_by,pickup_point,tracking_progress_percent,tracking_integrity_status,tracking_last_update"
+        "id,status,pickup_verified_at,dropoff_verified_at,created_at,pickup_photo_url,dropoff_photo_url,assigned_courier_id,assigned_at,created_by,recipient_id,pickup_point,tracking_progress_percent,tracking_integrity_status,tracking_last_update"
       )
       .eq("id", parcelId)
       .maybeSingle();
@@ -625,7 +723,10 @@ router.get(
     }
 
     const canSeePickup =
-      data.assigned_courier_id === req.user?.uid || data.created_by === req.user?.uid || hasRole(req.user, "admin");
+      data.assigned_courier_id === req.user?.uid ||
+      data.created_by === req.user?.uid ||
+      data.recipient_id === req.user?.uid ||
+      hasRole(req.user, "admin");
     const parcel = {
       ...data,
       pickup_point: canSeePickup ? data.pickup_point : null
@@ -711,16 +812,17 @@ router.post(
     }
     const { data: parcel } = await supabase
       .from("parcels")
-      .select("created_by")
+      .select("created_by,recipient_id,dual_tracking")
       .eq("id", parcelId)
       .maybeSingle();
     const { sendToParcelTopic } = require("../utils/notifications");
-    if (parcel?.created_by) {
+    const clientRecipients = parcelClientRecipients(parcel || {});
+    if (clientRecipients.length > 0) {
       await enqueueNotification({
         type: NOTIFICATION_EVENT_TYPES.COURIER_ASSIGNED,
         title: "Courier assigned",
         body: "A courier has been assigned.",
-        recipients: [parcel.created_by],
+        recipients: clientRecipients,
         entityType: "parcel",
         entityId: parcelId,
         payload: { parcelId, status: "ASSIGNED" }
@@ -832,17 +934,18 @@ router.post(
     // Send notifications
     const { data: parcelInfo } = await supabase
       .from("parcels")
-      .select("created_by")
+      .select("created_by,recipient_id,dual_tracking")
       .eq("id", parcelId)
       .maybeSingle();
 
     const { sendToParcelTopic } = require("../utils/notifications");
-    if (parcelInfo?.created_by) {
+    const acceptedRecipients = parcelClientRecipients(parcelInfo || {});
+    if (acceptedRecipients.length > 0) {
       await enqueueNotification({
         type: NOTIFICATION_EVENT_TYPES.COURIER_ACCEPTED,
         title: "Courier accepted",
         body: "Your courier accepted the delivery.",
-        recipients: [parcelInfo.created_by],
+        recipients: acceptedRecipients,
         entityType: "parcel",
         entityId: parcelId,
         payload: { parcelId, status: "ASSIGNED" }
@@ -916,7 +1019,7 @@ router.post(
       if (nextCorridor?.created_by) {
         const { data: parcelOwner } = await supabase
           .from("parcels")
-          .select("created_by")
+          .select("created_by,recipient_id,dual_tracking")
           .eq("id", parcelId)
           .maybeSingle();
         const { error: assignError } = await supabase
@@ -954,12 +1057,13 @@ router.post(
               payload: { parcelId, status: "ASSIGNED", reassigned: true }
             });
           }
-          if (parcelOwner?.created_by) {
+          const reassignedClients = parcelClientRecipients(parcelOwner || {});
+          if (reassignedClients.length > 0) {
             await enqueueNotification({
               type: NOTIFICATION_EVENT_TYPES.COURIER_REASSIGNED,
               title: "Courier reassigned",
               body: "A new courier is being assigned to your parcel.",
-              recipients: [parcelOwner.created_by],
+              recipients: reassignedClients,
               entityType: "parcel",
               entityId: parcelId,
               payload: { parcelId, status: "ASSIGNED", reassigned: true }
@@ -1254,6 +1358,187 @@ router.post(
     }
 
     return res.status(403).json({ error: "Outside checkpoint radius", code: "CHECKPOINT_GEOFENCE_FAIL" });
+  })
+);
+
+// POST /parcels/:id/rate - Submit rating for a completed parcel
+router.post(
+  "/:id/rate",
+  requireRole("client"),
+  asyncHandler(async (req, res) => {
+    const parcelId = req.params.id;
+    const { stars, feedback, routeAdherence, punctualityDelta } = req.body || {};
+
+    if (!stars || stars < 1 || stars > 5) {
+      throw new ApiError("stars must be 1-5", 400, "RATING_INVALID_INPUT");
+    }
+
+    const supabase = getSupabase();
+    
+    // Get parcel and verify it's completed
+    const { data: parcel, error: parcelError } = await supabase
+      .from("parcels")
+      .select("id,created_by,assigned_courier_id,status,dropoff_verified_at")
+      .eq("id", parcelId)
+      .maybeSingle();
+
+    if (parcelError) {
+      throw new ApiError(parcelError.message, 500, "PARCEL_LOOKUP_FAILED");
+    }
+
+    if (!parcel) {
+      throw new ApiError("Parcel not found", 404, "PARCEL_NOT_FOUND");
+    }
+
+    // Only creator or recipient can rate
+    if (parcel.created_by !== req.user?.uid) {
+      throw new ApiError("Not authorized to rate this parcel", 403, "RATING_FORBIDDEN");
+    }
+
+    // Parcel must be completed
+    if (parcel.status !== "COMPLETED" || !parcel.dropoff_verified_at) {
+      throw new ApiError("Parcel must be completed before rating", 409, "PARCEL_NOT_COMPLETED");
+    }
+
+    // Submit rating
+    const result = await submitParcelRating(
+      parcelId,
+      parcel.assigned_courier_id,
+      stars,
+      feedback || null,
+      typeof routeAdherence === "number" ? routeAdherence : null,
+      typeof punctualityDelta === "number" ? punctualityDelta : null
+    );
+
+    return res.json(result);
+  })
+);
+
+// GET /parcels/:courierId/rating - Get courier rating aggregation
+router.get(
+  "/courier/:courierId/rating",
+  asyncHandler(async (req, res) => {
+    const courierId = req.params.courierId;
+
+    const rating = await aggregateCourierRating(courierId);
+
+    if (!rating) {
+      return res.json({
+        courierId,
+        score: 0,
+        breakdown: { clientRating: 0, routeAdherence: 0, punctuality: 0, tripFrequency: 0 },
+        metadata: { totalRatings: 0 }
+      });
+    }
+
+    return res.json({ courierId, ...rating });
+  })
+);
+
+// POST /courier/location - Record courier background location
+router.post(
+  "/courier/location",
+  requireRole("courier"),
+  asyncHandler(async (req, res) => {
+    const {
+      latitude,
+      longitude,
+      accuracy,
+      timestamp,
+      speed,
+      heading,
+      altitude
+    } = req.body || {};
+
+    // Validate required fields
+    if (
+      typeof latitude !== "number" ||
+      typeof longitude !== "number" ||
+      typeof accuracy !== "number"
+    ) {
+      throw new ApiError("latitude, longitude, accuracy required", 400, "LOCATION_INVALID_INPUT");
+    }
+
+    const supabase = getSupabase();
+    const courierId = req.user?.uid;
+
+    try {
+      // Store location in courier_locations table
+      // This table stores real-time location history for delivery tracking
+      const { error: insertError } = await supabase.from("courier_locations").insert({
+        courier_id: courierId,
+        location_point: `POINT(${longitude} ${latitude})`,
+        accuracy_m: accuracy,
+        speed_kmh: speed,
+        heading: heading,
+        altitude_m: altitude,
+        recorded_at: timestamp || new Date().toISOString(),
+      });
+
+      if (insertError) {
+        // Log but don't fail - location tracking is non-critical
+        console.warn("[CourierLocation] Insert failed:", insertError);
+      }
+
+      // Check if courier is at any active parcel checkpoints
+      // and trigger checkpoint notifications if needed
+      try {
+        const { data: parcels, error: parcelError } = await supabase
+          .from("parcels")
+          .select("id,status,pickup_point,dropoff_point")
+          .eq("assigned_courier_id", courierId)
+          .in("status", ["IN_TRANSIT", "AT_DROPOFF"]);
+
+        if (parcelError) {
+          console.warn("[CourierLocation] Parcel lookup failed:", parcelError);
+        } else if (parcels && parcels.length > 0) {
+          // Check distance to each parcel's points
+          for (const parcel of parcels) {
+            const pickupPoint = parseWktPoint(parcel.pickup_point);
+            const dropoffPoint = parseWktPoint(parcel.dropoff_point);
+
+            if (pickupPoint) {
+              const distToPickup = haversineMeters(
+                pickupPoint,
+                { lat: latitude, lng: longitude }
+              );
+              // Notify if within 200m of pickup
+              if (distToPickup <= 200 && parcel.status === "MATCHED") {
+                console.log(`[CourierLocation] Courier approaching pickup for parcel ${parcel.id}`);
+              }
+            }
+
+            if (dropoffPoint && parcel.status === "IN_TRANSIT") {
+              const distToDropoff = haversineMeters(
+                dropoffPoint,
+                { lat: latitude, lng: longitude }
+              );
+              // Notify if within 200m of dropoff
+              if (distToDropoff <= 200) {
+                console.log(`[CourierLocation] Courier approaching dropoff for parcel ${parcel.id}`);
+                
+                // Broadcast to websocket subscribers
+                const { broadcastParcelStatus } = require("../ws");
+                broadcastParcelStatus(parcel.id, {
+                  status: "COURIER_APPROACHING",
+                  parcelId: parcel.id,
+                  distanceMeters: distToDropoff,
+                });
+              }
+            }
+          }
+        }
+      } catch (checkpointError) {
+        console.warn("[CourierLocation] Checkpoint check failed:", checkpointError);
+        // Non-blocking error
+      }
+
+      res.locals.skipRequestIdBody = true;
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("[CourierLocation] Error:", error);
+      throw new ApiError(error.message, 500, "LOCATION_STORE_FAILED");
+    }
   })
 );
 

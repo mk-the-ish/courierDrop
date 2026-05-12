@@ -6,6 +6,7 @@ const { matchPendingParcels } = require("./matching");
 const { validateTrackingHealth } = require("../jobs/tracking_validation");
 const { cleanupTrackingData } = require("../jobs/cleanup_tracking_data");
 const { runNotificationOutboxJob } = require("../jobs/process_notification_outbox");
+const { aggregateCourierScores } = require("../jobs/aggregate_courier_scores");
 
 class JobScheduler {
   constructor() {
@@ -339,6 +340,15 @@ function initializeDefaultJobs() {
     runNotificationOutboxJob,
     {
       description: "Processes notification outbox and retries failed deliveries"
+    }
+  );
+
+  scheduler.registerJob(
+    "aggregate_courier_scores",
+    "0 * * * *",
+    aggregateCourierScores,
+    {
+      description: "Recomputes courier_score from ratings, punctuality, adherence, incidents"
     }
   );
 }

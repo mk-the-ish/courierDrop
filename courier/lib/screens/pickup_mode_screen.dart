@@ -37,6 +37,7 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
   Timer? _lockoutTimer;
   int? _lockoutSeconds;
   String? _currentTopic;
+  bool? _routeStarted;
 
   static const String _prefParcelId = "pickup_parcelId";
   static const String _prefPin = "pickup_pin";
@@ -49,6 +50,64 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
     super.initState();
     _restoreFormState();
     _handleLostData();
+    _refreshRouteState();
+  }
+
+  Future<void> _refreshRouteState() async {
+    try {
+      final state = await widget.authState.apiClient.getCourierServiceState();
+      final routeId = state["current_route_id"]?.toString();
+      if (!mounted) return;
+      setState(() => _routeStarted = routeId != null && routeId.isNotEmpty);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _routeStarted = false);
+    }
+  }
+
+  Future<void> _registerMeetingPoint() async {
+    final parcelId = _parcelIdController.text.trim();
+    if (parcelId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter parcel ID first.")),
+      );
+      return;
+    }
+    setState(() => _isLocating = true);
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Location permission denied.")),
+        );
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      await widget.authState.apiClient.postPickupMeetingPoint(
+        parcelId: parcelId,
+        lat: position.latitude,
+        lng: position.longitude,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Meeting point registered (within 50m of pickup).")),
+      );
+      await _loadParcel();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Meeting point failed: $error")),
+      );
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
   }
 
   Future<void> _handleLostData() async {
@@ -440,6 +499,19 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_routeStarted == false)
+            MaterialBanner(
+              content: const Text(
+                "Start Route from the dashboard before pickup. The server requires an active route.",
+              ),
+              leading: const Icon(Icons.route, color: Colors.orange),
+              actions: [
+                TextButton(
+                  onPressed: _refreshRouteState,
+                  child: const Text("Refresh"),
+                ),
+              ],
+            ),
           TextField(
             controller: _parcelIdController,
             decoration: const InputDecoration(
@@ -541,6 +613,12 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: isBusy ? null : _registerMeetingPoint,
+            icon: const Icon(Icons.edit_location_alt),
+            label: const Text("Set meeting point (my GPS, within 50m of pickup)"),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(

@@ -218,6 +218,10 @@ class ApiClient {
     required bool fragile,
     String? notes,
     String? clientId,
+    String? recipientId,
+    bool dualTracking = false,
+    double? weightKg,
+    int? clientEtaMinutes,
   }) async {
     final uri = Uri.parse("$baseUrl/parcels");
     final payload = <String, dynamic>{
@@ -228,6 +232,10 @@ class ApiClient {
       "priority": priority,
       "fragile": fragile,
       "notes": notes ?? "",
+      if (recipientId != null && recipientId.isNotEmpty) "recipientId": recipientId,
+      "dualTracking": dualTracking,
+      if (weightKg != null) "weightKg": weightKg,
+      if (clientEtaMinutes != null) "clientEtaMinutes": clientEtaMinutes,
     };
 
     final response = await _client.post(
@@ -276,6 +284,89 @@ class ApiClient {
     if (response.statusCode >= 400) {
       throw Exception("Failed to log error: ${response.body}");
     }
+  }
+
+  Future<Map<String, dynamic>> getMyProfile() async {
+    final uri = Uri.parse("$baseUrl/users/me");
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Profile fetch failed: ${response.body}");
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> searchRecipientUsers(String query) async {
+    final uri = Uri.parse("$baseUrl/users/search/recipient").replace(
+      queryParameters: {"q": query},
+    );
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Recipient search failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = decoded["users"] as List<dynamic>? ?? [];
+    return rows.map((e) => (e as Map).cast<String, dynamic>()).toList();
+  }
+
+  Future<void> patchOnboardingProfile({
+    String? displayName,
+    String? phoneNumber,
+  }) async {
+    final uri = Uri.parse("$baseUrl/users/onboarding/profile");
+    final response = await _client.patch(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({
+        if (displayName != null) "displayName": displayName,
+        if (phoneNumber != null) "phoneNumber": phoneNumber,
+      }),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Profile update failed: ${response.body}");
+    }
+  }
+
+  Future<String> uploadOnboardingDocument(String filePath, {required String kind}) async {
+    final uri = Uri.parse("$baseUrl/users/onboarding/document");
+    final request = http.MultipartRequest("POST", uri);
+    request.headers.addAll(_headers());
+    request.fields["kind"] = kind;
+    request.files.add(await http.MultipartFile.fromPath("file", filePath));
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode >= 400) {
+      throw Exception("Document upload failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return decoded["url"] as String;
+  }
+
+  Future<List<Map<String, dynamic>>> getRecipientParcels() async {
+    final uri = Uri.parse("$baseUrl/parcels/recipient/me");
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Recipient parcels failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = decoded["parcels"] as List<dynamic>? ?? [];
+    return rows.map((e) => (e as Map).cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> recipientIssueDropoffOtp({
+    required String parcelId,
+    required double lat,
+    required double lng,
+  }) async {
+    final uri = Uri.parse("$baseUrl/handshake/recipient/issue-dropoff-otp");
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({"parcelId": parcelId, "lat": lat, "lng": lng}),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Issue dropoff OTP failed: ${response.body}");
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   Future<void> registerDeviceToken({

@@ -227,9 +227,181 @@ async function markRead({ userId, notificationId }) {
   return { updated: true };
 }
 
+/**
+ * SMS Queue Functions
+ */
+
+const { sendSmsE164 } = require('../utils/sms');
+const ApiError = require('../utils/api_error');
+
+/**
+ * Queue SMS for offline delivery or immediate sending
+ */
+async function enqueueSms(phoneNumber, messageBody, context, parcelId = null, courierId = null, customerId = null) {
+  const supabase = getSupabase();
+  
+  if (!phoneNumber) {
+    throw new ApiError('Phone number required', 400, 'SMS_INVALID_PHONE');
+  }
+
+  const { data, error } = await supabase.rpc('enqueue_sms', {
+    p_phone_number: phoneNumber,
+    p_message_body: messageBody,
+    p_context: context,
+    p_parcel_id: parcelId,
+    p_courier_id: courierId,
+    p_customer_id: customerId,
+  });
+
+  if (error) {
+    throw new ApiError(error.message, 500, 'SMS_ENQUEUE_FAILED');
+  }
+
+  return data;
+}
+
+/**
+ * Send SMS immediately via Twilio and mark as sent
+ * Falls back to queue if Twilio fails
+ */
+async function sendSmsWithFallback(phoneNumber, messageBody, context, parcelId = null, courierId = null, customerId = null) {
+  const supabase = getSupabase();
+  
+  try {
+    // First enqueue the SMS
+    const enqueueResult = await enqueueSms(phoneNumber, messageBody, context, parcelId, courierId, customerId);
+    const smsId = enqueueResult.id;
+
+    // Attempt to send via Twilio
+    const twilioResult = await sendSmsE164(phoneNumber, messageBody);
+
+    if (twilioResult.ok) {
+      // Mark as sent in queue
+      const { error } = await supabase.rpc('mark_sms_sent', {
+        p_sms_id: smsId,
+      });
+      if (error) console.error('[SMS] Failed to mark as sent:', error);
+      return { success: true, smsId, method: 'sent' };
+    } else if (twilioResult.skipped) {
+      // Twilio not configured, SMS stays in queue for manual processing
+      return { success: true, smsId, method: 'queued', reason: 'twilio_not_configured' };
+    } else {
+      // Twilio failed, mark as failed and keep in queue
+      const { error } = await supabase.rpc('mark_sms_failed', {
+        p_sms_id: smsId,
+        p_error_message: twilioResult.error || 'Unknown error',
+      });
+      if (error) console.error('[SMS] Failed to update queue:', error);
+      return { success: false, smsId, method: 'queued', reason: 'twilio_failed', error: twilioResult.error };
+    }
+  } catch (error) {
+    console.error('[SMS] Unexpected error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Process pending SMS from queue (for scheduled job)
+ */
+async function processPendingSms(limit = 50) {
+  const supabase = getSupabase();
+
+  const { data: pendingSmsRecords, error: fetchError } = await supabase.rpc('get_pending_sms', {
+    p_limit: limit,
+  });
+
+  if (fetchError) {
+    throw new ApiError(fetchError.message, 500, 'SMS_FETCH_FAILED');
+  }
+
+  if (!pendingSmsRecords || pendingSmsRecords.length === 0) {
+    return { processed: 0, succeeded: 0, failed: 0 };
+  }
+
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const smsRecord of pendingSmsRecords) {
+    try {
+      const twilioResult = await sendSmsE164(smsRecord.phone_number, smsRecord.message_body);
+
+      if (twilioResult.ok) {
+        // Mark as sent
+        const { error: markError } = await supabase.rpc('mark_sms_sent', {
+          p_sms_id: smsRecord.id,
+        });
+        if (markError) {
+          console.error('[SMS] Failed to mark as sent:', markError);
+          failed++;
+        } else {
+          succeeded++;
+        }
+      } else if (twilioResult.skipped) {
+        // Twilio not configured, keep in queue
+        failed++;
+      } else {
+        // Twilio error, mark failed and increment attempts
+        const { error: markError } = await supabase.rpc('mark_sms_failed', {
+          p_sms_id: smsRecord.id,
+          p_error_message: twilioResult.error || 'Unknown error',
+        });
+        if (markError) {
+          console.error('[SMS] Failed to update queue:', markError);
+        }
+        failed++;
+      }
+    } catch (error) {
+      console.error(`[SMS] Error processing SMS ${smsRecord.id}:`, error);
+      const { error: markError } = await supabase.rpc('mark_sms_failed', {
+        p_sms_id: smsRecord.id,
+        p_error_message: error.message,
+      });
+      if (markError) console.error('[SMS] Failed to update queue:', markError);
+      failed++;
+    }
+  }
+
+  return {
+    processed: pendingSmsRecords.length,
+    succeeded,
+    failed,
+  };
+}
+
+/**
+ * Send pickup confirmation SMS to customer
+ */
+async function sendPickupConfirmationSms(parcelId, courierId, customerId, phoneNumber) {
+  const message = `DropCity: Your parcel has been picked up by courier. Tracking your delivery in progress.`;
+  return sendSmsWithFallback(phoneNumber, message, 'pickup_confirmation', parcelId, courierId, customerId);
+}
+
+/**
+ * Send delivery confirmation SMS to customer
+ */
+async function sendDeliveryConfirmationSms(parcelId, courierId, customerId, phoneNumber) {
+  const message = `DropCity: Your parcel has been delivered. Thank you for using DropCity!`;
+  return sendSmsWithFallback(phoneNumber, message, 'delivery_confirmation', parcelId, courierId, customerId);
+}
+
+/**
+ * Send handoff/recipient confirmation SMS
+ */
+async function sendRecipientHandoffSms(parcelId, courierId, recipientPhoneNumber) {
+  const message = `DropCity: A parcel is ready for pickup. Code verification required at handoff point.`;
+  return sendSmsWithFallback(recipientPhoneNumber, message, 'recipient_handoff', parcelId, courierId);
+}
+
 module.exports = {
   enqueueNotification,
   processOutboxBatch,
   fanoutNotification,
-  markRead
+  markRead,
+  // SMS functions
+  enqueueSms,
+  sendSmsWithFallback,
+  processPendingSms,
+  sendPickupConfirmationSms,
+  sendDeliveryConfirmationSms,
+  sendRecipientHandoffSms,
 };

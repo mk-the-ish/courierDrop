@@ -11,6 +11,8 @@ const ApiError = require("../utils/api_error");
 const asyncHandler = require("../utils/async_handler");
 const { requireRole } = require("../middleware/auth");
 const { broadcastTrackingUpdate } = require("../ws");
+const { calculateVectorProgress } = require("../services/tracking_vector");
+const { connectivityAudit } = require("../services/connectivity_audit_service");
 
 const router = express.Router();
 
@@ -26,7 +28,7 @@ router.post(
   "/update",
   requireRole("courier"),
   asyncHandler(async (req, res) => {
-    const { parcelId, lat, lng, accuracy, viaBatchSync } = req.body || {};
+    const { parcelId, lat, lng, accuracy, viaBatchSync, deviceInfo, networkInfo } = req.body || {};
     const courierId = req.user?.uid;
 
     console.log(`[Tracking.update] START: courierId=${courierId}, parcelId=${parcelId}, lat=${lat}, lng=${lng}, accuracy=${accuracy}`);
@@ -159,6 +161,31 @@ router.post(
     const distanceToDestination =
       typeof distanceResult === "number" ? distanceResult : null;
 
+    const { data: lastPulse } = await supabase
+      .from("courier_tracking_logs")
+      .select("created_at,current_distance_m")
+      .eq("parcel_id", parcelId)
+      .eq("courier_id", courierId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nowIso = new Date().toISOString();
+    await connectivityAudit({
+      courierId,
+      parcelId,
+      lat,
+      lng,
+      lastPulseAt: lastPulse?.created_at,
+      currentPulseAt: nowIso,
+      networkInfo
+    });
+
+    const vectorDelta = calculateVectorProgress(
+      distanceToDestination,
+      lastPulse?.current_distance_m
+    );
+
     // Log the tracking event
     const { error: logError } = await supabase
       .from("courier_tracking_logs")
@@ -172,7 +199,10 @@ router.post(
         current_distance_m: distanceToDestination,
         movement_direction: isMovingPositively ? "TOWARD_DESTINATION" : null,
         via_batch_sync: Boolean(viaBatchSync),
-        created_at: new Date().toISOString()
+        device_info: deviceInfo && typeof deviceInfo === "object" ? deviceInfo : {},
+        network_info: networkInfo && typeof networkInfo === "object" ? networkInfo : {},
+        vector_progress_delta: vectorDelta,
+        created_at: nowIso
       });
 
     if (logError) {

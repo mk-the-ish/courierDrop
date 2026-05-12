@@ -423,13 +423,17 @@ class ApiClient {
     required double lat,
     required double lng,
     double? accuracy,
+    Map<String, dynamic>? deviceInfo,
+    Map<String, dynamic>? networkInfo,
   }) async {
     final uri = Uri.parse("$baseUrl/tracking/update");
-    final payload = {
+    final payload = <String, dynamic>{
       "parcelId": parcelId,
       "lat": lat,
       "lng": lng,
       "accuracy": accuracy,
+      if (deviceInfo != null) "deviceInfo": deviceInfo,
+      if (networkInfo != null) "networkInfo": networkInfo,
     };
     final response = await _client.post(
       uri,
@@ -510,6 +514,106 @@ class ApiClient {
     }
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     return decoded["url"] as String;
+  }
+
+  Future<Map<String, dynamic>> getMyProfile() async {
+    final uri = Uri.parse("$baseUrl/users/me");
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Profile fetch failed: ${response.body}");
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<void> patchOnboardingProfile({
+    String? displayName,
+    String? phoneNumber,
+  }) async {
+    final uri = Uri.parse("$baseUrl/users/onboarding/profile");
+    final response = await _client.patch(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({
+        if (displayName != null) "displayName": displayName,
+        if (phoneNumber != null) "phoneNumber": phoneNumber,
+      }),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Profile update failed: ${response.body}");
+    }
+  }
+
+  Future<String> uploadOnboardingDocument(String filePath, {required String kind}) async {
+    final uri = Uri.parse("$baseUrl/users/onboarding/document");
+    final request = http.MultipartRequest("POST", uri);
+    request.headers.addAll(_headers());
+    request.fields["kind"] = kind;
+    request.files.add(await http.MultipartFile.fromPath("file", filePath));
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode >= 400) {
+      throw Exception("Document upload failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return decoded["url"] as String;
+  }
+
+  Future<void> postPickupMeetingPoint({
+    required String parcelId,
+    required double lat,
+    required double lng,
+  }) async {
+    final uri = Uri.parse("$baseUrl/handshake/pickup/meeting-point");
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({"parcelId": parcelId, "lat": lat, "lng": lng}),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Meeting point failed: ${response.body}");
+    }
+  }
+
+  Future<Map<String, dynamic>> requestManualDropoffOtp({
+    required String parcelId,
+    required String phoneE164,
+  }) async {
+    final uri = Uri.parse("$baseUrl/handshake/courier/request-manual-dropoff-otp");
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({"parcelId": parcelId, "phoneE164": phoneE164}),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Manual OTP request failed: ${response.body}");
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<void> completeCourierDropoff({
+    required String parcelId,
+    required String otp,
+    required String photoUrl,
+    required double lat,
+    required double lng,
+    double? accuracy,
+  }) async {
+    final uri = Uri.parse("$baseUrl/handshake/courier/complete-dropoff");
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({
+        "parcelId": parcelId,
+        "otp": otp,
+        "photoUrl": photoUrl,
+        "lat": lat,
+        "lng": lng,
+        "accuracy": accuracy,
+      }),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Complete dropoff failed: ${response.body}");
+    }
   }
 
   Future<Map<String, dynamic>> healthCheck() async {
