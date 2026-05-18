@@ -13,6 +13,8 @@ const { requireRole } = require("../middleware/auth");
 const { broadcastTrackingUpdate } = require("../ws");
 const { calculateVectorProgress } = require("../services/tracking_vector");
 const { connectivityAudit } = require("../services/connectivity_audit_service");
+const { analyzeParcelHeuristics } = require("../services/heuristic_tracking");
+const { estimateParcelEta } = require("../services/eta_model");
 
 const router = express.Router();
 
@@ -438,6 +440,32 @@ router.post(
       synced: successCount,
       results
     });
+  })
+);
+
+router.get(
+  "/heuristics/:parcelId",
+  requireRole("courier"),
+  asyncHandler(async (req, res) => {
+    const parcelId = req.params.parcelId;
+    const result = await analyzeParcelHeuristics(parcelId);
+    if (!result) {
+      throw new ApiError("Heuristic data unavailable", 404, "HEURISTIC_NOT_FOUND");
+    }
+    return res.json(result);
+  })
+);
+
+router.get(
+  "/eta/:parcelId",
+  requireRole("courier"),
+  asyncHandler(async (req, res) => {
+    const parcelId = req.params.parcelId;
+    const eta = await estimateParcelEta(parcelId);
+    if (!eta) {
+      throw new ApiError("ETA unavailable", 404, "ETA_NOT_FOUND");
+    }
+    return res.json(eta);
   })
 );
 

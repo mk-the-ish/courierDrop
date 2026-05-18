@@ -21,7 +21,10 @@ class AuthState extends ChangeNotifier implements ValueListenable<Object?> {
   Object? get value => isBusy;
 
   bool _isBusy = false;
+  String? _errorMessage;
   Timer? _refreshTimer;
+
+  String? get errorMessage => _errorMessage;
 
   void _scheduleRefresh() {
     _refreshTimer?.cancel();
@@ -47,6 +50,7 @@ class AuthState extends ChangeNotifier implements ValueListenable<Object?> {
 
   Future<void> signUp(String email, String password, {String? displayName, String? role}) async {
     _isBusy = true;
+    _errorMessage = null;
     notifyListeners();
     try {
       await _authService.signUp(
@@ -56,6 +60,50 @@ class AuthState extends ChangeNotifier implements ValueListenable<Object?> {
         role: role,
       );
       _scheduleRefresh();
+    } catch (e) {
+      _errorMessage = e.toString();
+      rethrow;
+    } finally {
+      _isBusy = false;
+      notifyListeners();
+    }
+  }
+
+  // Courier-specific login
+  Future<bool> loginCourier({required String email, required String password}) async {
+    _isBusy = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _authService.signIn(email: email, password: password);
+      _scheduleRefresh();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      return false;
+    } finally {
+      _isBusy = false;
+      notifyListeners();
+    }
+  }
+
+  // Courier-specific signup
+  Future<bool> signupCourier({required String email, required String password}) async {
+    _isBusy = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _authService.signUp(
+        email: email,
+        password: password,
+        displayName: email.split('@')[0],
+        role: 'courier',
+      );
+      _scheduleRefresh();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      return false;
     } finally {
       _isBusy = false;
       notifyListeners();

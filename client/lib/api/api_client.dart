@@ -104,6 +104,34 @@ class ApiClient {
     );
   }
 
+  Future<AuthResponse> signUpClient({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    final uri = Uri.parse("$baseUrl/auth/signup/client");
+    final payload = <String, dynamic>{
+      "email": email,
+      "password": password,
+      if (displayName != null && displayName.isNotEmpty)
+        "displayName": displayName,
+    };
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception(_friendlyAuthError(response.body));
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return AuthResponse(
+      idToken: decoded["idToken"] as String,
+      userId: decoded["localId"] as String,
+      refreshToken: decoded["refreshToken"] as String?,
+    );
+  }
+
   Future<AuthResponse> login({
     required String email,
     required String password,
@@ -127,6 +155,45 @@ class ApiClient {
       userId: decoded["localId"] as String,
       refreshToken: decoded["refreshToken"] as String?,
     );
+  }
+
+  Future<AuthResponse> loginClient({
+    required String email,
+    required String password,
+  }) async {
+    final uri = Uri.parse("$baseUrl/auth/login/client");
+    final payload = <String, dynamic>{
+      "email": email,
+      "password": password,
+    };
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception(_friendlyAuthError(response.body));
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return AuthResponse(
+      idToken: decoded["idToken"] as String,
+      userId: decoded["localId"] as String,
+      refreshToken: decoded["refreshToken"] as String?,
+    );
+  }
+
+  Future<void> requestClientPasswordReset({
+    required String email,
+  }) async {
+    final uri = Uri.parse("$baseUrl/auth/forgot-password/client");
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({"email": email}),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Password reset request failed: ${response.body}");
+    }
   }
 
   Future<AuthResponse> refreshToken({
@@ -323,6 +390,31 @@ class ApiClient {
     );
     if (response.statusCode >= 400) {
       throw Exception("Profile update failed: ${response.body}");
+    }
+  }
+
+  Future<void> submitClientProfile({
+    required String fullName,
+    required String username,
+    required String idNumber,
+    required String idImageUrl,
+    String? phoneNumber,
+  }) async {
+    final uri = Uri.parse("$baseUrl/users/client/profile");
+    final payload = <String, dynamic>{
+      "full_name": fullName,
+      "username": username,
+      "id_number": idNumber,
+      "id_image_url": idImageUrl,
+      if (phoneNumber != null && phoneNumber.isNotEmpty) "phone_number": phoneNumber,
+    };
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Failed to submit client profile: ${response.body}");
     }
   }
 

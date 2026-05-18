@@ -711,4 +711,47 @@ class ApiClient {
       throw Exception("Mark all notifications read failed: ${response.body}");
     }
   }
+
+  Future<void> submitCourierProfile({
+    required String fullName,
+    required String idNumber,
+    required String idImageUrl,
+    required String licenseNumber,
+    required String licenseImageUrl,
+    required String vehicleRegistration,
+    required List<String> vehicleRegistrationImages,
+    required String vehicleType,
+    required String vehicleMake,
+    required String vehicleModel,
+    required String vehicleYear,
+    required String vehicleColor,
+    required String vehicleCapacityKg,
+  }) async {
+    final uri = Uri.parse("$baseUrl/users/courier/profile");
+    final payload = <String, dynamic>{
+      "full_name": fullName,
+      "id_number": idNumber,
+      "id_image_url": idImageUrl,
+      "license_number": licenseNumber,
+      "license_image_url": licenseImageUrl,
+      "vehicle_registration": vehicleRegistration,
+      "vehicle_registration_images": vehicleRegistrationImages,
+      "vehicle_type": vehicleType,
+      "vehicle_make": vehicleMake,
+      "vehicle_model": vehicleModel,
+      "vehicle_year": vehicleYear,
+      "vehicle_color": vehicleColor,
+      "vehicle_capacity_kg": vehicleCapacityKg,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception("Failed to submit courier profile: ${response.body}");
+    }
+  }
 }

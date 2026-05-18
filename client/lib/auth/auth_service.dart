@@ -32,7 +32,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final result = await _apiClient.login(email: email, password: password);
+    final result = await _apiClient.loginClient(email: email, password: password);
     _apiClient.setAuthToken(result.idToken);
     await _tokenStore.saveTokens(
       idToken: result.idToken,
@@ -52,7 +52,7 @@ class AuthService {
     String? displayName,
     String? role,
   }) async {
-    final result = await _apiClient.signUp(
+    final result = await _apiClient.signUpClient(
       email: email,
       password: password,
       displayName: displayName,
@@ -68,17 +68,11 @@ class AuthService {
       idToken: result.idToken,
     );
 
-    // Set user role if provided
-    if (role != null && (role == "client" || role == "courier")) {
-      try {
-        await _apiClient.setupUserRole(role: role);
-      } catch (e) {
-        print("[Auth] Warning: Failed to set user role: $e");
-        // Don't throw - user can set role later
-      }
-    }
-
     return _currentUser!;
+  }
+
+  Future<void> requestPasswordReset(String email) {
+    return _apiClient.requestClientPasswordReset(email: email);
   }
 
   Future<void> signOut() async {

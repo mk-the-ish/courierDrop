@@ -44,6 +44,17 @@ class AuthState extends ChangeNotifier {
     }
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    _isBusy = true;
+    notifyListeners();
+    try {
+      await _authService.requestPasswordReset(email);
+    } finally {
+      _isBusy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> signOut() async {
     _isBusy = true;
     notifyListeners();

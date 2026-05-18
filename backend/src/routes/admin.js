@@ -7,8 +7,143 @@ const { getFirebaseAuth } = require("../firebase");
 const { getScheduler } = require("../services/scheduler");
 const { matchPendingParcels } = require("../services/matching");
 const { parseWktPoint, haversineMeters } = require("../utils/geo");
+const { estimateParcelEta } = require("../services/eta_model");
 
 const router = express.Router();
+
+router.get(
+  "/adherence/reports",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { days = 7, limit = 200 } = req.query || {};
+    const supabase = getSupabase();
+    const since = new Date(Date.now() - Number(days) * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: deviations, error: devErr } = await supabase
+      .from("route_deviation_events")
+      .select("courier_id,deviation_type,duration_seconds,created_at")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(Number(limit));
+    if (devErr) {
+      throw new ApiError(devErr.message, 500, "ADHERENCE_REPORT_FAILED");
+    }
+
+    const grouped = new Map();
+    for (const row of deviations || []) {
+      const id = row.courier_id || "unknown";
+      const g = grouped.get(id) || {
+        courier_id: id,
+        incidents: 0,
+        total_duration_seconds: 0,
+        types: {}
+      };
+      g.incidents += 1;
+      g.total_duration_seconds += row.duration_seconds || 0;
+      const t = row.deviation_type || "UNKNOWN";
+      g.types[t] = (g.types[t] || 0) + 1;
+      grouped.set(id, g);
+    }
+
+    const report = Array.from(grouped.values())
+      .map((row) => ({
+        ...row,
+        adherence_score: Math.max(0, 100 - row.incidents * 5 - Math.round(row.total_duration_seconds / 600))
+      }))
+      .sort((a, b) => a.adherence_score - b.adherence_score);
+
+    return res.json({ days: Number(days), report });
+  })
+);
+
+router.get(
+  "/eta/:parcelId",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const result = await estimateParcelEta(req.params.parcelId);
+    if (!result) {
+      throw new ApiError("ETA unavailable", 404, "ETA_NOT_FOUND");
+    }
+    return res.json(result);
+  })
+);
+
+router.get(
+  "/disputes",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { limit = 100 } = req.query || {};
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("route_deviation_events")
+      .select("id,parcel_id,courier_id,deviation_type,duration_seconds,created_at")
+      .order("created_at", { ascending: false })
+      .limit(Number(limit));
+    if (error) {
+      throw new ApiError(error.message, 500, "DISPUTES_FETCH_FAILED");
+    }
+    return res.json({ disputes: data || [] });
+  })
+);
+
+router.post(
+  "/disputes/:id/resolve",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { resolution, notes } = req.body || {};
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from("route_deviation_events")
+      .update({
+        resolution_status: resolution || "RESOLVED",
+        resolution_notes: notes || null,
+        resolved_at: new Date().toISOString(),
+        resolved_by: req.user?.uid || null
+      })
+      .eq("id", id);
+    if (error) {
+      throw new ApiError(error.message, 500, "DISPUTE_RESOLVE_FAILED");
+    }
+    return res.json({ status: "ok", id });
+  })
+);
+
+router.post(
+  "/courier/:id/approve",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const courierId = req.params.id;
+    const { approved = true, notes } = req.body || {};
+    const supabase = getSupabase();
+    const verificationStatus = approved ? "APPROVED" : "REJECTED";
+
+    const { error: usersError } = await supabase
+      .from("users")
+      .update({
+        verification_status: verificationStatus,
+        verified_at: approved ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", courierId);
+    if (usersError) {
+      throw new ApiError(usersError.message, 500, "COURIER_APPROVAL_FAILED");
+    }
+
+    const { error: auditError } = await supabase.from("profile_verification_audit").insert({
+      courier_id: courierId,
+      admin_id: req.user?.uid || null,
+      action: approved ? "approved" : "rejected",
+      reason: notes || null,
+      new_status: verificationStatus,
+      created_at: new Date().toISOString()
+    });
+    if (auditError) {
+      throw new ApiError(auditError.message, 500, "COURIER_APPROVAL_AUDIT_FAILED");
+    }
+    return res.json({ status: "ok", courierId, verificationStatus });
+  })
+);
 
 router.get(
   "/notifications/health",

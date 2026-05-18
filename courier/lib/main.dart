@@ -1,58 +1,82 @@
 import "dart:async";
+import "dart:io";
 import "dart:ui";
 
-import "package:flutter/material.dart";
+import "package:flutter/foundation.dart";
 import "package:firebase_core/firebase_core.dart";
 import "package:firebase_messaging/firebase_messaging.dart";
-import "dart:io";
+import "package:flutter/material.dart";
+import "package:provider/provider.dart";
 
 import "api/api_client.dart";
 import "auth/auth_service.dart";
 import "auth/auth_state.dart";
+import "controllers/signup_controller.dart";
+import "screens/auth/login_screen.dart";
+import "screens/auth/signup_screen.dart";
+import "screens/auth/splash_screen.dart";
+import "screens/auth/welcome_screen.dart";
 import "screens/home_screen.dart";
-import "screens/login_screen.dart";
 import "services/courier_tracking_service.dart";
+import "theme.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
-import "theme.dart";
 
-void main() {
-  // MUST be the first call - before any async/zone operations
-  WidgetsFlutterBinding.ensureInitialized();
+Future<void> main() async {
+  BindingBase.debugZoneErrorsAreFatal = true;
 
-  // Run everything in the same async zone
-  runZonedGuarded(
-    () => _runApp(),
+  await runZonedGuarded<Future<void>>(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await Firebase.initializeApp();
+
+      final apiClient = ApiClient();
+
+      final authState = AuthState(
+        AuthService(apiClient: apiClient),
+      );
+
+      final errorReporter = ErrorReporter(
+        apiClient: apiClient,
+        authState: authState,
+      );
+
+      final offlineQueue = OfflineQueue.instance(apiClient);
+
+      errorReporter.start();
+
+      FlutterError.onError = (FlutterErrorDetails details) {
+        errorReporter.reportFlutterError(details);
+      };
+
+      PlatformDispatcher.instance.onError = (error, stack) {
+        errorReporter.report(
+          error,
+          stack,
+          context: "platform",
+        );
+        return true;
+      };
+
+      runApp(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthState>.value(
+              value: authState,
+            ),
+          ],
+          child: DropCityCourierApp(
+            authState: authState,
+            offlineQueue: offlineQueue,
+          ),
+        ),
+      );
+    },
     (error, stack) {
-      // Fallback error handling if app fails
       debugPrint("Uncaught zone error: $error");
       debugPrintStack(stackTrace: stack);
     },
   );
-}
-
-Future<void> _runApp() async {
-  try {
-    await Firebase.initializeApp();
-    final apiClient = ApiClient();
-    final authState = AuthState(AuthService(apiClient: apiClient));
-    final errorReporter =
-        ErrorReporter(apiClient: apiClient, authState: authState);
-    final offlineQueue = OfflineQueue.instance(apiClient);
-    errorReporter.start();
-
-    FlutterError.onError = errorReporter.reportFlutterError;
-    PlatformDispatcher.instance.onError = (error, stack) {
-      errorReporter.report(error, stack, context: "platform");
-      return true;
-    };
-
-    runApp(DropCityCourierApp(authState: authState, offlineQueue: offlineQueue));
-  } catch (e, stack) {
-    debugPrint("Failed to initialize app: $e");
-    debugPrintStack(stackTrace: stack);
-    rethrow;
-  }
 }
 
 class DropCityCourierApp extends StatefulWidget {
@@ -91,26 +115,23 @@ class _DropCityCourierAppState extends State<DropCityCourierApp>
     );
     widget.authState.addListener(_onAuthChanged);
     widget.offlineQueue.start();
-    _restoreHintTimer = Timer(const Duration(seconds: 2), () {
-      if (!mounted || !_restoring) {
-        return;
-      }
-      setState(() => _showContinueOption = true);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreSession();
+      _initPushNotifications();
+
+      _trackingStateTimer = Timer.periodic(
+        const Duration(seconds: 20),
+        (_) => _syncTrackingService(),
+      );
     });
-    _restoreSession();
-    _initPushNotifications();
-    _trackingStateTimer = Timer.periodic(
-      const Duration(seconds: 20),
-      (_) => _syncTrackingService(),
-    );
   }
 
   Future<void> _restoreSession() async {
     final restoreFuture = widget.authState.restoreSession();
     restoreFuture.then((_) {
-      if (!mounted || !_restoring) {
-        return;
-      }
+      if (!mounted) return;
+
       setState(() => _restoring = false);
     }).catchError((_) {
       // Errors are handled by the timeout/try-catch path below.
@@ -237,15 +258,22 @@ class _DropCityCourierAppState extends State<DropCityCourierApp>
           theme: dropCityLightTheme,
           darkTheme: dropCityDarkTheme,
           themeMode: ThemeMode.system,
-          home: _restoring
-              ? _LaunchScreen(
-                  hint: _restoreHint,
-                  showContinueOption: _showContinueOption,
-                  onContinue: _continueWithoutWaiting,
-                )
-              : widget.authState.isAuthenticated
-                  ? HomeScreen(authState: widget.authState)
-                  : LoginScreen(authState: widget.authState),
+          initialRoute: _restoring ? '/' : (widget.authState.isAuthenticated ? '/dashboard' : '/splash'),
+          routes: {
+            '/': (context) => _LaunchScreen(
+              hint: _restoreHint,
+              showContinueOption: _showContinueOption,
+              onContinue: _continueWithoutWaiting,
+            ),
+            '/splash': (context) => const SplashScreen(),
+            '/welcome': (context) => const WelcomeScreen(),
+            '/login': (context) => const LoginScreen(),
+            '/signup': (context) => ChangeNotifierProvider(
+              create: (_) => CourierSignupController(widget.authState.apiClient),
+              child: const SignupScreen(),
+            ),
+            '/dashboard': (context) => HomeScreen(authState: widget.authState),
+          },
         );
       },
     );

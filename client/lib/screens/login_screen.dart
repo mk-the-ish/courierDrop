@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../auth/auth_state.dart";
+import "auth/signup_screen.dart";
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.authState});
@@ -15,16 +16,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
 
-  bool _isSignup = false;
   bool _obscurePassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
@@ -36,16 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     try {
-      if (_isSignup) {
-        await widget.authState.signUp(
-          email,
-          password,
-          displayName: _nameController.text.trim(),
-          role: "client",
-        );
-      } else {
-        await widget.authState.signIn(email, password);
-      }
+      await widget.authState.signIn(email, password);
     } catch (error) {
       if (!mounted) {
         return;
@@ -67,46 +56,6 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: ChoiceChip(
-                      label: const Text("Login"),
-                      selected: !_isSignup,
-                      onSelected: widget.authState.isBusy
-                          ? null
-                          : (value) => setState(() => _isSignup = !value),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ChoiceChip(
-                      label: const Text("Sign up"),
-                      selected: _isSignup,
-                      onSelected: widget.authState.isBusy
-                          ? null
-                          : (value) => setState(() => _isSignup = value),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (_isSignup)
-                TextFormField(
-                  controller: _nameController,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(labelText: "Display name"),
-                  validator: (value) {
-                    if (!_isSignup) {
-                      return null;
-                    }
-                    if ((value ?? "").trim().isEmpty) {
-                      return "Display name is required";
-                    }
-                    return null;
-                  },
-                ),
-              if (_isSignup) const SizedBox(height: 12),
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -149,13 +98,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (password.isEmpty) {
                     return "Password is required";
                   }
-                  if (_isSignup && password.length < 6) {
-                    return "Use at least 6 characters";
-                  }
                   return null;
                 },
               ),
               const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: widget.authState.isBusy ? null : _showForgotPasswordDialog,
+                  child: const Text("Forgot password?"),
+                ),
+              ),
+              const SizedBox(height: 8),
               AnimatedBuilder(
                 animation: widget.authState,
                 builder: (context, _) {
@@ -164,21 +118,72 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Text(
                       widget.authState.isBusy
                           ? "Working..."
-                          : _isSignup
-                              ? "Create account"
-                              : "Sign in",
+                          : "Sign in",
                     ),
                   );
                 },
               ),
               const SizedBox(height: 12),
-              const Text(
-                "Backend-driven Firebase auth.",
-                textAlign: TextAlign.center,
+              OutlinedButton(
+                onPressed: widget.authState.isBusy
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ClientSignupScreen(authState: widget.authState),
+                          ),
+                        );
+                      },
+                child: const Text("Create account"),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    final emailController = TextEditingController(text: _emailController.text.trim());
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Reset password"),
+        content: TextField(
+          controller: emailController,
+          decoration: const InputDecoration(labelText: "Email"),
+          keyboardType: TextInputType.emailAddress,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+              if (email.isEmpty || !email.contains("@")) {
+                return;
+              }
+              try {
+                await widget.authState.requestPasswordReset(email);
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Reset email sent.")),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+                );
+              }
+            },
+            child: const Text("Send"),
+          ),
+        ],
       ),
     );
   }

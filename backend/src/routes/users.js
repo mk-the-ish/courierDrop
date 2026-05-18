@@ -223,6 +223,187 @@ router.patch(
   })
 );
 
+// POST /users/courier/profile - Save courier profile (multi-step signup)
+router.post(
+  "/courier/profile",
+  requireUser,
+  requireRole("courier"),
+  asyncHandler(async (req, res) => {
+    const userId = req.user?.uid;
+    const {
+      full_name,
+      id_number,
+      id_image_url,
+      license_number,
+      license_image_url,
+      vehicle_registration,
+      vehicle_registration_images,
+      vehicle_type,
+      vehicle_make,
+      vehicle_model,
+      vehicle_year,
+      vehicle_color,
+      vehicle_capacity_kg
+    } = req.body || {};
+
+    if (!full_name || !id_number || !license_number) {
+      throw new ApiError(
+        "full_name, id_number, and license_number are required",
+        400,
+        "COURIER_PROFILE_INCOMPLETE"
+      );
+    }
+
+    const supabase = getSupabase();
+
+    // Upsert courier profile
+    const { error } = await supabase.from("courier_profiles").upsert({
+      id: userId,
+      full_name,
+      id_number,
+      id_image_url,
+      license_number,
+      license_image_url,
+      vehicle_registration,
+      vehicle_registration_images: vehicle_registration_images || [],
+      vehicle_type,
+      vehicle_make,
+      vehicle_model,
+      vehicle_year,
+      vehicle_color,
+      vehicle_capacity_kg: vehicle_capacity_kg || 50,
+      profile_complete: !!(
+        full_name &&
+        id_number &&
+        id_image_url &&
+        license_number &&
+        license_image_url &&
+        vehicle_registration
+      ),
+      updated_at: new Date().toISOString()
+    });
+
+    if (error) {
+      throw new ApiError(error.message, 500, "COURIER_PROFILE_SAVE_FAILED");
+    }
+
+    // Update users table profile_step
+    await supabase
+      .from("users")
+      .update({ profile_step: 4, profile_complete: true })
+      .eq("id", userId);
+
+    return res.json({ status: "ok", message: "Courier profile saved successfully" });
+  })
+);
+
+// POST /users/client/profile - Save client profile (multi-step signup)
+router.post(
+  "/client/profile",
+  requireUser,
+  requireRole("client"),
+  asyncHandler(async (req, res) => {
+    const userId = req.user?.uid;
+    const { full_name, username, id_number, id_image_url, phone_number } = req.body || {};
+
+    if (!full_name || !username || !id_number) {
+      throw new ApiError(
+        "full_name, username, and id_number are required",
+        400,
+        "CLIENT_PROFILE_INCOMPLETE"
+      );
+    }
+
+    const supabase = getSupabase();
+
+    // Check if username is unique
+    const { data: existingUsername } = await supabase
+      .from("client_profiles")
+      .select("id")
+      .eq("username", username)
+      .neq("id", userId)
+      .maybeSingle();
+
+    if (existingUsername) {
+      throw new ApiError("Username already taken", 409, "USERNAME_TAKEN");
+    }
+
+    // Upsert client profile
+    const { error } = await supabase.from("client_profiles").upsert({
+      id: userId,
+      full_name,
+      username,
+      id_number,
+      id_image_url,
+      phone_number,
+      profile_complete: !!(full_name && username && id_number && id_image_url),
+      updated_at: new Date().toISOString()
+    });
+
+    if (error) {
+      throw new ApiError(error.message, 500, "CLIENT_PROFILE_SAVE_FAILED");
+    }
+
+    // Update users table profile_step
+    await supabase
+      .from("users")
+      .update({ profile_step: 2, profile_complete: true })
+      .eq("id", userId);
+
+    return res.json({ status: "ok", message: "Client profile saved successfully" });
+  })
+);
+
+// GET /users/courier/:id/profile - Get courier profile
+router.get(
+  "/courier/:id/profile",
+  asyncHandler(async (req, res) => {
+    const courierUserId = req.params.id;
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+      .from("courier_profiles")
+      .select("*")
+      .eq("id", courierUserId)
+      .maybeSingle();
+
+    if (error) {
+      throw new ApiError(error.message, 500, "COURIER_PROFILE_LOOKUP_FAILED");
+    }
+
+    if (!data) {
+      throw new ApiError("Courier profile not found", 404, "COURIER_PROFILE_NOT_FOUND");
+    }
+
+    return res.json(data);
+  })
+);
+
+// GET /users/client/:id/profile - Get client profile
+router.get(
+  "/client/:id/profile",
+  asyncHandler(async (req, res) => {
+    const clientUserId = req.params.id;
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+      .from("client_profiles")
+      .select("*")
+      .eq("id", clientUserId)
+      .maybeSingle();
+
+    if (error) {
+      throw new ApiError(error.message, 500, "CLIENT_PROFILE_LOOKUP_FAILED");
+    }
+
+    if (!data) {
+      throw new ApiError("Client profile not found", 404, "CLIENT_PROFILE_NOT_FOUND");
+    }
+
+    return res.json(data);
+  })
+);
+
 // GET /users/:id - Get user profile by ID (admin only)
 router.get(
   "/:id",

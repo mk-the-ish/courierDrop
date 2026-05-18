@@ -1,7 +1,7 @@
 import "package:flutter/material.dart";
 import "dart:async";
 import "../auth/auth_state.dart";
-import "parcel_request_screen.dart";
+import "delivery_creation_flow_screen.dart";
 import "progress_screen.dart";
 import "parcel_status_screen.dart";
 
@@ -474,7 +474,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) =>
-                        ParcelRequestScreen(authState: widget.authState),
+                        DeliveryCreationFlowScreen(authState: widget.authState),
                   ),
                 );
               },

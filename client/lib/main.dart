@@ -17,12 +17,10 @@ import "firebase_options.dart";
 import "theme.dart";
 
 Future<void> main() async {
-  // 1. Initialize bindings first
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // 2. Wrap EVERYTHING in runZonedGuarded
-  runZonedGuarded(() async {
+  // Keep binding initialization and runApp in the same zone.
+  await runZonedGuarded(() async {
     try {
+      WidgetsFlutterBinding.ensureInitialized();
       await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform);
       final apiClient = ApiClient();

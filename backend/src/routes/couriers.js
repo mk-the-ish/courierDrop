@@ -172,4 +172,94 @@ router.post(
   })
 );
 
+router.post(
+  "/routes",
+  requireRole("courier"),
+  asyncHandler(async (req, res) => {
+    const courierId = req.user?.uid;
+    const { corridorId, plannedStartAt, declaredEtaMinutes } = req.body || {};
+    if (!corridorId) {
+      throw new ApiError("corridorId required", 400, "ROUTE_INVALID_INPUT");
+    }
+    const supabase = getSupabase();
+    const { data: corridor, error: cErr } = await supabase
+      .from("corridors")
+      .select("id,start_point,end_point,created_by")
+      .eq("id", corridorId)
+      .maybeSingle();
+    if (cErr) throw new ApiError(cErr.message, 500, "ROUTE_CORRIDOR_LOOKUP_FAILED");
+    if (!corridor || corridor.created_by !== courierId) {
+      throw new ApiError("Corridor not found for courier", 404, "ROUTE_CORRIDOR_NOT_FOUND");
+    }
+    const { data, error } = await supabase
+      .from("routes")
+      .insert({
+        courier_id: courierId,
+        corridor_id: corridorId,
+        start_point: corridor.start_point,
+        end_point: corridor.end_point,
+        planned_start_at: plannedStartAt || null,
+        declared_eta_minutes: declaredEtaMinutes || null,
+        status: "PLANNED",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select("*")
+      .single();
+    if (error) throw new ApiError(error.message, 500, "ROUTE_CREATE_FAILED");
+    return res.status(201).json({ route: data });
+  })
+);
+
+router.get(
+  "/routes",
+  requireRole("courier"),
+  asyncHandler(async (req, res) => {
+    const courierId = req.user?.uid;
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("routes")
+      .select("*")
+      .eq("courier_id", courierId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new ApiError(error.message, 500, "ROUTE_LIST_FAILED");
+    return res.json({ routes: data || [] });
+  })
+);
+
+router.patch(
+  "/routes/:routeId",
+  requireRole("courier"),
+  asyncHandler(async (req, res) => {
+    const courierId = req.user?.uid;
+    const routeId = req.params.routeId;
+    const { action } = req.body || {};
+    if (!["activate", "complete", "cancel"].includes(action)) {
+      throw new ApiError("action must be activate|complete|cancel", 400, "ROUTE_INVALID_ACTION");
+    }
+    const supabase = getSupabase();
+    const patch = { updated_at: new Date().toISOString() };
+    if (action === "activate") {
+      patch.status = "ACTIVE";
+      patch.activated_at = new Date().toISOString();
+    } else if (action === "complete") {
+      patch.status = "COMPLETED";
+      patch.completed_at = new Date().toISOString();
+    } else {
+      patch.status = "CANCELLED";
+    }
+    const { data, error } = await supabase
+      .from("routes")
+      .update(patch)
+      .eq("id", routeId)
+      .eq("courier_id", courierId)
+      .select("*")
+      .maybeSingle();
+    if (error) throw new ApiError(error.message, 500, "ROUTE_UPDATE_FAILED");
+    if (!data) throw new ApiError("Route not found", 404, "ROUTE_NOT_FOUND");
+    return res.json({ route: data });
+  })
+);
+
 module.exports = router;

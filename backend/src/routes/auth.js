@@ -202,6 +202,267 @@ router.post(
   })
 );
 
+// Role-specific signup endpoints (for multi-step signup workflows)
+router.post(
+  "/signup/courier",
+  asyncHandler(async (req, res) => {
+    console.log(`[AUTH] 👨‍💼 Courier signup attempt for: ${req.body?.email}`);
+    
+    rateLimit(req, AUTH_LIMIT);
+    const { email, password, displayName } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "email and password required",
+        code: "AUTH_INVALID_INPUT"
+      });
+    }
+
+    console.log(`[AUTH] 🔄 Calling Firebase signup for courier: ${email}`);
+    const response = await callFirebaseAuth("accounts:signUp", {
+      email,
+      password,
+      displayName
+    });
+
+    console.log(`[AUTH] ✅ Courier signup successful for: ${email} (UID: ${response.localId})`);
+    
+    // Auto-setup courier role
+    const { getSupabase } = require("../supabase");
+    const supabase = getSupabase();
+    await supabase
+      .from("users")
+      .upsert({
+        id: response.localId,
+        email,
+        role: "courier",
+        display_name: displayName,
+        auth_method: "firebase",
+        profile_step: 1,
+        verified_at: null
+      });
+
+    return res.status(201).json({
+      idToken: response.idToken,
+      refreshToken: response.refreshToken,
+      expiresIn: response.expiresIn,
+      localId: response.localId,
+      role: "courier"
+    });
+  })
+);
+
+router.post(
+  "/signup/client",
+  asyncHandler(async (req, res) => {
+    console.log(`[AUTH] 👤 Client signup attempt for: ${req.body?.email}`);
+    
+    rateLimit(req, AUTH_LIMIT);
+    const { email, password, displayName } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "email and password required",
+        code: "AUTH_INVALID_INPUT"
+      });
+    }
+
+    console.log(`[AUTH] 🔄 Calling Firebase signup for client: ${email}`);
+    const response = await callFirebaseAuth("accounts:signUp", {
+      email,
+      password,
+      displayName
+    });
+
+    console.log(`[AUTH] ✅ Client signup successful for: ${email} (UID: ${response.localId})`);
+    
+    // Auto-setup client role
+    const { getSupabase } = require("../supabase");
+    const supabase = getSupabase();
+    await supabase
+      .from("users")
+      .upsert({
+        id: response.localId,
+        email,
+        role: "client",
+        display_name: displayName,
+        auth_method: "firebase",
+        profile_step: 1,
+        verified_at: null
+      });
+
+    return res.status(201).json({
+      idToken: response.idToken,
+      refreshToken: response.refreshToken,
+      expiresIn: response.expiresIn,
+      localId: response.localId,
+      role: "client"
+    });
+  })
+);
+
+// Role-specific login endpoints
+router.post(
+  "/login/courier",
+  asyncHandler(async (req, res) => {
+    console.log(`[AUTH] 🔐 Courier login attempt for: ${req.body?.email}`);
+    
+    rateLimit(req, AUTH_LIMIT);
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "email and password required",
+        code: "AUTH_INVALID_INPUT"
+      });
+    }
+
+    const response = await callFirebaseAuth("accounts:signInWithPassword", {
+      email,
+      password
+    });
+
+    console.log(`[AUTH] ✅ Courier login successful for: ${email} (UID: ${response.localId})`);
+    
+    // Verify role is courier
+    const { getSupabase } = require("../supabase");
+    const supabase = getSupabase();
+    const { data: user } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", response.localId)
+      .single();
+
+    if (user?.role !== "courier") {
+      throw new ApiError("Invalid role for this endpoint", 403, "AUTH_ROLE_MISMATCH");
+    }
+
+    return res.json({
+      idToken: response.idToken,
+      refreshToken: response.refreshToken,
+      expiresIn: response.expiresIn,
+      localId: response.localId,
+      role: "courier"
+    });
+  })
+);
+
+router.post(
+  "/login/client",
+  asyncHandler(async (req, res) => {
+    console.log(`[AUTH] 🔐 Client login attempt for: ${req.body?.email}`);
+    
+    rateLimit(req, AUTH_LIMIT);
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "email and password required",
+        code: "AUTH_INVALID_INPUT"
+      });
+    }
+
+    const response = await callFirebaseAuth("accounts:signInWithPassword", {
+      email,
+      password
+    });
+
+    console.log(`[AUTH] ✅ Client login successful for: ${email} (UID: ${response.localId})`);
+    
+    // Verify role is client
+    const { getSupabase } = require("../supabase");
+    const supabase = getSupabase();
+    const { data: user } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", response.localId)
+      .single();
+
+    if (user?.role !== "client") {
+      throw new ApiError("Invalid role for this endpoint", 403, "AUTH_ROLE_MISMATCH");
+    }
+
+    return res.json({
+      idToken: response.idToken,
+      refreshToken: response.refreshToken,
+      expiresIn: response.expiresIn,
+      localId: response.localId,
+      role: "client"
+    });
+  })
+);
+
+async function validateRoleByEmail(email, requiredRole) {
+  const { getSupabase } = require("../supabase");
+  const supabase = getSupabase();
+  const { data: user, error } = await supabase
+    .from("users")
+    .select("role")
+    .eq("email", email)
+    .maybeSingle();
+  if (error) {
+    throw new ApiError(error.message, 500, "AUTH_ROLE_LOOKUP_FAILED");
+  }
+  if (!user || user.role !== requiredRole) {
+    throw new ApiError("Invalid role for this endpoint", 403, "AUTH_ROLE_MISMATCH");
+  }
+}
+
+router.post(
+  "/forgot-password",
+  asyncHandler(async (req, res) => {
+    rateLimit(req, AUTH_LIMIT);
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({
+        error: "email required",
+        code: "AUTH_INVALID_INPUT"
+      });
+    }
+    await callFirebaseAuth("accounts:sendOobCode", {
+      requestType: "PASSWORD_RESET",
+      email
+    });
+    return res.json({ status: "ok", message: "Password reset email sent" });
+  })
+);
+
+router.post(
+  "/forgot-password/courier",
+  asyncHandler(async (req, res) => {
+    rateLimit(req, AUTH_LIMIT);
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({
+        error: "email required",
+        code: "AUTH_INVALID_INPUT"
+      });
+    }
+    await validateRoleByEmail(email, "courier");
+    await callFirebaseAuth("accounts:sendOobCode", {
+      requestType: "PASSWORD_RESET",
+      email
+    });
+    return res.json({ status: "ok", message: "Password reset email sent" });
+  })
+);
+
+router.post(
+  "/forgot-password/client",
+  asyncHandler(async (req, res) => {
+    rateLimit(req, AUTH_LIMIT);
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({
+        error: "email required",
+        code: "AUTH_INVALID_INPUT"
+      });
+    }
+    await validateRoleByEmail(email, "client");
+    await callFirebaseAuth("accounts:sendOobCode", {
+      requestType: "PASSWORD_RESET",
+      email
+    });
+    return res.json({ status: "ok", message: "Password reset email sent" });
+  })
+);
+
 router.post(
   "/verify",
   asyncHandler(async (req, res) => {

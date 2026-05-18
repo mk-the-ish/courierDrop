@@ -7,6 +7,7 @@ const { validateTrackingHealth } = require("../jobs/tracking_validation");
 const { cleanupTrackingData } = require("../jobs/cleanup_tracking_data");
 const { runNotificationOutboxJob } = require("../jobs/process_notification_outbox");
 const { aggregateCourierScores } = require("../jobs/aggregate_courier_scores");
+const { runHeuristicTrackingJob } = require("../jobs/heuristic_tracking");
 
 class JobScheduler {
   constructor() {
@@ -349,6 +350,15 @@ function initializeDefaultJobs() {
     aggregateCourierScores,
     {
       description: "Recomputes courier_score from ratings, punctuality, adherence, incidents"
+    }
+  );
+
+  scheduler.registerJob(
+    "heuristic_tracking_sweep",
+    "*/3 * * * *",
+    runHeuristicTrackingJob,
+    {
+      description: "Runs heuristic tracking analysis for in-transit parcels"
     }
   );
 }
