@@ -1,10 +1,9 @@
 import "package:flutter/material.dart";
-import "package:google_maps_flutter/google_maps_flutter.dart";
-import "package:uuid/uuid.dart";
 
 import "../auth/auth_state.dart";
-import "../utils/offline_queue.dart";
+import "../theme.dart";
 import "map_route_declaration_screen.dart";
+import "route_details_screen.dart";
 
 class RouteDeclarationScreen extends StatefulWidget {
   const RouteDeclarationScreen({super.key, required this.authState});
@@ -16,213 +15,324 @@ class RouteDeclarationScreen extends StatefulWidget {
 }
 
 class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _startController = TextEditingController();
-  final _endController = TextEditingController();
-  final _windowStartController = TextEditingController();
-  final _windowEndController = TextEditingController();
-  final _notesController = TextEditingController();
+  List<Map<String, dynamic>> _routes = [];
+  bool _isLoading = true;
 
-  List<LatLng> _polylinePoints = [];
-  bool _allowMultipleParcels = true;
-  bool _isSubmitting = false;
+  @override
+  void initState() {
+    super.initState();
+    _loadRoutes();
+  }
 
   @override
   void dispose() {
-    _startController.dispose();
-    _endController.dispose();
-    _windowStartController.dispose();
-    _windowEndController.dispose();
-    _notesController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-    final corridorPayload = {
-      "clientId": const Uuid().v4(),
-      "startLocation": _startController.text.trim(),
-      "endLocation": _endController.text.trim(),
-      "windowStart": _windowStartController.text.trim(),
-      "windowEnd": _windowEndController.text.trim(),
-      "allowMultipleParcels": _allowMultipleParcels,
-      "notes": _notesController.text.trim(),
-    };
+  Future<void> _loadRoutes() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
     try {
-      final corridorId = await widget.authState.apiClient.postRouteDeclaration(
-        clientId: corridorPayload["clientId"] as String,
-        startLocation: corridorPayload["startLocation"] as String,
-        endLocation: corridorPayload["endLocation"] as String,
-        windowStart: corridorPayload["windowStart"] as String,
-        windowEnd: corridorPayload["windowEnd"] as String,
-        allowMultipleParcels:
-            corridorPayload["allowMultipleParcels"] as bool? ?? true,
-        notes: corridorPayload["notes"] as String?,
+      final routes = await widget.authState.apiClient.getCourierRoutes();
+      if (!mounted) return;
+      setState(() {
+        _routes = routes;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to load routes: $e")),
       );
-      if (_polylinePoints.length >= 2) {
-        await widget.authState.apiClient.postCorridorLine(
-          corridorId: corridorId,
-          polyline: _polylinePoints
-              .map((point) => {"lat": point.latitude, "lng": point.longitude})
-              .toList(),
+    }
+  }
+
+  Future<void> _createNewRoute() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MapRouteDeclarationScreen(authState: widget.authState),
+      ),
+    );
+    if (result != null && result is Map<String, dynamic>) {
+      // result contains { 'startPoint': LatLng, 'endPoint': LatLng, 'polyline': List<LatLng> }
+      if (!mounted) return;
+      final routeDetails = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RouteDetailsScreen(
+            authState: widget.authState,
+            startPoint: result['startPoint'],
+            endPoint: result['endPoint'],
+            polyline: result['polyline'],
+          ),
+        ),
+      );
+      if (routeDetails != null) {
+        await _loadRoutes();
+      }
+    }
+  }
+
+  Future<void> _updateRouteStatus(String routeId, String action) async {
+    try {
+      await widget.authState.apiClient.updateCourierRouteStatus(
+        routeId: routeId,
+        action: action,
+      );
+      await _loadRoutes();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Route ${action}d.")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Route update failed: $e")),
+      );
+    }
+  }
+
+  Future<void> _selectRouteAsNext(Map<String, dynamic> route) async {
+    final routeId = route["id"]?.toString();
+    if (routeId == null) return;
+
+    // First, show date/time picker for start time
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 30)),
+      initialDate: now,
+    );
+    if (date == null) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
+    );
+    if (time == null) return;
+
+    final plannedStartAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+
+    // Show confirmation dialog with selected time
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text(
+          "Use This Route",
+          style: TextStyle(color: dropCityTextLight),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Start time: ${plannedStartAt.toString().split('.')[0]}",
+              style: TextStyle(color: Colors.grey[400]),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "Ready to go?",
+              style: TextStyle(color: Colors.grey[400]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: dropCityOrangeAccent,
+            ),
+            child: const Text("Confirm & Use"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      // Update route with start time and activate
+      try {
+        // Call API to set start time and activate
+        await _updateRouteStatus(routeId, "activate");
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Route active! Starting at ${plannedStartAt.toString().split('.')[0]}"),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to set route: $e")),
         );
       }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Route declared successfully.")),
-      );
-      // Clear form after success
-      _startController.clear();
-      _endController.clear();
-      _windowStartController.clear();
-      _windowEndController.clear();
-      _notesController.clear();
-      _polylinePoints = [];
-      _allowMultipleParcels = true;
-    } catch (_) {
-      await OfflineQueue.instance(widget.authState.apiClient).enqueueRoute(
-        corridorPayload: corridorPayload,
-        polyline: _polylinePoints
-            .map((point) => {"lat": point.latitude, "lng": point.longitude})
-            .toList(),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Queued offline. Will retry on reconnect.")),
-      );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isBusy = widget.authState.isBusy || _isSubmitting;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Declare Route"),
+        title: const Text("My Routes"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              const Text(
-                "Declare Today's Corridor",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _startController,
-                decoration: const InputDecoration(
-                  labelText: "Start location",
-                  hintText: "e.g., 12 Main Rd, District 8",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.location_on),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _routes.isEmpty
+              ? _buildEmptyState()
+              : ListView(
+                  padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
+                  children: [
+                    ..._routes.map(_buildRouteCard),
+                  ],
                 ),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? "Required" : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _endController,
-                decoration: const InputDecoration(
-                  labelText: "End location",
-                  hintText: "e.g., Market Square",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.location_on),
-                ),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? "Required" : null,
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          MapRouteDeclarationScreen(authState: widget.authState),
-                    ),
-                  );
-                  if (result != null && result is List<LatLng>) {
-                    setState(() => _polylinePoints = result);
-                  }
-                },
-                icon: const Icon(Icons.map),
-                label: Text(_polylinePoints.isEmpty
-                    ? "Draw Route on Map"
-                    : "Route: ${_polylinePoints.length} points"),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _windowStartController,
-                      decoration: const InputDecoration(
-                        labelText: "Window start",
-                        hintText: "07:00",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                              ? "Required"
-                              : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _windowEndController,
-                      decoration: const InputDecoration(
-                        labelText: "Window end",
-                        hintText: "09:30",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                              ? "Required"
-                              : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                title: const Text("Accept multiple parcels"),
-                subtitle: const Text("Allow more than one parcel on this route"),
-                value: _allowMultipleParcels,
-                onChanged: isBusy
-                    ? null
-                    : (value) => setState(() => _allowMultipleParcels = value),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _notesController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: "Notes for clients",
-                  hintText: "e.g., Only small parcels, no liquids",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: isBusy ? null : _submit,
-                child: Text(isBusy ? "Submitting..." : "Declare route"),
-              ),
-              const SizedBox(height: 24),
-            ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _createNewRoute,
+        backgroundColor: dropCityOrangeAccent,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.directions_run,
+            size: 64,
+            color: Colors.grey[500],
           ),
+          const SizedBox(height: 16),
+          Text(
+            "No routes declared yet",
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Create a route to get started",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: _createNewRoute,
+            icon: const Icon(Icons.add),
+            label: const Text("Create Route"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRouteCard(Map<String, dynamic> route) {
+    final id = route["id"]?.toString() ?? "-";
+    final status = route["status"]?.toString() ?? "PLANNED";
+    final start = route["planned_start_at"]?.toString() ?? "-";
+    final eta = route["declared_eta_minutes"]?.toString() ?? "-";
+    final canActivate = status == "PLANNED";
+    final canComplete = status == "ACTIVE";
+    final canCancel = status == "PLANNED";
+    final canSelect = status == "ACTIVE" || status == "PLANNED";
+
+    Color badgeColor;
+    switch (status) {
+      case "ACTIVE":
+        badgeColor = Colors.green;
+        break;
+      case "COMPLETED":
+        badgeColor = Colors.blueGrey;
+        break;
+      case "CANCELLED":
+        badgeColor = Colors.red;
+        break;
+      default:
+        badgeColor = Colors.orange;
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "Route $id",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(color: badgeColor, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text("Planned start: $start"),
+            Text("Declared ETA: $eta min"),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: canActivate ? () => _updateRouteStatus(id, "activate") : null,
+                    child: const Text("Activate"),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: canComplete ? () => _updateRouteStatus(id, "complete") : null,
+                    child: const Text("Complete"),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: canCancel ? () => _updateRouteStatus(id, "cancel") : null,
+                    child: const Text("Cancel"),
+                  ),
+                ),
+              ],
+            ),
+            if (canSelect) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _selectRouteAsNext(route),
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text("Use This Route"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: dropCityOrangeAccent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

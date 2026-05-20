@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/auth_state.dart';
+import '../../theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -69,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(authState.errorMessage ?? 'Login failed'),
-            backgroundColor: Colors.red,
+            backgroundColor: dropCityErrorRed,
           ),
         );
       }
@@ -78,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: dropCityErrorRed,
           ),
         );
       }
@@ -93,13 +94,13 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF1a1a2e),
-              const Color(0xFF16213e),
+              dropCityDarkGradientStart,
+              dropCityDarkGradientEnd,
             ],
           ),
         ),
@@ -119,18 +120,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 100,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(
+                          gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              const Color(0xFFFF6B35),
-                              const Color(0xFFFFA500),
+                              dropCityOrangeAccent,
+                              dropCityOrangeLight,
                             ],
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color:
-                                  const Color(0xFFFF6B35).withOpacity(0.4),
+                              color: dropCityOrangeAccent.withOpacity(0.4),
                               blurRadius: 20,
                               spreadRadius: 5,
                             ),
@@ -152,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             .textTheme
                             .headlineMedium
                             ?.copyWith(
-                              color: Colors.white,
+                              color: dropCityTextLight,
                               fontWeight: FontWeight.bold,
                             ),
                       ),
@@ -160,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         'Log in to your courier account',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[400],
+                              color: dropCityTextGrey,
                             ),
                       ),
                       const SizedBox(height: 48),
@@ -169,40 +169,37 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(color: dropCityTextLight),
                         decoration: InputDecoration(
                           labelText: 'Email Address',
-                          labelStyle: TextStyle(color: Colors.grey[400]),
+                          labelStyle: const TextStyle(color: dropCityTextGrey),
                           errorText: _emailError,
-                          errorStyle:
-                              const TextStyle(color: Color(0xFFEF5350)),
+                          errorStyle: const TextStyle(color: dropCityErrorRed),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                            borderSide: const BorderSide(color: dropCityInputBorder),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(dropCityBorderRadius),
                             borderSide: const BorderSide(
-                              color: Color(0xFFFF6B35),
+                              color: dropCityOrangeAccent,
                               width: 2,
                             ),
                           ),
                           errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(dropCityBorderRadius),
                             borderSide: const BorderSide(
-                              color: Color(0xFFEF5350),
+                              color: dropCityErrorRed,
                               width: 2,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                BorderSide(color: Colors.grey[700]!),
+                            borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                            borderSide: const BorderSide(color: dropCityInputBorder),
                           ),
                           prefixIcon: const Icon(
                             Icons.email_outlined,
-                            color: Color(0xFFFF6B35),
+                            color: dropCityOrangeAccent,
                           ),
                         ),
                       ),
@@ -212,40 +209,37 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(color: dropCityTextLight),
                         decoration: InputDecoration(
                           labelText: 'Password',
-                          labelStyle: TextStyle(color: Colors.grey[400]),
+                          labelStyle: const TextStyle(color: dropCityTextGrey),
                           errorText: _passwordError,
-                          errorStyle:
-                              const TextStyle(color: Color(0xFFEF5350)),
+                          errorStyle: const TextStyle(color: dropCityErrorRed),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                            borderSide: const BorderSide(color: dropCityInputBorder),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(dropCityBorderRadius),
                             borderSide: const BorderSide(
-                              color: Color(0xFFFF6B35),
+                              color: dropCityOrangeAccent,
                               width: 2,
                             ),
                           ),
                           errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(dropCityBorderRadius),
                             borderSide: const BorderSide(
-                              color: Color(0xFFEF5350),
+                              color: dropCityErrorRed,
                               width: 2,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                BorderSide(color: Colors.grey[700]!),
+                            borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                            borderSide: const BorderSide(color: dropCityInputBorder),
                           ),
                           prefixIcon: const Icon(
                             Icons.lock_outline,
-                            color: Color(0xFFFF6B35),
+                            color: dropCityOrangeAccent,
                           ),
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -268,10 +262,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           onTap: () {
                             // TODO: Implement forgot password flow
                           },
-                          child: Text(
+                          child: const Text(
                             'Forgot password?',
                             style: TextStyle(
-                              color: const Color(0xFFFF6B35),
+                              color: dropCityOrangeAccent,
                               fontSize: 14,
                             ),
                           ),
@@ -284,17 +278,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF6B35),
-                            disabledBackgroundColor: Colors.grey[600],
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 8,
-                            shadowColor: const Color(0xFFFF6B35)
-                                .withOpacity(0.5),
-                          ),
                           child: _isLoading
                               ? const SizedBox(
                                   height: 20,
@@ -334,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: const Text(
                               'Sign Up',
                               style: TextStyle(
-                                color: Color(0xFFFF6B35),
+                                color: dropCityOrangeAccent,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -352,7 +335,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 top: 12,
                 left: 12,
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  icon: const Icon(Icons.arrow_back, color: dropCityTextLight),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ),
@@ -363,3 +346,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

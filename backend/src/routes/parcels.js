@@ -397,6 +397,75 @@ function estimateEta(parcel, model, now = new Date()) {
 }
 
 router.post(
+  "/:id/handoff-issue",
+  requireRole("client"),
+  asyncHandler(async (req, res) => {
+    const parcelId = req.params.id;
+    const { issueType, notes, recipientPhone, preferredResolution } = req.body || {};
+    if (!issueType || typeof issueType !== "string") {
+      throw new ApiError("issueType required", 400, "HANDOFF_ISSUE_INVALID_INPUT");
+    }
+
+    const supabase = getSupabase();
+    const { data: parcel, error: parcelError } = await supabase
+      .from("parcels")
+      .select("id,created_by,recipient_id,assigned_courier_id,status")
+      .eq("id", parcelId)
+      .maybeSingle();
+    if (parcelError) {
+      throw new ApiError(parcelError.message, 500, "PARCEL_LOOKUP_FAILED");
+    }
+    if (!parcel) {
+      throw new ApiError("Parcel not found", 404, "PARCEL_NOT_FOUND");
+    }
+
+    const uid = req.user?.uid;
+    const isSender = parcel.created_by && parcel.created_by === uid;
+    const isRecipient = parcel.recipient_id && parcel.recipient_id === uid;
+    if (!isSender && !isRecipient) {
+      throw new ApiError("Not permitted", 403, "PARCEL_FORBIDDEN");
+    }
+
+    const courierId = parcel.assigned_courier_id || "unknown";
+    const nowIso = new Date().toISOString();
+
+    const { error: issueError } = await supabase.from("route_deviation_events").insert({
+      parcel_id: parcelId,
+      courier_id: courierId,
+      deviation_type: "HANDOFF_ISSUE_REPORTED",
+      duration_seconds: 0,
+      created_at: nowIso,
+      resolution_status: "OPEN",
+      resolution_notes: JSON.stringify({
+        issueType,
+        notes: notes || "",
+        recipientPhone: recipientPhone || "",
+        preferredResolution: preferredResolution || "",
+        reportedBy: uid || null
+      })
+    });
+    if (issueError) {
+      throw new ApiError(issueError.message, 500, "HANDOFF_ISSUE_REPORT_FAILED");
+    }
+
+    await supabase.from("handshake_events").insert({
+      parcel_id: parcelId,
+      step: "DISPUTE",
+      actor_id: uid || null,
+      status: "REPORTED",
+      created_at: nowIso
+    });
+
+    return res.status(201).json({
+      status: "ok",
+      parcelId,
+      issueType,
+      message: "Handoff issue reported. Admin review pending."
+    });
+  })
+);
+
+router.post(
   "/",
   asyncHandler(async (req, res) => {
   const {
@@ -520,7 +589,11 @@ router.post(
       destCoords.lat,
       destCoords.lng,
       size || 'M',
-      typeof weightKg === "number" ? weightKg : null
+      typeof weightKg === "number" ? weightKg : null,
+      {
+        priority: priority || "standard",
+        acceptedPrice: typeof userPrice === "number" && Number.isFinite(userPrice) ? userPrice : null
+      }
     );
     payload.recommended_price = priceRec.recommendedPrice;
     

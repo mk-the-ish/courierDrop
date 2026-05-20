@@ -170,7 +170,7 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                       decoration: InputDecoration(
                         hintText: 'johndoe',
                         labelText: 'Username',
-                        prefixIcon: const Icon(Icons.at),
+                        prefixIcon: const Icon(Icons.email),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),

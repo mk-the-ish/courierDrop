@@ -725,4 +725,28 @@ class ApiClient {
       throw Exception("Mark all notifications read failed: ${response.body}");
     }
   }
+
+  Future<Map<String, dynamic>> reportHandoffIssue({
+    required String parcelId,
+    required String issueType,
+    String? notes,
+    String? recipientPhone,
+    String? preferredResolution,
+  }) async {
+    final uri = Uri.parse("$baseUrl/parcels/$parcelId/handoff-issue");
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({
+        "issueType": issueType,
+        "notes": notes ?? "",
+        "recipientPhone": recipientPhone ?? "",
+        "preferredResolution": preferredResolution ?? "",
+      }),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Handoff issue report failed: ${response.body}");
+    }
+    return (jsonDecode(response.body) as Map).cast<String, dynamic>();
+  }
 }

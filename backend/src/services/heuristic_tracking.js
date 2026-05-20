@@ -41,6 +41,101 @@ function durationMinutes(fromIso, toIso) {
   return Math.max(0, (b - a) / 60000);
 }
 
+function computeInstantDiagnostics({
+  nowIso,
+  lat,
+  lng,
+  isOnCorridor,
+  currentDistanceM,
+  lastPulse
+}) {
+  const flags = {};
+  let speedKmh = null;
+  let movementConfidence = 0.5;
+
+  if (
+    lastPulse &&
+    typeof lastPulse.lat === "number" &&
+    typeof lastPulse.lng === "number" &&
+    Number.isFinite(lastPulse.lat) &&
+    Number.isFinite(lastPulse.lng)
+  ) {
+    const dMeters = haversineMeters(
+      { lat: lastPulse.lat, lng: lastPulse.lng },
+      { lat, lng }
+    );
+    const dtHours = Math.max(
+      1 / 3600,
+      (new Date(nowIso).getTime() - new Date(lastPulse.created_at).getTime()) / 3600000
+    );
+    speedKmh = dMeters !== null ? dMeters / 1000 / dtHours : null;
+    if (typeof speedKmh === "number" && Number.isFinite(speedKmh)) {
+      if (speedKmh >= TELEPORT_SPEED_KMH) {
+        flags.teleportation = true;
+      }
+      if (speedKmh < 2) {
+        flags.stagnation = true;
+      }
+    }
+  }
+
+  const deltaToDestination =
+    typeof lastPulse?.current_distance_m === "number" &&
+    typeof currentDistanceM === "number"
+      ? lastPulse.current_distance_m - currentDistanceM
+      : null;
+
+  if (deltaToDestination !== null) {
+    if (deltaToDestination > 5) {
+      movementConfidence += 0.25;
+    } else if (deltaToDestination < -10) {
+      flags.regressing = true;
+      movementConfidence -= 0.2;
+    } else {
+      movementConfidence -= 0.05;
+    }
+  }
+
+  if (isOnCorridor === true) {
+    movementConfidence += 0.2;
+  } else {
+    flags.off_corridor = true;
+    movementConfidence -= 0.15;
+  }
+
+  const routeAdherenceScore = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        (isOnCorridor ? 85 : 55) +
+          (deltaToDestination !== null ? Math.max(-20, Math.min(20, deltaToDestination / 20)) : 0) -
+          (flags.teleportation ? 40 : 0) -
+          (flags.stagnation ? 15 : 0)
+      )
+    )
+  );
+
+  const checkpointConfidence = Math.max(
+    0,
+    Math.min(
+      1,
+      0.55 +
+        (isOnCorridor ? 0.2 : -0.1) +
+        (flags.teleportation ? -0.35 : 0) +
+        (flags.stagnation ? -0.1 : 0)
+    )
+  );
+
+  return {
+    speedKmh: typeof speedKmh === "number" && Number.isFinite(speedKmh) ? Number(speedKmh.toFixed(2)) : null,
+    movementConfidence: Number(Math.max(0, Math.min(1, movementConfidence)).toFixed(3)),
+    checkpointConfidence: Number(checkpointConfidence.toFixed(3)),
+    routeAdherenceScore,
+    flags
+  };
+}
+
 async function analyzeParcelHeuristics(parcelId) {
   const supabase = getSupabase();
   const { data: parcel, error: parcelErr } = await supabase
@@ -195,6 +290,7 @@ async function runHeuristicTrackingSweep() {
 }
 
 module.exports = {
+  computeInstantDiagnostics,
   analyzeParcelHeuristics,
   runHeuristicTrackingSweep
 };

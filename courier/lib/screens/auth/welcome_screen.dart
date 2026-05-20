@@ -1,144 +1,165 @@
-import 'package:flutter/material.dart';
+import "package:flutter/material.dart";
 
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({Key? key}) : super(key: key);
+  const WelcomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final theme = Theme.of(context);
+
+    // Explicit requested color scheme integration
+    const Color darkBlue = Color(0xFF1a1a2e);
+    const Color darkerBlue = Color(0xFF16213e);
+    const Color primaryOrange = Color(0xFFFF6B35);
+    const Color cloudWhite = Color(0xFFF8F9FA);
 
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF1a1a2e), // Dark blue
-              const Color(0xFF16213e), // Darker blue
+              darkBlue,
+              darkerBlue,
             ],
           ),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top section - Logo and tagline
+                // Top Branding Section (The D-Corridor Signature Brand Mark)
                 Column(
                   children: [
                     SizedBox(height: screenHeight * 0.08),
+                    
+                    // DropCity Brand Logo
                     Container(
-                      width: 100,
-                      height: 100,
+                      width: 120,
+                      height: 120,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color(0xFFFF6B35),
-                            const Color(0xFFFFA500),
-                          ],
+                        color: Colors.black.withOpacity(0.25),
+                        border: Border.all(
+                          color: primaryOrange.withOpacity(0.2),
+                          width: 1.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFFF6B35).withOpacity(0.4),
-                            blurRadius: 20,
-                            spreadRadius: 5,
+                            color: primaryOrange.withOpacity(0.15),
+                            blurRadius: 30,
+                            spreadRadius: 10,
                           ),
                         ],
                       ),
                       child: Center(
-                        child: Text(
-                          '📦',
-                          style: Theme.of(context).textTheme.displayMedium,
+                        child: Image.asset(
+                          "assets/images/logo.png",
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
+                    
+                    // App Name
                     Text(
-                      'Welcome to DropCity',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      "DropCity Courier",
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: cloudWhite,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
+                    
+                    // Opportunistic logistics tagline oriented around local transport solutions
                     Text(
-                      'Join our network of couriers and deliver packages faster than ever.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[400],
-                            height: 1.5,
-                          ),
+                      "Monetize your daily commute. Accept secure, zero-detour deliveries directly along your existing transit corridors.",
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                        height: 1.5,
+                        fontSize: 15,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
                 ),
 
-                // Bottom section - Auth buttons
+                // Bottom Authentication Navigation Section
                 Column(
                   children: [
-                    // Sign Up button
-                    SizedBox(
+                    // Professional Sign Up (Primary Button using the vibrant Orange gradient)
+                    Container(
                       width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [primaryOrange, Color(0xFFFF8C42)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primaryOrange.withOpacity(0.35),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
                       child: ElevatedButton(
-                        onPressed: () =>
-                            Navigator.of(context).pushNamed('/signup'),
+                        onPressed: () => Navigator.of(context).pushNamed("/signup"),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF6B35),
-                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
                           padding: const EdgeInsets.symmetric(vertical: 18),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          elevation: 8,
-                          shadowColor:
-                              const Color(0xFFFF6B35).withOpacity(0.5),
                         ),
-                        child: Text(
-                          'Sign Up as Courier',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                        child: const Text(
+                          "Sign Up as Courier",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
 
-                    // Log In button
+                    // Professional Log In (Outlined Button matching the brand theme)
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: () =>
-                            Navigator.of(context).pushNamed('/login'),
+                        onPressed: () => Navigator.of(context).pushNamed("/login"),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(
-                            color: Color(0xFFFF6B35),
+                          foregroundColor: cloudWhite,
+                          side: BorderSide(
+                            color: primaryOrange.withOpacity(0.8),
                             width: 2,
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 18),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: Text(
-                          'Log In',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.white,
-                              ),
+                        child: const Text(
+                          "Log In",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: cloudWhite,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),

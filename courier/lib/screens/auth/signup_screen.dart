@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/signup_controller.dart';
+import '../../theme.dart';
 import './signup_steps/step1_email.dart';
 import './signup_steps/step2_personal.dart';
 import './signup_steps/step3_license.dart';
@@ -19,13 +20,13 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF1a1a2e),
-              const Color(0xFF16213e),
+              dropCityDarkGradientStart,
+              dropCityDarkGradientEnd,
             ],
           ),
         ),
@@ -59,7 +60,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     top: MediaQuery.of(context).padding.top + 12,
                     left: 12,
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      icon: const Icon(Icons.arrow_back, color: dropCityTextLight),
                       onPressed: () {
                         controller.goBack();
                       },
@@ -71,7 +72,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   top: MediaQuery.of(context).padding.top + 12,
                   right: 12,
                   child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
+                    icon: const Icon(Icons.close, color: dropCityTextLight),
                     onPressed: () {
                       Navigator.of(context).pop();
                     },
@@ -95,14 +96,14 @@ class _SignupScreenState extends State<SignupScreen> {
         Text(
           'Step ${controller.currentStep} of $steps',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[400],
+                color: dropCityTextGrey,
               ),
         ),
         const SizedBox(height: 8),
         Text(
           stepNames[controller.currentStep - 1],
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
+                color: dropCityTextLight,
                 fontWeight: FontWeight.bold,
               ),
         ),
@@ -115,8 +116,8 @@ class _SignupScreenState extends State<SignupScreen> {
             value: controller.currentStep / steps,
             minHeight: 8,
             backgroundColor: Colors.grey[700],
-            valueColor: AlwaysStoppedAnimation<Color>(
-              const Color(0xFFFF6B35),
+            valueColor: const AlwaysStoppedAnimation<Color>(
+              dropCityOrangeAccent,
             ),
           ),
         ),
@@ -148,14 +149,14 @@ class _SignupScreenState extends State<SignupScreen> {
         Container(
           width: 120,
           height: 120,
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             shape: BoxShape.circle,
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                const Color(0xFF4CAF50),
-                const Color(0xFF66BB6A),
+                dropCitySuccessGreen,
+                Color(0xFF66BB6A),
               ],
             ),
           ),
@@ -169,7 +170,7 @@ class _SignupScreenState extends State<SignupScreen> {
         Text(
           'Welcome to DropCity!',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: Colors.white,
+                color: dropCityTextLight,
                 fontWeight: FontWeight.bold,
               ),
           textAlign: TextAlign.center,
@@ -178,7 +179,7 @@ class _SignupScreenState extends State<SignupScreen> {
         Text(
           'Your profile has been created successfully.\nYou\'re ready to start delivering!',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[400],
+                color: dropCityTextGrey,
                 height: 1.5,
               ),
           textAlign: TextAlign.center,
@@ -188,13 +189,6 @@ class _SignupScreenState extends State<SignupScreen> {
           width: double.infinity,
           child: ElevatedButton(
             onPressed: () => Navigator.of(context).pushReplacementNamed('/dashboard'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF6B35),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
             child: Text(
               'Go to Dashboard',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(

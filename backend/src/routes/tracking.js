@@ -11,15 +11,22 @@ const ApiError = require("../utils/api_error");
 const asyncHandler = require("../utils/async_handler");
 const { requireRole } = require("../middleware/auth");
 const { broadcastTrackingUpdate } = require("../ws");
+const { enqueueNotification } = require("../services/notification_service");
+const { NOTIFICATION_EVENT_TYPES } = require("../services/notification_events");
 const { calculateVectorProgress } = require("../services/tracking_vector");
 const { connectivityAudit } = require("../services/connectivity_audit_service");
-const { analyzeParcelHeuristics } = require("../services/heuristic_tracking");
+const {
+  analyzeParcelHeuristics,
+  computeInstantDiagnostics
+} = require("../services/heuristic_tracking");
 const { estimateParcelEta } = require("../services/eta_model");
 
 const router = express.Router();
 
 const CORRIDOR_TOLERANCE_M = 500;
 const BATCH_SYNC_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const ETA_NOTIFY_MIN_INTERVAL_MS = 5 * 60 * 1000;
+const ETA_NOTIFY_DELTA_MINUTES = 4;
 
 /**
  * POST /tracking/update
@@ -50,7 +57,7 @@ router.post(
     const { data: parcel, error: parcelError } = await supabase
       .from("parcels")
       .select(
-        "id,status,destination_point,assigned_courier_id,assigned_at,pickup_verified_at"
+        "id,status,destination_point,assigned_courier_id,assigned_at,pickup_verified_at,created_by"
       )
       .eq("id", parcelId)
       .maybeSingle();
@@ -165,7 +172,7 @@ router.post(
 
     const { data: lastPulse } = await supabase
       .from("courier_tracking_logs")
-      .select("created_at,current_distance_m")
+      .select("created_at,current_distance_m,raw_location")
       .eq("parcel_id", parcelId)
       .eq("courier_id", courierId)
       .order("created_at", { ascending: false })
@@ -188,6 +195,25 @@ router.post(
       lastPulse?.current_distance_m
     );
 
+    const lastWkt = (lastPulse?.raw_location || "").toString();
+    const lastMatch = lastWkt.match(/POINT\(([-\d.]+)\s+([-\d.]+)\)/i);
+    const lastPulsePoint = lastMatch
+      ? { lat: Number(lastMatch[2]), lng: Number(lastMatch[1]) }
+      : null;
+    const diagnostics = computeInstantDiagnostics({
+      nowIso,
+      lat,
+      lng,
+      isOnCorridor,
+      currentDistanceM: distanceToDestination,
+      lastPulse: {
+        created_at: lastPulse?.created_at,
+        current_distance_m: lastPulse?.current_distance_m,
+        lat: lastPulsePoint?.lat,
+        lng: lastPulsePoint?.lng
+      }
+    });
+
     // Log the tracking event
     const { error: logError } = await supabase
       .from("courier_tracking_logs")
@@ -204,6 +230,13 @@ router.post(
         device_info: deviceInfo && typeof deviceInfo === "object" ? deviceInfo : {},
         network_info: networkInfo && typeof networkInfo === "object" ? networkInfo : {},
         vector_progress_delta: vectorDelta,
+        speed_kmh: diagnostics.speedKmh,
+        heuristic_flags: {
+          ...diagnostics.flags,
+          movement_confidence: diagnostics.movementConfidence,
+          checkpoint_confidence: diagnostics.checkpointConfidence,
+          route_adherence_score: diagnostics.routeAdherenceScore
+        },
         created_at: nowIso
       });
 
@@ -259,13 +292,72 @@ router.post(
       on_corridor: isOnCorridor
     });
 
+    // Sender ETA notifications (throttled + significant-delta gated).
+    try {
+      if (parcel.created_by) {
+        const eta = await estimateParcelEta(parcelId);
+        if (eta?.etaMinutes) {
+          const { data: lastEtaNotification } = await supabase
+            .from("notifications")
+            .select("created_at,payload")
+            .eq("type", NOTIFICATION_EVENT_TYPES.SENDER_ETA_UPDATE)
+            .eq("entity_type", "parcel")
+            .eq("entity_id", String(parcelId))
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const nowMs = Date.now();
+          const lastCreatedMs = lastEtaNotification?.created_at
+            ? new Date(lastEtaNotification.created_at).getTime()
+            : 0;
+          const withinInterval =
+            lastCreatedMs > 0 && nowMs - lastCreatedMs < ETA_NOTIFY_MIN_INTERVAL_MS;
+          const lastEtaMinutes = Number(lastEtaNotification?.payload?.etaMinutes);
+          const hasLargeDelta =
+            Number.isFinite(lastEtaMinutes) &&
+            Math.abs(lastEtaMinutes - eta.etaMinutes) >= ETA_NOTIFY_DELTA_MINUTES;
+
+          if (!withinInterval || hasLargeDelta) {
+            await enqueueNotification({
+              type: NOTIFICATION_EVENT_TYPES.SENDER_ETA_UPDATE,
+              title: "Delivery ETA updated",
+              body: `Courier ETA is now about ${eta.etaMinutes} min.`,
+              recipients: [parcel.created_by],
+              entityType: "parcel",
+              entityId: parcelId,
+              payload: {
+                parcelId,
+                etaMinutes: eta.etaMinutes,
+                confidence: eta.confidence || "LOW",
+                confidenceScore: eta.confidenceScore ?? null,
+                distanceMeters: eta.distanceMeters ?? null,
+                sourceBreakdown: eta.sourceBreakdown || []
+              }
+            });
+          }
+        }
+      }
+    } catch (etaNotifyError) {
+      console.warn(
+        `[Tracking.update] ETA notify skipped: parcelId=${parcelId}, error=${etaNotifyError.message}`
+      );
+    }
+
     console.log(`[Tracking.update] SUCCESS: parcelId=${parcelId}, response sent`);
     return res.json({
       status: "ok",
       progress_percent: progressPercentage,
       on_corridor: isOnCorridor,
       integrity_status: integrityStatus,
-      distance_m: distanceToDestination
+      distance_m: distanceToDestination,
+      diagnostics: {
+        movementConfidence: diagnostics.movementConfidence,
+        checkpointConfidence: diagnostics.checkpointConfidence,
+        routeAdherenceScore: diagnostics.routeAdherenceScore,
+        speedKmh: diagnostics.speedKmh,
+        flags: diagnostics.flags
+      }
     });
   })
 );

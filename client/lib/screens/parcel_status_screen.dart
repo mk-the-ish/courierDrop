@@ -11,6 +11,8 @@ import "package:shared_preferences/shared_preferences.dart";
 import "package:mobile_scanner/mobile_scanner.dart";
 
 import "../auth/auth_state.dart";
+import "recipient_handoff_screen.dart";
+import "sender_handoff_fallback_screen.dart";
 
 class ParcelStatusScreen extends StatefulWidget {
   const ParcelStatusScreen({
@@ -41,12 +43,14 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
   final List<Map<String, dynamic>> _handshakeEvents = [];
   String _eventFilter = "all";
   bool _historyUnavailable = false;
+  Map<String, dynamic>? _myProfile;
 
   static const _dismissKey = "dismiss_courier_accepted_banner";
 
   @override
   void initState() {
     super.initState();
+    _loadMyProfile();
     _loadDismissPreference();
     final initialParcelId = widget.initialParcelId?.trim();
     if (initialParcelId != null && initialParcelId.isNotEmpty) {
@@ -57,6 +61,16 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
         }
         _beginTracking();
       });
+    }
+  }
+
+  Future<void> _loadMyProfile() async {
+    try {
+      final profile = await widget.authState.apiClient.getMyProfile();
+      if (!mounted) return;
+      setState(() => _myProfile = profile);
+    } catch (_) {
+      // Keep screen functional if profile fetch fails.
     }
   }
 
@@ -445,6 +459,12 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
         : null;
     final trackingIntegrity = _parcel?["tracking_integrity_status"]?.toString();
     final trackingLastUpdate = _parcel?["tracking_last_update"]?.toString();
+    final meId = _myProfile?["id"]?.toString() ?? widget.authState.user?.uid;
+    final parcelRecipientId = _parcel?["recipient_id"]?.toString();
+    final parcelCreatedBy = _parcel?["created_by"]?.toString();
+    final recipientIsInApp = parcelRecipientId != null && parcelRecipientId.isNotEmpty;
+    final isRecipient = meId != null && parcelRecipientId == meId;
+    final isSender = meId != null && parcelCreatedBy == meId;
     return Scaffold(
       appBar: AppBar(title: const Text("Parcel Status")),
       body: ListView(
@@ -578,6 +598,84 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
               subtitle: Text("Status: $status"),
             ),
           ),
+          if (status == "IN_TRANSIT" && isRecipient) ...[
+            const SizedBox(height: 8),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.verified_user, color: Colors.teal),
+                title: const Text("Recipient handoff"),
+                subtitle: const Text("Generate a secure PIN and share it with the courier."),
+                trailing: ElevatedButton(
+                  onPressed: () {
+                    final id = _parcel?["id"]?.toString() ?? _parcelIdController.text.trim();
+                    if (id.isEmpty) return;
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => RecipientHandoffScreen(
+                          authState: widget.authState,
+                          parcelId: id,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text("Open"),
+                ),
+              ),
+            ),
+          ],
+          if (status == "IN_TRANSIT" && isSender && !recipientIsInApp) ...[
+            const SizedBox(height: 8),
+            Card(
+              color: Colors.amber.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "External recipient fallback",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Recipient is not in-app. Coordinate with courier using SMS/phone and ensure recipient is ready at dropoff.",
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Tip: ask courier to request manual dropoff OTP for recipient phone."),
+                              ),
+                            );
+                          },
+                          child: const Text("Delivery tips"),
+                        ),
+                        OutlinedButton(
+                          onPressed: () {
+                            final id = _parcel?["id"]?.toString() ?? _parcelIdController.text.trim();
+                            if (id.isEmpty) return;
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => SenderHandoffFallbackScreen(
+                                  authState: widget.authState,
+                                  parcelId: id,
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text("Initiate dispute"),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Card(
             child: Padding(

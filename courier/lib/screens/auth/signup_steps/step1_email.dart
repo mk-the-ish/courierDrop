@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../controllers/signup_controller.dart';
+import '../../../theme.dart';
 
 class CourierSignupStep1Email extends StatefulWidget {
   const CourierSignupStep1Email({Key? key}) : super(key: key);

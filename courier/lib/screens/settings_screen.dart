@@ -98,13 +98,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Profile Section
-            Container(
-              color: Colors.blue.shade50,
-              padding: const EdgeInsets.all(16),
-              child: Column(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 100),
+          child: Column(
+            children: [
+              // Profile Section
+              Container(
+                color: Colors.blue.shade50,
+                padding: const EdgeInsets.all(16),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
@@ -210,6 +212,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
           ],
+        ),
         ),
       ),
     );

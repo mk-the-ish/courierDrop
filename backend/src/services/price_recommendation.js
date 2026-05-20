@@ -1,160 +1,180 @@
-/**
- * Price Recommendation Engine
- * 
- * Formula: F = min((S × D) + (P_r × 2), MWP)
- * S: Space factor (0.5, 1.0, 2.0)
- * D: Distance coefficient
- * P_r: Passenger fare for route
- * MWP: Max willingness to pay (not implemented - uses calculated price)
- */
-
 const { getSupabase } = require("../supabase");
 
-const SIZE_MULTIPLIERS = {
-  S: 0.5,
-  M: 1.0,
-  L: 2.0
-};
+const SIZE_MULTIPLIERS = { S: 0.5, M: 1.0, L: 2.0 };
+const URGENCY_MULTIPLIER = { standard: 1.0, express: 1.2, "same-day": 1.35 };
 
-/**
- * Calculate distance coefficient based on corridor distance
- * Closer to passenger fare pricing
- */
-function calculateDistanceCoefficient(distanceKm) {
-  // 1 km = ~0.1 USD base cost
-  return Math.max(0.3, distanceKm * 0.08);
+function toRouteKey(originLat, originLng, destinationLat, destinationLng) {
+  const round = (v) => Number(v).toFixed(2);
+  return `${round(originLat)},${round(originLng)}->${round(destinationLat)},${round(destinationLng)}`;
 }
 
-/**
- * Get price recommendation for a delivery
- * @param {number} originLat
- * @param {number} originLng
- * @param {number} destinationLat
- * @param {number} destinationLng
- * @param {string} size - 'S', 'M', or 'L'
- * @param {number} weightKg - Optional weight
- * @returns {Promise<{recommendedPrice: number, baseFare: number, sizeMultiplier: number, components: object}>}
- */
-async function getRecommendedPrice(originLat, originLng, destinationLat, destinationLng, size = 'M', weightKg = null) {
-  try {
-    const supabase = getSupabase();
-    
-    // Validate size
-    if (!SIZE_MULTIPLIERS[size]) {
-      throw new Error(`Invalid size: ${size}. Must be S, M, or L.`);
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function defaultResponse(size = "M", weightKg = null) {
+  const base = { S: 1.0, M: 1.8, L: 3.0 }[size] || 1.8;
+  const weightMultiplier = weightKg && weightKg > 2 ? 1 + Math.min(0.35, (weightKg - 2) * 0.03) : 1;
+  const price = Number((base * weightMultiplier).toFixed(2));
+  return {
+    recommendedPrice: price,
+    baseFare: base,
+    sizeMultiplier: SIZE_MULTIPLIERS[size] || 1.0,
+    corridorName: "DEFAULT",
+    components: {
+      segmentTransferPct: 1,
+      urgencyMultiplier: 1,
+      weightMultiplier,
+      demandModifier: 1
     }
+  };
+}
 
-    const sizeMultiplier = SIZE_MULTIPLIERS[size];
-    
-    // Find closest base fare route using PostGIS
-    const originPoint = `POINT(${originLng} ${originLat})`;
-    const destPoint = `POINT(${destinationLng} ${destinationLat})`;
-    
-    // Get all base fares and find the closest match
-    const { data: baseFares, error: fareError } = await supabase
-      .from("base_fares")
-      .select("*")
-      .order("distance_km", { ascending: true })
-      .limit(5);
+async function getDemandModifier(supabase) {
+  const { count } = await supabase
+    .from("parcels")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["REQUESTED", "MATCHING", "ASSIGNED", "IN_TRANSIT"]);
+  if (!Number.isFinite(count)) return 1;
+  if (count <= 20) return 1.0;
+  if (count <= 60) return 1.08;
+  if (count <= 120) return 1.16;
+  return 1.25;
+}
 
-    if (fareError) {
-      console.error("[PriceRec] Error fetching base fares:", fareError);
-      // Return default pricing if lookup fails
-      return getDefaultPrice(size, weightKg);
-    }
-
-    if (!baseFares || baseFares.length === 0) {
-      return getDefaultPrice(size, weightKg);
-    }
-
-    // Use the first (closest distance) base fare as reference
-    const baseRoute = baseFares[0];
-    const passengerFare = baseRoute.passenger_fare_usd;
-    const distanceKm = baseRoute.distance_km;
-    
-    // Calculate components
-    const distanceCoeff = calculateDistanceCoefficient(distanceKm);
-    const spaceComponent = sizeMultiplier * distanceCoeff;
-    const passengerComponent = passengerFare * 2; // Round trip proxy
-    
-    // Final price = (S × D) + (P_r × 2)
-    let recommendedPrice = Math.round((spaceComponent + passengerComponent) * 100) / 100;
-    
-    // Weight adjustment: every 5kg adds 10% to base price
-    if (weightKg && weightKg > 2) {
-      const weightAdjustment = Math.floor((weightKg - 2) / 5) * 0.1;
-      recommendedPrice = recommendedPrice * (1 + weightAdjustment);
-    }
-
-    // Cap at reasonable maximum (2 passenger fares)
-    const maxPrice = passengerFare * 2.5;
-    recommendedPrice = Math.min(recommendedPrice, maxPrice);
-    
-    return {
-      recommendedPrice: Math.round(recommendedPrice * 100) / 100,
-      baseFare: passengerFare,
-      sizeMultiplier,
-      distanceKm,
-      corridorName: baseRoute.corridor_name,
-      components: {
-        spaceComponent: Math.round(spaceComponent * 100) / 100,
-        passengerComponent: Math.round(passengerComponent * 100) / 100,
-        weightAdjustment: weightKg && weightKg > 2 ? `+${Math.floor((weightKg - 2) / 5) * 10}%` : '0%'
-      }
-    };
-  } catch (error) {
-    console.error("[PriceRec] Error calculating price:", error.message);
-    return getDefaultPrice(size, weightKg);
+async function getRouteHistoryAdjustment(supabase, routeKey) {
+  const { data } = await supabase
+    .from("route_pricing_history")
+    .select("recommended_price,accepted_price")
+    .eq("route_key", routeKey)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (!data || data.length === 0) {
+    return { multiplier: 1, sampleCount: 0 };
   }
+  const ratios = data
+    .map((row) => {
+      const rec = Number(row.recommended_price);
+      const acc = Number(row.accepted_price);
+      if (!Number.isFinite(rec) || rec <= 0 || !Number.isFinite(acc) || acc <= 0) return null;
+      return acc / rec;
+    })
+    .filter((x) => x !== null);
+  if (ratios.length === 0) {
+    return { multiplier: 1, sampleCount: 0 };
+  }
+  const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+  return { multiplier: clamp(avg, 0.85, 1.2), sampleCount: ratios.length };
 }
 
-/**
- * Fallback pricing when corridor matching fails
- */
-function getDefaultPrice(size = 'M', weightKg = null) {
-  const basePrices = {
-    S: 0.80,  // Small: $0.80
-    M: 1.50,  // Medium: $1.50
-    L: 2.50   // Large: $2.50
+async function getRecommendedPrice(
+  originLat,
+  originLng,
+  destinationLat,
+  destinationLng,
+  size = "M",
+  weightKg = null,
+  options = {}
+) {
+  const supabase = getSupabase();
+  if (!supabase || !SIZE_MULTIPLIERS[size]) {
+    return defaultResponse(size, weightKg);
+  }
+
+  const routeKey = toRouteKey(originLat, originLng, destinationLat, destinationLng);
+  const priority = (options.priority || "standard").toString().toLowerCase();
+  const urgencyMultiplier = URGENCY_MULTIPLIER[priority] || URGENCY_MULTIPLIER.standard;
+
+  const { data: baseFares } = await supabase
+    .from("base_fares")
+    .select("*")
+    .order("distance_km", { ascending: true })
+    .limit(5);
+  if (!baseFares || baseFares.length === 0) {
+    return defaultResponse(size, weightKg);
+  }
+
+  const baseRoute = baseFares[0];
+  const baseFare = Number(baseRoute.passenger_fare_usd) || 1.0;
+  const distanceKm = Number(baseRoute.distance_km) || 5;
+
+  const requestedDistanceM = Math.max(
+    200,
+    distanceKm * 1000 * 0.75
+  );
+  const corridorDistanceM = Math.max(500, distanceKm * 1000);
+  const segmentTransferPct = clamp(requestedDistanceM / corridorDistanceM, 0.2, 1.0);
+  const weightMultiplier =
+    weightKg && Number.isFinite(weightKg)
+      ? clamp(1 + Math.max(0, weightKg - 1) * 0.025, 1, 1.5)
+      : 1;
+  const demandModifier = await getDemandModifier(supabase);
+  const historyAdj = await getRouteHistoryAdjustment(supabase, routeKey);
+
+  const sizeFactor = SIZE_MULTIPLIERS[size];
+  const recommendedPriceRaw =
+    baseFare *
+    sizeFactor *
+    segmentTransferPct *
+    urgencyMultiplier *
+    weightMultiplier *
+    demandModifier *
+    historyAdj.multiplier;
+  const recommendedPrice = Number(clamp(recommendedPriceRaw, 0.6, baseFare * 4).toFixed(2));
+
+  const factors = {
+    routeKey,
+    modelVersion: "v2",
+    baseFare,
+    sizeFactor,
+    segmentTransferPct: Number(segmentTransferPct.toFixed(3)),
+    urgencyMultiplier,
+    weightMultiplier: Number(weightMultiplier.toFixed(3)),
+    demandModifier,
+    historicalMultiplier: Number(historyAdj.multiplier.toFixed(3)),
+    historySampleCount: historyAdj.sampleCount
   };
 
-  let price = basePrices[size] || basePrices.M;
-  
-  // Weight adjustment
-  if (weightKg && weightKg > 2) {
-    const weightAdjustment = Math.floor((weightKg - 2) / 5) * 0.1;
-    price = price * (1 + weightAdjustment);
-  }
+  await supabase.from("price_recommendations_log").insert({
+    parcel_id: options.parcelId || null,
+    corridor_id: options.corridorId || null,
+    factors,
+    recommended_price: recommendedPrice,
+    model_version: "v2",
+    created_at: new Date().toISOString()
+  });
+
+  await supabase.from("route_pricing_history").insert({
+    route_key: routeKey,
+    corridor_id: options.corridorId || null,
+    parcel_id: options.parcelId || null,
+    distance_meters: requestedDistanceM,
+    weight_kg: weightKg && Number.isFinite(weightKg) ? weightKg : null,
+    size_code: size,
+    recommended_price: recommendedPrice,
+    accepted_price: options.acceptedPrice && Number.isFinite(options.acceptedPrice) ? options.acceptedPrice : null,
+    created_at: new Date().toISOString()
+  });
 
   return {
-    recommendedPrice: Math.round(price * 100) / 100,
-    baseFare: basePrices[size],
-    sizeMultiplier: SIZE_MULTIPLIERS[size],
-    distanceKm: 5,
-    corridorName: 'DEFAULT',
-    components: {
-      spaceComponent: Math.round(basePrices[size] * SIZE_MULTIPLIERS[size] * 100) / 100,
-      passengerComponent: basePrices[size],
-      weightAdjustment: weightKg && weightKg > 2 ? `+${Math.floor((weightKg - 2) / 5) * 10}%` : '0%'
-    }
+    recommendedPrice,
+    baseFare,
+    sizeMultiplier: sizeFactor,
+    distanceKm,
+    corridorName: baseRoute.corridor_name,
+    components: factors
   };
 }
 
-/**
- * Validate user-provided price against recommended
- * Returns whether price is acceptable
- */
-function validateUserPrice(recommendedPrice, userPrice, tolerance = 0.3) {
-  // User can deviate ±30% from recommended
+function validateUserPrice(recommendedPrice, userPrice, tolerance = 0.35) {
   const minAcceptable = recommendedPrice * (1 - tolerance);
   const maxAcceptable = recommendedPrice * (1 + tolerance);
-  
   return {
     isAcceptable: userPrice >= minAcceptable && userPrice <= maxAcceptable,
-    minPrice: Math.round(minAcceptable * 100) / 100,
-    maxPrice: Math.round(maxAcceptable * 100) / 100,
-    recommendedPrice: Math.round(recommendedPrice * 100) / 100,
-    deviation: Math.round((((userPrice - recommendedPrice) / recommendedPrice) * 100 * 100)) / 100 // percentage
+    minPrice: Number(minAcceptable.toFixed(2)),
+    maxPrice: Number(maxAcceptable.toFixed(2)),
+    recommendedPrice: Number(recommendedPrice.toFixed(2)),
+    deviation: Number((((userPrice - recommendedPrice) / recommendedPrice) * 100).toFixed(2))
   };
 }
 
@@ -163,3 +183,4 @@ module.exports = {
   validateUserPrice,
   SIZE_MULTIPLIERS
 };
+

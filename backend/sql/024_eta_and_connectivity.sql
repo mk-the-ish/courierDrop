@@ -4,12 +4,20 @@ CREATE TABLE IF NOT EXISTS eta_calculations_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   parcel_id UUID REFERENCES parcels(id) ON DELETE CASCADE,
   courier_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  corridor_id UUID REFERENCES corridors(id) ON DELETE SET NULL,
   eta_minutes INTEGER NOT NULL,
   confidence TEXT NOT NULL DEFAULT 'LOW', -- LOW|MEDIUM|HIGH
+  confidence_score NUMERIC,
   distance_meters NUMERIC,
   breakdown JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE eta_calculations_log
+  ADD COLUMN IF NOT EXISTS corridor_id UUID REFERENCES corridors(id) ON DELETE SET NULL;
+
+ALTER TABLE eta_calculations_log
+  ADD COLUMN IF NOT EXISTS confidence_score NUMERIC;
 
 CREATE INDEX IF NOT EXISTS eta_calculations_log_parcel_idx
   ON eta_calculations_log (parcel_id, created_at DESC);
@@ -40,4 +48,3 @@ CREATE TABLE IF NOT EXISTS zone_connectivity (
   score NUMERIC DEFAULT 1.0,
   updated_at TIMESTAMP DEFAULT NOW()
 );
-

@@ -4,10 +4,7 @@ import "package:shared_preferences/shared_preferences.dart";
 import "../auth/auth_state.dart";
 import "../services/courier_tracking_service.dart";
 import "../services/tracking_outbox.dart";
-import "assigned_parcels_screen.dart";
-import "pickup_mode_screen.dart";
-import "route_declaration_screen.dart";
-import "settings_screen.dart";
+
 
 class CourierDashboardScreen extends StatefulWidget {
   const CourierDashboardScreen({super.key, required this.authState});
@@ -24,6 +21,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   List<Map<String, dynamic>> _assigned = const [];
   List<Map<String, dynamic>> _pending = const [];
   List<Map<String, dynamic>> _corridors = const [];
+  List<Map<String, dynamic>> _routes = const [];
   Map<String, dynamic>? _vehicle;
   int _trackingQueueCount = 0;
   int _trackingDeadLetterCount = 0;
@@ -33,7 +31,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   List<Map<String, dynamic>> _deviationAlerts = const [];
   String _serviceState = "OFFLINE";
   String? _activeRouteId;
-  String? _selectedRouteId;
+  String? _selectedRouteId; // declared route id
   List<Map<String, dynamic>> _notifications = const [];
   int _unreadNotifications = 0;
 
@@ -52,10 +50,12 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
       final assignedFuture = widget.authState.apiClient.getAssignedParcels();
       final pendingFuture = widget.authState.apiClient.getPendingParcels();
       final corridorsFuture = widget.authState.apiClient.getMyCorridors();
+      final routesFuture = widget.authState.apiClient.getCourierRoutes();
 
       final assigned = await assignedFuture;
       final pending = await pendingFuture;
       final corridors = await corridorsFuture;
+      final routes = await routesFuture;
       final alerts = await widget.authState.apiClient.getMyTrackingAlerts();
       final serviceState = await widget.authState.apiClient.getCourierServiceState();
       final notifications =
@@ -75,11 +75,22 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
         _assigned = assigned;
         _pending = pending;
         _corridors = corridors;
+        _routes = routes;
         _vehicle = vehicle;
         _deviationAlerts = alerts;
         _serviceState = serviceState["state"]?.toString() ?? "OFFLINE";
         _activeRouteId = serviceState["current_route_id"]?.toString();
-        _selectedRouteId ??= _corridors.isNotEmpty ? _corridors.first["id"]?.toString() : null;
+        final activeDeclaredRoute = _routes.cast<Map<String, dynamic>?>().firstWhere(
+              (route) => (route?["status"]?.toString() ?? "") == "ACTIVE",
+              orElse: () => null,
+            );
+        final activeDeclaredRouteId = activeDeclaredRoute?["id"]?.toString();
+
+        if (activeDeclaredRouteId != null && activeDeclaredRouteId.isNotEmpty) {
+          _selectedRouteId = activeDeclaredRouteId;
+        } else {
+          _selectedRouteId ??= _routes.isNotEmpty ? _routes.first["id"]?.toString() : null;
+        }
         _notifications = notifications;
         _unreadNotifications = notifications
             .where((item) => (item["status"]?.toString() ?? "") == "unread")
@@ -196,30 +207,18 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   }
 
   int _activeRoutesCount() {
-    final now = DateTime.now().toUtc();
-    var count = 0;
-    for (final route in _corridors) {
-      final start = DateTime.tryParse(route["window_start"]?.toString() ?? "");
-      final end = DateTime.tryParse(route["window_end"]?.toString() ?? "");
-      if (start == null || end == null) {
-        continue;
-      }
-      if (start.isBefore(now) && end.isAfter(now)) {
-        count += 1;
-      }
-    }
-    return count;
+    return _routes.where((route) => (route["status"]?.toString() ?? "") == "ACTIVE").length;
   }
 
   Map<String, dynamic>? _nextRoute() {
     final now = DateTime.now().toUtc();
-    final candidates = _corridors.where((route) {
-      final start = DateTime.tryParse(route["window_start"]?.toString() ?? "");
+    final candidates = _routes.where((route) {
+      final start = DateTime.tryParse(route["planned_start_at"]?.toString() ?? "");
       return start != null && start.isAfter(now);
     }).toList();
     candidates.sort((a, b) {
-      final aStart = DateTime.tryParse(a["window_start"]?.toString() ?? "") ?? now;
-      final bStart = DateTime.tryParse(b["window_start"]?.toString() ?? "") ?? now;
+      final aStart = DateTime.tryParse(a["planned_start_at"]?.toString() ?? "") ?? now;
+      final bStart = DateTime.tryParse(b["planned_start_at"]?.toString() ?? "") ?? now;
       return aStart.compareTo(bStart);
     });
     return candidates.isEmpty ? null : candidates.first;
@@ -280,15 +279,24 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   }
 
   Future<void> _startTravel() async {
-    final routeId = _selectedRouteId;
-    if (routeId == null || routeId.isEmpty) {
+    final selectedRoute = _routes.firstWhere(
+      (route) => route["id"]?.toString() == _selectedRouteId,
+      orElse: () => const <String, dynamic>{},
+    );
+    final routeId = selectedRoute["id"]?.toString();
+    final corridorId = selectedRoute["corridor_id"]?.toString();
+    if (routeId == null || routeId.isEmpty || corridorId == null || corridorId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Select a route before starting travel")),
+        const SnackBar(content: Text("Select a declared route linked to a corridor.")),
       );
       return;
     }
     try {
-      await widget.authState.apiClient.startCourierTravel(routeId);
+      await widget.authState.apiClient.updateCourierRouteStatus(
+        routeId: routeId,
+        action: "activate",
+      );
+      await widget.authState.apiClient.startCourierTravel(corridorId);
       await _loadDashboard();
     } catch (error) {
       if (!mounted) return;
@@ -300,6 +308,12 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
 
   Future<void> _endTravel() async {
     try {
+      if (_selectedRouteId != null && _selectedRouteId!.isNotEmpty) {
+        await widget.authState.apiClient.updateCourierRouteStatus(
+          routeId: _selectedRouteId!,
+          action: "complete",
+        );
+      }
       await widget.authState.apiClient.endCourierTravel();
       await _loadDashboard();
     } catch (error) {
@@ -338,24 +352,13 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
             onPressed: _isLoading ? null : _loadDashboard,
             icon: const Icon(Icons.refresh),
           ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SettingsScreen(authState: widget.authState),
-                ),
-              );
-            },
-          ),
         ],
       ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadDashboard,
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
             children: [
               const Text(
                 "Route Management",
@@ -478,15 +481,15 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                       DropdownButtonFormField<String>(
                         value: _selectedRouteId,
                         decoration: const InputDecoration(
-                          labelText: "Selected route to travel",
+                          labelText: "Selected declared route",
                           border: OutlineInputBorder(),
                         ),
-                        items: _corridors
+                        items: _routes
                             .map(
                               (route) => DropdownMenuItem<String>(
                                 value: route["id"]?.toString(),
                                 child: Text(
-                                  "${route["start_location"] ?? "-"} → ${route["end_location"] ?? "-"}",
+                                  "Route ${((route["id"]?.toString() ?? "-").length > 6 ? (route["id"]?.toString() ?? "-").substring(0, 6) : (route["id"]?.toString() ?? "-"))} • ${route["status"] ?? "PLANNED"}",
                                 ),
                               ),
                             )
@@ -501,14 +504,14 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: _serviceState == "ONLINE" ? _startTravel : null,
-                              child: const Text("Start Route"),
+                              child: const Text("Activate Route"),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: ElevatedButton(
                               onPressed: _serviceState == "TRAVELLING" ? _endTravel : null,
-                              child: const Text("End Route"),
+                              child: const Text("Complete Route"),
                             ),
                           ),
                         ],
@@ -580,8 +583,8 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                   subtitle: nextRoute == null
                       ? const Text("No upcoming route windows")
                       : Text(
-                          "${nextRoute["start_location"] ?? "-"} → ${nextRoute["end_location"] ?? "-"}\n"
-                          "${_formatWindow(nextRoute["window_start"]?.toString())} - ${_formatWindow(nextRoute["window_end"]?.toString())}",
+                          "Route ${nextRoute["id"]?.toString() ?? "-"} • ${nextRoute["status"] ?? "PLANNED"}\n"
+                          "Planned start: ${_formatWindow(nextRoute["planned_start_at"]?.toString())}",
                         ),
                 ),
               ),
@@ -602,63 +605,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        RouteDeclarationScreen(authState: widget.authState),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add_location),
-              label: const Text("Declare Route"),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              PickupModeScreen(authState: widget.authState),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.location_on),
-                    label: const Text("Pickup Mode"),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              AssignedParcelsScreen(authState: widget.authState),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.inventory),
-                    label: const Text("Parcels"),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+
     );
   }
 }

@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter/services.dart";
 
 import "../auth/auth_state.dart";
+import "pickup_mode_screen.dart";
 
 class AssignedParcelsScreen extends StatefulWidget {
   const AssignedParcelsScreen({super.key, required this.authState});
@@ -14,6 +15,7 @@ class AssignedParcelsScreen extends StatefulWidget {
 
 class _AssignedParcelsScreenState extends State<AssignedParcelsScreen> {
   bool _isLoading = false;
+  bool _routeActive = false;
   List<Map<String, dynamic>> _pendingParcels = [];
   List<Map<String, dynamic>> _assignedParcels = [];
 
@@ -28,10 +30,12 @@ class _AssignedParcelsScreenState extends State<AssignedParcelsScreen> {
     try {
       final pending = await widget.authState.apiClient.getPendingParcels();
       final assigned = await widget.authState.apiClient.getAssignedParcels();
+      final state = await widget.authState.apiClient.getCourierServiceState();
       if (!mounted) return;
       setState(() {
         _pendingParcels = pending;
         _assignedParcels = assigned;
+        _routeActive = (state["state"]?.toString() ?? "") == "TRAVELLING";
       });
     } catch (error) {
       if (!mounted) return;
@@ -44,6 +48,12 @@ class _AssignedParcelsScreenState extends State<AssignedParcelsScreen> {
   }
 
   Future<void> _acceptParcel(String parcelId) async {
+    if (!_routeActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Start an active route before accepting parcels.")),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       await widget.authState.apiClient.acceptPendingParcel(parcelId);
@@ -114,7 +124,7 @@ class _AssignedParcelsScreenState extends State<AssignedParcelsScreen> {
               SizedBox(
                 width: 100,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : () => _acceptParcel(parcel["id"].toString()),
+                  onPressed: _isLoading || !_routeActive ? null : () => _acceptParcel(parcel["id"].toString()),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -133,6 +143,27 @@ class _AssignedParcelsScreenState extends State<AssignedParcelsScreen> {
                   child: const Text("Decline", style: TextStyle(fontSize: 12)),
                 ),
               ),
+            ] else ...[
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 100,
+                child: OutlinedButton(
+                  onPressed: _isLoading || !_routeActive
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PickupModeScreen(
+                                authState: widget.authState,
+                                initialParcelId: parcel["id"]?.toString(),
+                                initialPickupPointWkt: parcel["pickup_point"]?.toString(),
+                              ),
+                            ),
+                          );
+                        },
+                  child: const Text("Pickup", style: TextStyle(fontSize: 12)),
+                ),
+              ),
             ],
           ],
         ),
@@ -143,12 +174,38 @@ class _AssignedParcelsScreenState extends State<AssignedParcelsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Parcels")),
+      appBar: AppBar(
+        title: const Text("Parcels"),
+        actions: [
+          IconButton(
+            tooltip: "Pickup Mode",
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PickupModeScreen(authState: widget.authState),
+                ),
+              );
+            },
+            icon: const Icon(Icons.location_on),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _loadParcels,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
           children: [
+            if (!_routeActive)
+              MaterialBanner(
+                content: const Text("Route is not active. Activate a route to accept or pickup parcels."),
+                leading: const Icon(Icons.route, color: Colors.orange),
+                actions: [
+                  TextButton(
+                    onPressed: _loadParcels,
+                    child: const Text("Refresh"),
+                  ),
+                ],
+              ),
             if (_isLoading) const LinearProgressIndicator(),
             
             // Pending section

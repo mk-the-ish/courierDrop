@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../controllers/signup_controller.dart';
+import '../../../theme.dart';
 
 class CourierSignupStep3License extends StatefulWidget {
   const CourierSignupStep3License({Key? key}) : super(key: key);
@@ -104,29 +105,29 @@ class _CourierSignupStep3LicenseState extends State<CourierSignupStep3License> {
           // License Number field
           TextField(
             controller: _licenseNumberController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: dropCityTextLight),
             decoration: InputDecoration(
               labelText: 'Driving License Number',
-              labelStyle: TextStyle(color: Colors.grey[400]),
+              labelStyle: const TextStyle(color: dropCityTextGrey),
               errorText: _licenseNumberError,
-              errorStyle: const TextStyle(color: Color(0xFFEF5350)),
+              errorStyle: const TextStyle(color: dropCityErrorRed),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
                 borderSide: const BorderSide(
-                  color: Color(0xFFFF6B35),
+                  color: dropCityOrangeAccent,
                   width: 2,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[700]!),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                borderSide: const BorderSide(color: dropCityInputBorder),
               ),
               prefixIcon: const Icon(
                 Icons.card_travel_outlined,
-                color: Color(0xFFFF6B35),
+                color: dropCityOrangeAccent,
               ),
             ),
           ),
@@ -147,8 +148,8 @@ class _CourierSignupStep3LicenseState extends State<CourierSignupStep3License> {
               width: double.infinity,
               height: 200,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFF6B35), width: 2),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                border: Border.all(color: dropCityOrangeAccent, width: 2),
               ),
               child: Stack(
                 fit: StackFit.expand,
@@ -186,9 +187,9 @@ class _CourierSignupStep3LicenseState extends State<CourierSignupStep3License> {
                 width: double.infinity,
                 height: 160,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(dropCityBorderRadius),
                   border: Border.all(
-                    color: Colors.grey[700]!,
+                    color: dropCityInputBorder,
                     width: 2,
                     style: BorderStyle.solid,
                   ),
@@ -200,13 +201,13 @@ class _CourierSignupStep3LicenseState extends State<CourierSignupStep3License> {
                     const Icon(
                       Icons.camera_alt_outlined,
                       size: 48,
-                      color: Color(0xFFFF6B35),
+                      color: dropCityOrangeAccent,
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'Tap to take a photo',
-                      style: TextStyle(
-                        color: Colors.grey[400],
+                      style: const TextStyle(
+                        color: dropCityTextGrey,
                         fontSize: 14,
                       ),
                     ),
@@ -241,11 +242,11 @@ class _CourierSignupStep3LicenseState extends State<CourierSignupStep3License> {
                 child: ElevatedButton(
                   onPressed: controller.isLoading ? null : _handleNext,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
+                    backgroundColor: dropCityOrangeAccent,
                     disabledBackgroundColor: Colors.grey[600],
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                     ),
                   ),
                   child: controller.isLoading

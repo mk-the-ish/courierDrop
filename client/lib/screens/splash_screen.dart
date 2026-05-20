@@ -53,7 +53,6 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo / Branding
               Container(
                 width: 120,
                 height: 120,
@@ -65,11 +64,12 @@ class _SplashScreenState extends State<SplashScreen> {
                     width: 2,
                   ),
                 ),
-                child: const Center(
-                  child: Icon(
-                    Icons.local_shipping_outlined,
-                    size: 60,
-                    color: Colors.white,
+                child: Center(
+                  child: Image.asset(
+                    "assets/images/logo.png",
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),

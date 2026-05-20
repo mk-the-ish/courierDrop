@@ -24,6 +24,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final Set<String> _ratingInProgress = {};
   List<Map<String, dynamic>> _notifications = const [];
   int _unreadNotifications = 0;
+  Map<String, dynamic>? _latestEtaUpdate;
 
   @override
   void initState() {
@@ -60,6 +61,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _unreadNotifications = notifications
             .where((item) => (item["status"]?.toString() ?? "") == "unread")
             .length;
+        _latestEtaUpdate = notifications.cast<Map<String, dynamic>>().firstWhere(
+              (item) =>
+                  (item["type"]?.toString() ?? "") ==
+                  "tracking.sender_eta_update",
+              orElse: () => const {},
+            );
+        if (_latestEtaUpdate != null && _latestEtaUpdate!.isEmpty) {
+          _latestEtaUpdate = null;
+        }
       });
       _checkForPendingRating();
     } catch (error) {
@@ -239,6 +249,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  String _formatWhen(String value) {
+    try {
+      final time = DateTime.parse(value);
+      final diff = DateTime.now().difference(time);
+      if (diff.inSeconds < 60) return "just now";
+      if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
+      if (diff.inHours < 24) return "${diff.inHours}h ago";
+      return "${diff.inDays}d ago";
+    } catch (_) {
+      return "-";
+    }
+  }
+
   String _friendlyConfidence(String? value) {
     final normalized = (value ?? "").toUpperCase();
     if (normalized == "HIGH") return "High";
@@ -376,6 +399,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                 ),
               ),
+              if (_latestEtaUpdate != null) ...[
+                const SizedBox(height: 12),
+                Card(
+                  color: Colors.orange.shade50,
+                  child: ListTile(
+                    leading: const Icon(Icons.update, color: Colors.orange),
+                    title: Text(_latestEtaUpdate?["title"]?.toString() ?? "ETA updated"),
+                    subtitle: Text(
+                      "${_latestEtaUpdate?["body"]?.toString() ?? ""}\n"
+                      "Received ${_formatWhen(_latestEtaUpdate?["created_at"]?.toString() ?? "")}",
+                    ),
+                    isThreeLine: true,
+                    trailing: ((_latestEtaUpdate?["status"]?.toString() ?? "") == "unread")
+                        ? TextButton(
+                            onPressed: () async {
+                              final id = _latestEtaUpdate?["id"]?.toString();
+                              if (id == null || id.isEmpty) return;
+                              await widget.authState.apiClient.markNotificationRead(id);
+                              await _loadDashboard();
+                            },
+                            child: const Text("Mark read"),
+                          )
+                        : const Icon(Icons.done, size: 18),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Card(
                 child: ListTile(

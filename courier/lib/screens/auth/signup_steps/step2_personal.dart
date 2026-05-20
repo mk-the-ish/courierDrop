@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../controllers/signup_controller.dart';
+import '../../../theme.dart';
 
 class CourierSignupStep2Personal extends StatefulWidget {
   const CourierSignupStep2Personal({Key? key}) : super(key: key);
@@ -117,29 +118,29 @@ class _CourierSignupStep2PersonalState
           // Full Name field
           TextField(
             controller: _fullNameController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: dropCityTextLight),
             decoration: InputDecoration(
               labelText: 'Full Name',
-              labelStyle: TextStyle(color: Colors.grey[400]),
+              labelStyle: const TextStyle(color: dropCityTextGrey),
               errorText: _nameError,
-              errorStyle: const TextStyle(color: Color(0xFFEF5350)),
+              errorStyle: const TextStyle(color: dropCityErrorRed),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
                 borderSide: const BorderSide(
-                  color: Color(0xFFFF6B35),
+                  color: dropCityOrangeAccent,
                   width: 2,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[700]!),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                borderSide: const BorderSide(color: dropCityInputBorder),
               ),
               prefixIcon: const Icon(
                 Icons.person_outline,
-                color: Color(0xFFFF6B35),
+                color: dropCityOrangeAccent,
               ),
             ),
           ),
@@ -149,29 +150,29 @@ class _CourierSignupStep2PersonalState
           TextField(
             controller: _idNumberController,
             keyboardType: TextInputType.text,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: dropCityTextLight),
             decoration: InputDecoration(
               labelText: 'National ID Number',
-              labelStyle: TextStyle(color: Colors.grey[400]),
+              labelStyle: const TextStyle(color: dropCityTextGrey),
               errorText: _idError,
-              errorStyle: const TextStyle(color: Color(0xFFEF5350)),
+              errorStyle: const TextStyle(color: dropCityErrorRed),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
                 borderSide: const BorderSide(
-                  color: Color(0xFFFF6B35),
+                  color: dropCityOrangeAccent,
                   width: 2,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[700]!),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                borderSide: const BorderSide(color: dropCityInputBorder),
               ),
               prefixIcon: const Icon(
                 Icons.badge_outlined,
-                color: Color(0xFFFF6B35),
+                color: dropCityOrangeAccent,
               ),
             ),
           ),
@@ -192,8 +193,8 @@ class _CourierSignupStep2PersonalState
               width: double.infinity,
               height: 200,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFF6B35), width: 2),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                border: Border.all(color: dropCityOrangeAccent, width: 2),
               ),
               child: Stack(
                 fit: StackFit.expand,
@@ -231,9 +232,9 @@ class _CourierSignupStep2PersonalState
                 width: double.infinity,
                 height: 160,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(dropCityBorderRadius),
                   border: Border.all(
-                    color: Colors.grey[700]!,
+                    color: dropCityInputBorder,
                     width: 2,
                     style: BorderStyle.solid,
                   ),
@@ -245,13 +246,13 @@ class _CourierSignupStep2PersonalState
                     const Icon(
                       Icons.camera_alt_outlined,
                       size: 48,
-                      color: Color(0xFFFF6B35),
+                      color: dropCityOrangeAccent,
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'Tap to take a photo',
-                      style: TextStyle(
-                        color: Colors.grey[400],
+                      style: const TextStyle(
+                        color: dropCityTextGrey,
                         fontSize: 14,
                       ),
                     ),
@@ -286,11 +287,11 @@ class _CourierSignupStep2PersonalState
                 child: ElevatedButton(
                   onPressed: controller.isLoading ? null : _handleNext,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
+                    backgroundColor: dropCityOrangeAccent,
                     disabledBackgroundColor: Colors.grey[600],
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                     ),
                   ),
                   child: controller.isLoading

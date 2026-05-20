@@ -13,9 +13,16 @@ import "package:shared_preferences/shared_preferences.dart";
 import "../auth/auth_state.dart";
 
 class PickupModeScreen extends StatefulWidget {
-  const PickupModeScreen({super.key, required this.authState});
+  const PickupModeScreen({
+    super.key,
+    required this.authState,
+    this.initialParcelId,
+    this.initialPickupPointWkt,
+  });
 
   final AuthState authState;
+  final String? initialParcelId;
+  final String? initialPickupPointWkt;
 
   @override
   State<PickupModeScreen> createState() => _PickupModeScreenState();
@@ -51,6 +58,28 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
     _restoreFormState();
     _handleLostData();
     _refreshRouteState();
+    _applyInitialParcelContext();
+  }
+
+  void _applyInitialParcelContext() {
+    final parcelId = widget.initialParcelId;
+    if (parcelId != null && parcelId.isNotEmpty) {
+      _parcelIdController.text = parcelId;
+    }
+    final point = widget.initialPickupPointWkt;
+    if (point != null && point.isNotEmpty) {
+      final match = RegExp(r"POINT\(([-\d\.]+) ([-\d\.]+)\)").firstMatch(point);
+      if (match != null) {
+        final lng = match.group(1);
+        final lat = match.group(2);
+        if (lat != null && lng != null) {
+          _latController.text = double.parse(lat).toStringAsFixed(6);
+          _lngController.text = double.parse(lng).toStringAsFixed(6);
+          _pickupPointHint = "Pickup loaded from parcel";
+          _startDistanceTracking();
+        }
+      }
+    }
   }
 
   Future<void> _refreshRouteState() async {
@@ -221,6 +250,14 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
   }
 
   Future<void> _submit() async {
+    if (_routeStarted != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Start an active route before pickup verification."),
+        ),
+      );
+      return;
+    }
     final parcelId = _parcelIdController.text.trim();
     final pin = _pinController.text.trim();
     final lat = double.tryParse(_latController.text.trim());
@@ -616,7 +653,7 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: isBusy ? null : _registerMeetingPoint,
+            onPressed: isBusy || _routeStarted != true ? null : _registerMeetingPoint,
             icon: const Icon(Icons.edit_location_alt),
             label: const Text("Set meeting point (my GPS, within 50m of pickup)"),
           ),
@@ -628,7 +665,7 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
           ),
           const SizedBox(height: 12),
           ElevatedButton(
-            onPressed: isBusy ? null : _submit,
+            onPressed: isBusy || _routeStarted != true ? null : _submit,
             child: Text(isBusy ? "Submitting..." : "Verify pickup"),
           ),
         ],

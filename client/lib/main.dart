@@ -16,6 +16,9 @@ import "utils/offline_queue.dart";
 import "firebase_options.dart";
 import "theme.dart";
 
+final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 Future<void> main() async {
   // Keep binding initialization and runApp in the same zone.
   await runZonedGuarded(() async {
@@ -133,6 +136,20 @@ class _DropCityClientAppState extends State<DropCityClientApp> {
     }
     FirebaseMessaging.onMessage.listen((message) {
       debugPrint("Push received: ${message.notification?.title}");
+      final type = message.data["type"]?.toString() ?? "";
+      final title = message.notification?.title ?? "Update";
+      final body = message.notification?.body ??
+          (type == "tracking.sender_eta_update"
+              ? "Courier ETA changed."
+              : "You have a new update.");
+      _scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text(
+            type == "tracking.sender_eta_update" ? "ETA update: $body" : body,
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
     });
     _tokenRefreshSub = messaging.onTokenRefresh.listen((token) {
       _pendingPushToken = token;
@@ -184,6 +201,7 @@ class _DropCityClientAppState extends State<DropCityClientApp> {
         return MaterialApp(
           title: "DropCity Client",
           debugShowCheckedModeBanner: false,
+          scaffoldMessengerKey: _scaffoldMessengerKey,
           theme: dropCityLightTheme,
           darkTheme: dropCityDarkTheme,
           themeMode: ThemeMode.system,

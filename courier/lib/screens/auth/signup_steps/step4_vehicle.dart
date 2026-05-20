@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../controllers/signup_controller.dart';
+import '../../../theme.dart';
 
 class CourierSignupStep4Vehicle extends StatefulWidget {
   const CourierSignupStep4Vehicle({Key? key}) : super(key: key);
@@ -98,7 +99,7 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Maximum 3 images allowed'),
-              backgroundColor: Color(0xFFEF5350),
+              backgroundColor: dropCityErrorRed,
             ),
           );
         }
@@ -166,26 +167,26 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
             onChanged: (value) {
               setState(() => _vehicleTypeController.text = value ?? '');
             },
-            style: const TextStyle(color: Colors.white),
-            dropdownColor: const Color(0xFF16213e),
+            style: const TextStyle(color: dropCityTextLight),
+            dropdownColor: dropCityDarkGradientEnd,
             decoration: InputDecoration(
               labelText: 'Vehicle Type',
-              labelStyle: TextStyle(color: Colors.grey[400]),
+              labelStyle: const TextStyle(color: dropCityTextGrey),
               errorText: _vehicleTypeError,
-              errorStyle: const TextStyle(color: Color(0xFFEF5350)),
+              errorStyle: const TextStyle(color: dropCityErrorRed),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
                 borderSide: const BorderSide(
-                  color: Color(0xFFFF6B35),
+                  color: dropCityOrangeAccent,
                   width: 2,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[700]!),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                borderSide: const BorderSide(color: dropCityInputBorder),
               ),
             ),
           ),
@@ -194,25 +195,25 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
           // Vehicle Registration
           TextField(
             controller: _vehicleRegistrationController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: dropCityTextLight),
             decoration: InputDecoration(
               labelText: 'Registration Number',
-              labelStyle: TextStyle(color: Colors.grey[400]),
+              labelStyle: const TextStyle(color: dropCityTextGrey),
               errorText: _registrationError,
-              errorStyle: const TextStyle(color: Color(0xFFEF5350)),
+              errorStyle: const TextStyle(color: dropCityErrorRed),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
                 borderSide: const BorderSide(
-                  color: Color(0xFFFF6B35),
+                  color: dropCityOrangeAccent,
                   width: 2,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[700]!),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                borderSide: const BorderSide(color: dropCityInputBorder),
               ),
             ),
           ),
@@ -224,23 +225,23 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
               Expanded(
                 child: TextField(
                   controller: _vehicleMakeController,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: dropCityTextLight),
                   decoration: InputDecoration(
                     labelText: 'Make',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    labelStyle: const TextStyle(color: dropCityTextGrey),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                       borderSide: const BorderSide(
-                        color: Color(0xFFFF6B35),
+                        color: dropCityOrangeAccent,
                         width: 2,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                      borderSide: const BorderSide(color: dropCityInputBorder),
                     ),
                   ),
                 ),
@@ -249,23 +250,23 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
               Expanded(
                 child: TextField(
                   controller: _vehicleModelController,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: dropCityTextLight),
                   decoration: InputDecoration(
                     labelText: 'Model',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    labelStyle: const TextStyle(color: dropCityTextGrey),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                       borderSide: const BorderSide(
-                        color: Color(0xFFFF6B35),
+                        color: dropCityOrangeAccent,
                         width: 2,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                      borderSide: const BorderSide(color: dropCityInputBorder),
                     ),
                   ),
                 ),
@@ -281,23 +282,23 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
                 child: TextField(
                   controller: _vehicleYearController,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: dropCityTextLight),
                   decoration: InputDecoration(
                     labelText: 'Year',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    labelStyle: const TextStyle(color: dropCityTextGrey),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                       borderSide: const BorderSide(
-                        color: Color(0xFFFF6B35),
+                        color: dropCityOrangeAccent,
                         width: 2,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                      borderSide: const BorderSide(color: dropCityInputBorder),
                     ),
                   ),
                 ),
@@ -306,23 +307,23 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
               Expanded(
                 child: TextField(
                   controller: _vehicleColorController,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: dropCityTextLight),
                   decoration: InputDecoration(
                     labelText: 'Color',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    labelStyle: const TextStyle(color: dropCityTextGrey),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
                       borderSide: const BorderSide(
-                        color: Color(0xFFFF6B35),
+                        color: dropCityOrangeAccent,
                         width: 2,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                      borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                      borderSide: const BorderSide(color: dropCityInputBorder),
                     ),
                   ),
                 ),
@@ -335,25 +336,25 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
           TextField(
             controller: _vehicleCapacityController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: dropCityTextLight),
             decoration: InputDecoration(
               labelText: 'Capacity (kg)',
-              labelStyle: TextStyle(color: Colors.grey[400]),
+              labelStyle: const TextStyle(color: dropCityTextGrey),
               errorText: _capacityError,
-              errorStyle: const TextStyle(color: Color(0xFFEF5350)),
+              errorStyle: const TextStyle(color: dropCityErrorRed),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
                 borderSide: const BorderSide(
-                  color: Color(0xFFFF6B35),
+                  color: dropCityOrangeAccent,
                   width: 2,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[700]!),
+                borderRadius: BorderRadius.circular(dropCityBorderRadius),
+                borderSide: const BorderSide(color: dropCityInputBorder),
               ),
             ),
           ),
@@ -382,9 +383,9 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
               itemBuilder: (context, index) {
                 return Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(dropCityBorderRadius),
                     border: Border.all(
-                      color: const Color(0xFFFF6B35),
+                      color: dropCityOrangeAccent,
                       width: 2,
                     ),
                   ),
@@ -434,9 +435,9 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
                 width: double.infinity,
                 height: 120,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(dropCityBorderRadius),
                   border: Border.all(
-                    color: Colors.grey[700]!,
+                    color: dropCityInputBorder,
                     width: 2,
                     style: BorderStyle.solid,
                   ),
@@ -448,13 +449,13 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
                     const Icon(
                       Icons.add_a_photo_outlined,
                       size: 40,
-                      color: Color(0xFFFF6B35),
+                      color: dropCityOrangeAccent,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Add Photo',
-                      style: TextStyle(
-                        color: Colors.grey[400],
+                      style: const TextStyle(
+                        color: dropCityTextGrey,
                         fontSize: 14,
                       ),
                     ),

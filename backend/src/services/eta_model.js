@@ -24,25 +24,63 @@ function parsePointWkt(wkt) {
   return { lng: Number(m[1]), lat: Number(m[2]) };
 }
 
+async function getHistoricalCorridorEta(supabase, corridorId) {
+  if (!corridorId) return null;
+  const { data, error } = await supabase
+    .from("eta_calculations_log")
+    .select("eta_minutes")
+    .eq("corridor_id", corridorId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (error || !data || data.length === 0) {
+    return null;
+  }
+  const values = data
+    .map((x) => Number(x.eta_minutes))
+    .filter((x) => Number.isFinite(x) && x > 0);
+  if (values.length === 0) return null;
+  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+  return { minutes: avg, sampleCount: values.length };
+}
+
+function confidenceFromSources(sourceCount, spreadMinutes) {
+  let score = Math.min(1, 0.35 + sourceCount * 0.18);
+  if (Number.isFinite(spreadMinutes)) {
+    if (spreadMinutes <= 8) score += 0.2;
+    else if (spreadMinutes <= 15) score += 0.1;
+    else if (spreadMinutes >= 30) score -= 0.15;
+  }
+  return Number(Math.max(0, Math.min(1, score)).toFixed(3));
+}
+
 async function estimateParcelEta(parcelId) {
+  if (!parcelId) {
+    return null;
+  }
+
   const supabase = getSupabase();
+  if (!supabase) {
+    return null;
+  }
+
   const { data: parcel, error } = await supabase
     .from("parcels")
     .select("id,assigned_courier_id,pickup_point,dropoff_point,destination_point,client_eta_minutes")
     .eq("id", parcelId)
     .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!parcel) return null;
+  if (error || !parcel) {
+    return null;
+  }
 
   const { data: latestLog } = await supabase
     .from("courier_tracking_logs")
-    .select("raw_location,created_at")
+    .select("raw_location,created_at,corridor_id")
     .eq("parcel_id", parcelId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const destination = parsePointWkt(parcel.dropoff_point || parcel.destination_point);
+  const destination = parsePointWkt(parcel.dropoff_point) || parsePointWkt(parcel.destination_point);
   const current = parsePointWkt(latestLog?.raw_location);
 
   let distanceEtaMin = null;
@@ -53,36 +91,54 @@ async function estimateParcelEta(parcelId) {
   }
 
   const declaredMin = typeof parcel.client_eta_minutes === "number" ? parcel.client_eta_minutes : null;
-  const historicalMin = distanceEtaMin ? distanceEtaMin * 1.15 : null;
+  const historical = await getHistoricalCorridorEta(supabase, latestLog?.corridor_id || null);
+  const historicalMin = historical?.minutes || null;
+  const mapProviderMin = null;
 
   const weighted = [];
-  if (declaredMin !== null) weighted.push({ value: declaredMin, weight: 0.3, source: "declared" });
-  if (distanceEtaMin !== null) weighted.push({ value: distanceEtaMin, weight: 0.5, source: "distance_speed" });
-  if (historicalMin !== null) weighted.push({ value: historicalMin, weight: 0.2, source: "historical" });
+  if (declaredMin !== null) weighted.push({ source: "declared_eta", minutes: declaredMin, weight: 0.25 });
+  if (distanceEtaMin !== null) weighted.push({ source: "distance_baseline", minutes: distanceEtaMin, weight: 0.35 });
+  if (historicalMin !== null) weighted.push({ source: "historical_corridor", minutes: historicalMin, weight: 0.3 });
+  if (mapProviderMin !== null) weighted.push({ source: "map_provider", minutes: mapProviderMin, weight: 0.1 });
 
-  const weightSum = weighted.reduce((s, x) => s + x.weight, 0) || 1;
-  const etaMinutes = weighted.reduce((s, x) => s + x.value * x.weight, 0) / weightSum;
+  if (weighted.length === 0) {
+    return null;
+  }
 
+  const weightSum = weighted.reduce((s, x) => s + x.weight, 0);
+  const etaMinutesRaw = weighted.reduce((s, x) => s + x.minutes * x.weight, 0) / weightSum;
+  const etaMinutes = Math.max(1, Math.round(etaMinutesRaw));
+  const values = weighted.map((x) => x.minutes);
+  const spreadMinutes = Math.max(...values) - Math.min(...values);
+  const confidenceScore = confidenceFromSources(weighted.length, spreadMinutes);
   const confidence =
-    weighted.length >= 3 ? "HIGH" : weighted.length === 2 ? "MEDIUM" : "LOW";
+    confidenceScore >= 0.8 ? "HIGH" : confidenceScore >= 0.55 ? "MEDIUM" : "LOW";
 
   const result = {
     parcelId,
-    etaMinutes: Math.max(1, Math.round(etaMinutes || 0)),
+    etaMinutes,
     confidence,
-    breakdown: weighted.map((x) => ({ source: x.source, minutes: Math.round(x.value) })),
+    confidenceScore,
+    sourceBreakdown: weighted.map((x) => ({
+      source: x.source,
+      minutes: Math.round(x.minutes),
+      weight: x.weight
+    })),
     distanceMeters: distanceM ? Math.round(distanceM) : null
   };
 
-  await supabase.from("eta_calculations_log").insert({
+  const logPayload = {
     parcel_id: parcelId,
     courier_id: parcel.assigned_courier_id,
-    eta_minutes: result.etaMinutes,
-    confidence: result.confidence,
-    breakdown: result.breakdown,
+    corridor_id: latestLog?.corridor_id || null,
+    eta_minutes: etaMinutes,
+    confidence,
+    confidence_score: confidenceScore,
+    breakdown: result.sourceBreakdown,
     distance_meters: result.distanceMeters,
     created_at: new Date().toISOString()
-  });
+  };
+  await supabase.from("eta_calculations_log").insert(logPayload);
 
   return result;
 }
@@ -90,3 +146,4 @@ async function estimateParcelEta(parcelId) {
 module.exports = {
   estimateParcelEta
 };
+

@@ -3,6 +3,7 @@ const { getSupabase } = require("../supabase");
 const ApiError = require("../utils/api_error");
 const asyncHandler = require("../utils/async_handler");
 const { parseWktPoint } = require("../utils/geo");
+const { getEligibleCourierMatches } = require("../services/matching");
 
 const router = express.Router();
 
@@ -67,18 +68,14 @@ router.post(
     );
   }
 
-  const supabase = getSupabase();
-  const { data, error } = await supabase.rpc("match_delivery_to_couriers", {
-    p_origin: originPoint,
-    p_destination: destinationPoint,
-    p_max_detour_m: maxDetourMeters ?? 50
-  });
+    const matches = await getEligibleCourierMatches({
+      origin,
+      destination,
+      maxDetourMeters: maxDetourMeters ?? 50,
+      parcelWeightKg: Number(req.body?.weightKg) || 1
+    });
 
-    if (error) {
-      throw new ApiError(error.message, 500, "MATCH_QUERY_FAILED");
-    }
-
-    return res.json({ matches: data || [] });
+    return res.json({ matches });
   })
 );
 

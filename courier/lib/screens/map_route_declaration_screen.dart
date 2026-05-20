@@ -316,7 +316,12 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
     }
 
     widget.onPolylineSelected?.call(_points);
-    Navigator.pop(context, _points);
+    // Return map with start point, end point, and full polyline
+    Navigator.pop(context, {
+      'startPoint': _points.first,
+      'endPoint': _points.last,
+      'polyline': _points,
+    });
   }
 
   @override

@@ -676,6 +676,54 @@ class ApiClient {
     return (jsonDecode(response.body) as Map).cast<String, dynamic>();
   }
 
+  Future<Map<String, dynamic>> createCourierRoute({
+    required String corridorId,
+    String? plannedStartAtIso,
+    int? declaredEtaMinutes,
+  }) async {
+    final uri = Uri.parse("$baseUrl/couriers/routes");
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({
+        "corridorId": corridorId,
+        if (plannedStartAtIso != null) "plannedStartAt": plannedStartAtIso,
+        if (declaredEtaMinutes != null) "declaredEtaMinutes": declaredEtaMinutes,
+      }),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Create route failed: ${response.body}");
+    }
+    return (jsonDecode(response.body) as Map).cast<String, dynamic>();
+  }
+
+  Future<List<Map<String, dynamic>>> getCourierRoutes() async {
+    final uri = Uri.parse("$baseUrl/couriers/routes");
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Fetch routes failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = decoded["routes"] as List<dynamic>? ?? [];
+    return items.map((e) => (e as Map).cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> updateCourierRouteStatus({
+    required String routeId,
+    required String action, // activate|complete|cancel
+  }) async {
+    final uri = Uri.parse("$baseUrl/couriers/routes/$routeId");
+    final response = await _client.patch(
+      uri,
+      headers: _headers(),
+      body: jsonEncode({"action": action}),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception("Route update failed: ${response.body}");
+    }
+    return (jsonDecode(response.body) as Map).cast<String, dynamic>();
+  }
+
   Future<List<Map<String, dynamic>>> getMyNotifications({
     String? status,
     int limit = 20,
