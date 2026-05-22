@@ -2,21 +2,20 @@ import "package:flutter/material.dart";
 
 import "../auth/auth_state.dart";
 import "../theme.dart";
-import "assigned_parcels_screen.dart";
-import "courier_dashboard_screen.dart";
-import "route_declaration_screen.dart";
-import "settings_screen.dart";
+import "client_account_screen.dart";
+import "dashboard_screen.dart";
+import "parcel_status_screen.dart";
 
-class NavigationHubScreen extends StatefulWidget {
-  const NavigationHubScreen({super.key, required this.authState});
+class ClientNavigationHubScreen extends StatefulWidget {
+  const ClientNavigationHubScreen({super.key, required this.authState});
 
   final AuthState authState;
 
   @override
-  State<NavigationHubScreen> createState() => _NavigationHubScreenState();
+  State<ClientNavigationHubScreen> createState() => _ClientNavigationHubScreenState();
 }
 
-class _NavigationHubScreenState extends State<NavigationHubScreen> {
+class _ClientNavigationHubScreenState extends State<ClientNavigationHubScreen> {
   int _selectedIndex = 0;
 
   late final List<Widget> _screens;
@@ -25,17 +24,10 @@ class _NavigationHubScreenState extends State<NavigationHubScreen> {
   void initState() {
     super.initState();
     _screens = [
-      CourierDashboardScreen(authState: widget.authState),
-      AssignedParcelsScreen(authState: widget.authState),
-      RouteDeclarationScreen(authState: widget.authState),
-      SettingsScreen(authState: widget.authState),
+      DashboardScreen(authState: widget.authState),
+      ParcelStatusScreen(authState: widget.authState),
+      ClientAccountScreen(authState: widget.authState),
     ];
-  }
-
-  void _onNavTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
   }
 
   @override
@@ -43,10 +35,13 @@ class _NavigationHubScreenState extends State<NavigationHubScreen> {
     return WillPopScope(
       onWillPop: () async => false,
       child: Scaffold(
-        body: _screens[_selectedIndex],
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: _screens,
+        ),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
-          onTap: _onNavTapped,
+          onTap: (index) => setState(() => _selectedIndex = index),
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.grey[900],
           elevation: 8,
@@ -59,15 +54,11 @@ class _NavigationHubScreenState extends State<NavigationHubScreen> {
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.local_shipping),
-              label: "Parcels",
+              label: "Deliveries",
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.route),
-              label: "Routes",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: "Settings",
+              icon: Icon(Icons.person),
+              label: "Account",
             ),
           ],
         ),
@@ -75,3 +66,4 @@ class _NavigationHubScreenState extends State<NavigationHubScreen> {
     );
   }
 }
+

@@ -4,6 +4,8 @@ import "dart:io";
 import "package:connectivity_plus/connectivity_plus.dart";
 import "package:device_info_plus/device_info_plus.dart";
 import "package:flutter/foundation.dart";
+import "package:flutter_background_geolocation/flutter_background_geolocation.dart"
+    as bg;
 import "package:geolocator/geolocator.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
@@ -31,13 +33,13 @@ class CourierTrackingService {
   static const prefLastAttemptAt = "tracking_health_last_attempt_at";
   static const prefIsRunning = "tracking_health_is_running";
 
-  StreamSubscription<Position>? _positionSub;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _refreshActiveParcelsTimer;
 
   final Set<String> _activeParcelIds = <String>{};
   bool _isRunning = false;
   bool _isFlushing = false;
+  bool _bgReady = false;
   Map<String, dynamic>? _deviceInfoCache;
 
   Future<Map<String, dynamic>> _telemetrySnapshot() async {
@@ -96,9 +98,10 @@ class CourierTrackingService {
     }
     await _setHealth(isRunning: true);
     _isRunning = true;
+    await _prepareBackgroundEngine();
     await _refreshActiveParcels();
     await _sendImmediatePulseIfPossible();
-    _startPositionStream();
+    await _startBackgroundEngine();
     _refreshActiveParcelsTimer = Timer.periodic(
       _refreshActiveParcelsEvery,
       (_) => _refreshActiveParcels(),
@@ -114,23 +117,25 @@ class CourierTrackingService {
       return;
     }
     try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      final position = await bg.BackgroundGeolocation.getCurrentPosition(
+        persist: false,
+        samples: 2,
+        timeout: 20,
       );
       final timestamp = DateTime.now().toUtc().toIso8601String();
       for (final parcelId in _activeParcelIds) {
         final sent = await _sendLiveUpdate(
           parcelId: parcelId,
-          lat: position.latitude,
-          lng: position.longitude,
-          accuracy: position.accuracy,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
         );
         if (!sent) {
           await _outbox.enqueue(
             parcelId: parcelId,
-            lat: position.latitude,
-            lng: position.longitude,
-            accuracy: position.accuracy,
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
             timestampIso: timestamp,
           );
         }
@@ -160,8 +165,11 @@ class CourierTrackingService {
     _isRunning = false;
     await _setHealth(isRunning: false);
     _activeParcelIds.clear();
-    await _positionSub?.cancel();
-    _positionSub = null;
+    try {
+      await bg.BackgroundGeolocation.stop();
+    } catch (_) {
+      // ignore stop failures
+    }
     await _connectivitySub?.cancel();
     _connectivitySub = null;
     _refreshActiveParcelsTimer?.cancel();
@@ -202,48 +210,48 @@ class CourierTrackingService {
     }
   }
 
-  void _startPositionStream() {
-    debugPrint("[Tracking.startPositionStream] Starting position stream");
-    _positionSub?.cancel();
-    final locationSettings = Platform.isAndroid
-        ? AndroidSettings(
-            accuracy: LocationAccuracy.bestForNavigation,
-            distanceFilter: _distanceFilterMeters,
-            intervalDuration: const Duration(seconds: 20),
-            foregroundNotificationConfig: const ForegroundNotificationConfig(
-              notificationTitle: "DropCity courier tracking active",
-              notificationText:
-                  "Tracking delivery progress in the background.",
-              enableWakeLock: true,
-            ),
-          )
-        : const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: _distanceFilterMeters,
-          );
-    _positionSub = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((position) async {
+  Future<void> _prepareBackgroundEngine() async {
+    if (_bgReady) {
+      return;
+    }
+    await bg.BackgroundGeolocation.ready(
+      bg.Config(
+        desiredAccuracy: bg.Config.DESIRED_ACCURACY_NAVIGATION,
+        distanceFilter: _distanceFilterMeters.toDouble(),
+        stopOnTerminate: false,
+        startOnBoot: true,
+        foregroundService: true,
+        heartbeatInterval: 60,
+        logLevel: bg.Config.LOG_LEVEL_OFF,
+        debug: false,
+      ),
+    );
+    _bgReady = true;
+  }
+
+  Future<void> _startBackgroundEngine() async {
+    debugPrint("[Tracking.startBackgroundEngine] Starting BG geolocation engine");
+    bg.BackgroundGeolocation.onLocation((location) async {
       if (!_isRunning || _activeParcelIds.isEmpty) {
         return;
       }
-      debugPrint("[Tracking.positionStream] Location update: lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m");
+      debugPrint("[Tracking.bgLocation] Location update: lat=${location.coords.latitude}, lng=${location.coords.longitude}, accuracy=${location.coords.accuracy}m");
       final timestamp = DateTime.now().toUtc().toIso8601String();
       int sentCount = 0;
       int queuedCount = 0;
       for (final parcelId in _activeParcelIds) {
         final sent = await _sendLiveUpdate(
           parcelId: parcelId,
-          lat: position.latitude,
-          lng: position.longitude,
-          accuracy: position.accuracy,
+          lat: location.coords.latitude,
+          lng: location.coords.longitude,
+          accuracy: location.coords.accuracy,
         );
         if (!sent) {
           await _outbox.enqueue(
             parcelId: parcelId,
-            lat: position.latitude,
-            lng: position.longitude,
-            accuracy: position.accuracy,
+            lat: location.coords.latitude,
+            lng: location.coords.longitude,
+            accuracy: location.coords.accuracy,
             timestampIso: timestamp,
           );
           queuedCount++;
@@ -251,9 +259,12 @@ class CourierTrackingService {
           sentCount++;
         }
       }
-      debugPrint("[Tracking.positionStream] Processed location: sent=$sentCount, queued=$queuedCount, activeCount=${_activeParcelIds.length}");
+      debugPrint("[Tracking.bgLocation] Processed location: sent=$sentCount, queued=$queuedCount, activeCount=${_activeParcelIds.length}");
       await flush();
+    }, (error) async {
+      await _setHealth(lastError: "bg_location_error_$error");
     });
+    await bg.BackgroundGeolocation.start();
   }
 
   Future<bool> _sendLiveUpdate({

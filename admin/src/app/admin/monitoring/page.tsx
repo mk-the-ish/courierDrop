@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, TrendingUp, Clock, MapPin, Radio, RadioOff, RefreshCw } from 'lucide-react';
+import { AlertCircle, TrendingUp, Clock, MapPin, Radio, CircleOff, RefreshCw } from 'lucide-react';
 
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
@@ -312,7 +312,7 @@ export default function MonitoringPage() {
                         </>
                       ) : (
                         <>
-                          <RadioOff className="w-4 h-4 text-slate-500" />
+                          <CircleOff className="w-4 h-4 text-slate-500" />
                           <span className="text-xs text-slate-400 font-medium">Offline</span>
                         </>
                       )}

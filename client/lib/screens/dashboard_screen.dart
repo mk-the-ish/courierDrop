@@ -2,7 +2,6 @@ import "package:flutter/material.dart";
 import "dart:async";
 import "../auth/auth_state.dart";
 import "delivery_creation_flow_screen.dart";
-import "progress_screen.dart";
 import "parcel_status_screen.dart";
 
 class DashboardScreen extends StatefulWidget {
@@ -321,7 +320,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: RefreshIndicator(
           onRefresh: _loadDashboard,
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
             children: [
               const Text(
                 "Parcel Management",
@@ -513,62 +512,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        DeliveryCreationFlowScreen(authState: widget.authState),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add_circle),
-              label: const Text("New Parcel"),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-              ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  DeliveryCreationFlowScreen(authState: widget.authState),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ProgressScreen(authState: widget.authState),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.navigation),
-                    label: const Text("Pickup/Dropoff"),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ParcelStatusScreen(authState: widget.authState),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.info),
-                    label: const Text("Status"),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+        },
+        icon: const Icon(Icons.add),
+        label: const Text("New Parcel"),
       ),
     );
   }

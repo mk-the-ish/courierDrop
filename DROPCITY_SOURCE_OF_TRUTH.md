@@ -1,6 +1,6 @@
 # DropCity Platform Source of Truth
 
-Last updated: May 20, 2026  
+Last updated: May 22, 2026  
 Owner: Project team (update this file whenever core flows or APIs change)
 
 ## 1) What DropCity Is Supposed To Achieve
@@ -66,12 +66,14 @@ Core outcome:
 ### Admin happy path
 1. Login.
 2. Monitor parcels/couriers/errors/alerts.
-3. Investigate deviations and handoff issues.
-4. Resolve disputes with audit trail.
+3. Investigate deviations and handoff issues via `Disputes`.
+4. Resolve disputes with explicit decision actions and immutable audit trail.
 
 ## 5) Screen and Page Inventory (Current Repo)
 
 ### Client app screens (`client/lib/screens`)
+- `client_navigation_hub_screen.dart` (3-tab bottom navigation: Home, Deliveries, Account)
+- `client_account_screen.dart`
 - `dashboard_screen.dart`
 - `delivery_creation_flow_screen.dart` (5-step client delivery creation flow)
 - `parcel_status_screen.dart`
@@ -82,17 +84,18 @@ Core outcome:
 - `dropoff_screen.dart`
 - `login_screen.dart`
 - `onboarding_screen.dart`
-- `splash_screen.dart`
-- `welcome_screen.dart`
+- `splash_screen.dart` (displays DropCity logo from assets)
+- `welcome_screen.dart` (displays DropCity logo from assets)
 - Auth screens:
   - `auth/signup_screen.dart`
   - `auth/signup_step1_email.dart`
   - `auth/signup_step2_personal.dart`
 
 ### Courier app screens (`courier/lib/screens`)
+- `navigation_hub_screen.dart` (4-tab bottom navigation: Home, Routes, Parcels, Settings)
 - `home_screen.dart`
-- `courier_dashboard_screen.dart`
-- `assigned_parcels_screen.dart`
+- `courier_dashboard_screen.dart` (metrics display, no navigation buttons)
+- `assigned_parcels_screen.dart` (includes Pickup Mode button in AppBar)
 - `route_declaration_screen.dart`
 - `route_details_screen.dart`
 - `map_route_declaration_screen.dart`
@@ -101,9 +104,8 @@ Core outcome:
 - `dropoff_screen.dart`
 - `settings_screen.dart`
 - `courier_info_screen.dart`
-- `navigation_hub_screen.dart`
-- `splash_screen.dart`
-- `welcome_screen.dart`
+- `splash_screen.dart` (displays DropCity logo from assets)
+- `welcome_screen.dart` (displays DropCity logo from assets)
 - Auth screens:
   - `auth/login_screen.dart`
   - `auth/signup_screen.dart`
@@ -123,6 +125,7 @@ Core outcome:
   - `admin/couriers`
   - `admin/vehicles`
   - `admin/health`
+  - `admin/disputes` (conflict resolution workspace)
   - `admin/settings`
   - `admin/scheduler`
   - `admin/spatial-analytics`
@@ -196,13 +199,15 @@ Practical domain mapping:
 - Tracking endpoint stores location pulses with corridor/vector context.
 - Per-pulse diagnostics include confidence and anomaly flags.
 - Heuristic sweeps produce adherence reports and score snapshots.
+- Courier mobile tracking runtime now uses `flutter_background_geolocation` as the primary engine
+  (foreground service + `stopOnTerminate=false` + `startOnBoot=true`) with the existing local outbox/retry/dead-letter pipeline.
 
 ### ETA
 - ETA model blends:
   - declared ETA
   - distance/baseline speed ETA
   - historical corridor ETA
-  - map-provider ETA slot (integration-ready)
+  - map-provider ETA (Google Directions, when server API key is configured)
 - Returns confidence label + confidence score + source breakdown.
 - Sender ETA update notifications are throttled and delta-aware.
 
@@ -250,19 +255,26 @@ Key entities:
 - Sender ETA update notifications (throttled + significant delta logic).
 - Pricing model v2 with factor logging.
 - Matching objective 8 constraints implemented in service + route path.
+- **Client app logo and navigation**: DropCity logo asset on splash/welcome screens; 3-tab bottom navigation (`Home`, `Deliveries`, `Account`) with theme colors (orange accent #FF6B35, dark background).
+- **Courier app logo and navigation**: DropCity logo asset on splash/welcome screens; 4-tab bottom navigation (`Home`, `Routes`, `Parcels`, `Settings`) with consolidated navigation; dashboard cleaned up (removed action buttons, settings icon moved to nav); pickup mode button moved to parcels screen.
+- Client navigation integrated (ClientNavigationHubScreen) with IndexedStack for efficient screen switching.
+- Courier navigation integrated (NavigationHubScreen) with proper screen management and WillPopScope.
+- Background tracking hardening for app-closed resilience upgraded on courier runtime using background geolocation engine.
+- Map-provider ETA source integration implemented (Google Directions, key-dependent graceful fallback).
+- Flutter background geolocation API corrections applied (removed invalid notificationTitle/Text params, fixed onLocation callback async handling).
 
 ### Partially implemented / still maturing
-- Background tracking resiliency across app-closed states (production hardening still required).
-- Map-provider ETA source integration (placeholder slot exists).
 - Full recipient/courier PIN-and-proof completion UX hardening across all edge cases.
-- Full admin conflict resolution workflow parity (UI + actions + audit guarantees).
-- Full nav parity with final design rule set (client 3-tab / courier 4-tab everywhere).
+- Admin conflict resolution now includes dedicated UI + actions + audit trail; remaining work is policy tuning (SLA automation, refunds integration, escalation workflow routing).
+- Device/OEM-specific background execution policy tuning and long-haul field validation still recommended.
+- Asset management: logo.png files need to be copied to `assets/images/` directories in both courier and client apps.
 
 ### Pending / likely next
 - Objective 9: admin conflict resolution screen and backend action endpoints alignment.
 - Google Places deep integration and location picker polish where still basic.
 - End-to-end integration testing + regression suite for critical flows.
 - Performance/reliability hardening (timeouts, retries, telemetry, rate limits).
+- Asset build verification and APK/IPA generation testing.
 
 ## 10) Operational Expectations
 - Matching job should continuously process unassigned requested parcels.
@@ -290,4 +302,3 @@ This file is authoritative for:
 - gap direction and next priorities
 
 When code changes affect flows/endpoints/screens/status, update this file in the same PR/commit.
-

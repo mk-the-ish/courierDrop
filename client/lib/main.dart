@@ -9,7 +9,7 @@ import "dart:io";
 import "api/api_client.dart";
 import "auth/auth_service.dart";
 import "auth/auth_state.dart";
-import "screens/dashboard_screen.dart";
+import "screens/client_navigation_hub_screen.dart";
 import "screens/login_screen.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
@@ -212,7 +212,7 @@ class _DropCityClientAppState extends State<DropCityClientApp> {
                   onContinue: _continueWithoutWaiting,
                 )
               : widget.authState.isAuthenticated
-                  ? DashboardScreen(authState: widget.authState)
+                  ? ClientNavigationHubScreen(authState: widget.authState)
                   : LoginScreen(authState: widget.authState),
         );
       },

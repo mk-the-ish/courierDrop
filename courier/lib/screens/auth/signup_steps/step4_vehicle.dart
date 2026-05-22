@@ -124,9 +124,9 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
       'vehicle_type': _vehicleTypeController.text,
       'vehicle_make': _vehicleMakeController.text,
       'vehicle_model': _vehicleModelController.text,
-      'vehicle_year': int.tryParse(_vehicleYearController.text) ?? 0,
+      'vehicle_year': _vehicleYearController.text,
       'vehicle_color': _vehicleColorController.text,
-      'vehicle_capacity_kg': double.tryParse(_vehicleCapacityController.text) ?? 0,
+      'vehicle_capacity_kg': _vehicleCapacityController.text,
     };
 
     final controller = context.read<CourierSignupController>();

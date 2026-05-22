@@ -468,7 +468,7 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text("Parcel Status")),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
         children: [
           if (_showAcceptedBanner)
             Container(

@@ -1,4 +1,5 @@
 const { getSupabase } = require("../supabase");
+const config = require("../config");
 
 const BASE_SPEED_KMH = 40;
 
@@ -41,6 +42,42 @@ async function getHistoricalCorridorEta(supabase, corridorId) {
   if (values.length === 0) return null;
   const avg = values.reduce((a, b) => a + b, 0) / values.length;
   return { minutes: avg, sampleCount: values.length };
+}
+
+async function getMapProviderEtaMinutes({ origin, destination }) {
+  const apiKey =
+    process.env.GOOGLE_MAPS_SERVER_API_KEY ||
+    process.env.MAPS_API_KEY ||
+    config?.googleMapsServerApiKey ||
+    "";
+  if (!apiKey || !origin || !destination) {
+    return null;
+  }
+
+  const originStr = `${origin.lat},${origin.lng}`;
+  const destinationStr = `${destination.lat},${destination.lng}`;
+  const url =
+    `https://maps.googleapis.com/maps/api/directions/json` +
+    `?origin=${encodeURIComponent(originStr)}` +
+    `&destination=${encodeURIComponent(destinationStr)}` +
+    `&departure_time=now&traffic_model=best_guess&key=${encodeURIComponent(apiKey)}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return null;
+    }
+    const decoded = await response.json();
+    const route = decoded?.routes?.[0];
+    const leg = route?.legs?.[0];
+    const durationSec =
+      Number(leg?.duration_in_traffic?.value) || Number(leg?.duration?.value);
+    if (!Number.isFinite(durationSec) || durationSec <= 0) {
+      return null;
+    }
+    return durationSec / 60;
+  } catch (_) {
+    return null;
+  }
 }
 
 function confidenceFromSources(sourceCount, spreadMinutes) {
@@ -93,13 +130,16 @@ async function estimateParcelEta(parcelId) {
   const declaredMin = typeof parcel.client_eta_minutes === "number" ? parcel.client_eta_minutes : null;
   const historical = await getHistoricalCorridorEta(supabase, latestLog?.corridor_id || null);
   const historicalMin = historical?.minutes || null;
-  const mapProviderMin = null;
+  const mapProviderMin = await getMapProviderEtaMinutes({
+    origin: current,
+    destination,
+  });
 
   const weighted = [];
   if (declaredMin !== null) weighted.push({ source: "declared_eta", minutes: declaredMin, weight: 0.25 });
   if (distanceEtaMin !== null) weighted.push({ source: "distance_baseline", minutes: distanceEtaMin, weight: 0.35 });
   if (historicalMin !== null) weighted.push({ source: "historical_corridor", minutes: historicalMin, weight: 0.3 });
-  if (mapProviderMin !== null) weighted.push({ source: "map_provider", minutes: mapProviderMin, weight: 0.1 });
+  if (mapProviderMin !== null) weighted.push({ source: "map_provider", minutes: mapProviderMin, weight: 0.2 });
 
   if (weighted.length === 0) {
     return null;
@@ -146,4 +186,3 @@ async function estimateParcelEta(parcelId) {
 module.exports = {
   estimateParcelEta
 };
-

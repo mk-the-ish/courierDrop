@@ -9,6 +9,7 @@ const config = {
   firebaseClientEmail: process.env.FIREBASE_CLIENT_EMAIL || "",
   firebasePrivateKey: process.env.FIREBASE_PRIVATE_KEY || "",
   firebaseWebApiKey: process.env.FIREBASE_WEB_API_KEY || "",
+  googleMapsServerApiKey: process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.MAPS_API_KEY || "",
   requireAuth: (process.env.REQUIRE_AUTH || "true").toLowerCase() === "true",
   twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || "",
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || "",

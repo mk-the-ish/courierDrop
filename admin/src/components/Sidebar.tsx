@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, AlertCircle, Settings, BarChart3, Clock, Truck, Users, ScrollText, MapPinned, LucideIcon } from 'lucide-react';
+import { Home, AlertCircle, Settings, BarChart3, Clock, Truck, Users, ScrollText, MapPinned, Scale, LucideIcon } from 'lucide-react';
 import { useAdminAuth } from '@/lib/admin-auth';
 
 interface Tab {
@@ -23,6 +23,7 @@ export default function Sidebar() {
     { id: 'vehicles', label: 'Vehicle Verification', icon: Truck, href: '/admin/vehicles' },
     { id: 'couriers', label: 'Couriers', icon: Users, href: '/admin/couriers' },
     { id: 'logs', label: 'Logs', icon: ScrollText, href: '/admin/logs' },
+    { id: 'disputes', label: 'Disputes', icon: Scale, href: '/admin/disputes' },
     { id: 'spatial', label: 'Spatial Analytics', icon: MapPinned, href: '/admin/spatial-analytics' },
     { id: 'health', label: 'System Health', icon: BarChart3, href: '/admin/health' },
     { id: 'scheduler', label: 'Scheduler', icon: Clock, href: '/admin/scheduler' },

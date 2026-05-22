@@ -51,12 +51,11 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                       child: Center(
-                        child: Icon(
-                          isCourier
-                              ? Icons.two_wheeler_outlined
-                              : Icons.shopping_bag_outlined,
-                          size: 50,
-                          color: Colors.white,
+                        child: Image.asset(
+                          "assets/images/logo.png",
+                          width: 70,
+                          height: 70,
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),

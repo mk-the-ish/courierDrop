@@ -1,8 +1,8 @@
 import "package:flutter/material.dart";
 
 import "../auth/auth_state.dart";
-import "courier_dashboard_screen.dart";
 import "courier_info_screen.dart";
+import "navigation_hub_screen.dart";
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.authState});
@@ -52,9 +52,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // User has vehicle info - show dashboard
+    // User has vehicle info - show 4-tab navigation hub
     if (_hasVehicleInfo) {
-      return CourierDashboardScreen(authState: widget.authState);
+      return NavigationHubScreen(authState: widget.authState);
     }
 
     // User needs to complete vehicle info

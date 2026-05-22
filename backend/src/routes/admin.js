@@ -72,17 +72,116 @@ router.get(
   "/disputes",
   requireRole("admin"),
   asyncHandler(async (req, res) => {
-    const { limit = 100 } = req.query || {};
+    const { limit = 100, status = "OPEN" } = req.query || {};
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    let query = supabase
       .from("route_deviation_events")
-      .select("id,parcel_id,courier_id,deviation_type,duration_seconds,created_at")
+      .select(
+        "id,parcel_id,courier_id,deviation_type,duration_seconds,created_at,resolution_status,resolution_notes,resolved_at,resolved_by"
+      )
       .order("created_at", { ascending: false })
       .limit(Number(limit));
+    if (status && status !== "ALL") {
+      query = query.eq("resolution_status", status);
+    }
+    const { data, error } = await query;
     if (error) {
       throw new ApiError(error.message, 500, "DISPUTES_FETCH_FAILED");
     }
-    return res.json({ disputes: data || [] });
+    const disputes = (data || []).map((d) => {
+      let parsedNotes = null;
+      try {
+        parsedNotes = d.resolution_notes ? JSON.parse(d.resolution_notes) : null;
+      } catch (_) {
+        parsedNotes = d.resolution_notes || null;
+      }
+      return {
+        ...d,
+        parsed_notes: parsedNotes,
+      };
+    });
+    return res.json({ disputes });
+  })
+);
+
+router.get(
+  "/disputes/:id/evidence",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const supabase = getSupabase();
+
+    const { data: dispute, error: disputeError } = await supabase
+      .from("route_deviation_events")
+      .select(
+        "id,parcel_id,courier_id,deviation_type,duration_seconds,created_at,resolution_status,resolution_notes,resolved_at,resolved_by"
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (disputeError) {
+      throw new ApiError(disputeError.message, 500, "DISPUTE_FETCH_FAILED");
+    }
+    if (!dispute) {
+      throw new ApiError("Dispute not found", 404, "DISPUTE_NOT_FOUND");
+    }
+
+    const parcelId = dispute.parcel_id;
+    const [parcelRes, handshakeRes, trackingRes, auditRes] = await Promise.all([
+      supabase
+        .from("parcels")
+        .select(
+          "id,status,origin,destination,created_by,assigned_courier_id,pickup_photo_url,dropoff_photo_url,pickup_verified_at,dropoff_verified_at,pickup_point,dropoff_point,destination_point"
+        )
+        .eq("id", parcelId)
+        .maybeSingle(),
+      supabase
+        .from("handshake_events")
+        .select("id,step,status,actor_id,lat,lng,accuracy_m,photo_url,created_at")
+        .eq("parcel_id", parcelId)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabase
+        .from("courier_tracking_logs")
+        .select("id,created_at,raw_location,is_on_corridor,current_distance_m,heuristic_flags,speed_kmh")
+        .eq("parcel_id", parcelId)
+        .order("created_at", { ascending: false })
+        .limit(150),
+      supabase
+        .from("dispute_resolution_audit")
+        .select("id,admin_id,decision,notes,partial_amount,metadata,created_at")
+        .eq("dispute_id", id)
+        .order("created_at", { ascending: false })
+    ]);
+
+    if (parcelRes.error) {
+      throw new ApiError(parcelRes.error.message, 500, "DISPUTE_PARCEL_FETCH_FAILED");
+    }
+    if (handshakeRes.error) {
+      throw new ApiError(handshakeRes.error.message, 500, "DISPUTE_HANDSHAKE_FETCH_FAILED");
+    }
+    if (trackingRes.error) {
+      throw new ApiError(trackingRes.error.message, 500, "DISPUTE_TRACKING_FETCH_FAILED");
+    }
+    if (auditRes.error) {
+      throw new ApiError(auditRes.error.message, 500, "DISPUTE_AUDIT_FETCH_FAILED");
+    }
+
+    return res.json({
+      dispute,
+      parcel: parcelRes.data || null,
+      evidence: {
+        handshake_events: handshakeRes.data || [],
+        tracking_logs: trackingRes.data || [],
+        photos: {
+          pickup: parcelRes.data?.pickup_photo_url || null,
+          dropoff: parcelRes.data?.dropoff_photo_url || null,
+          handshake: (handshakeRes.data || [])
+            .map((event) => event.photo_url)
+            .filter(Boolean),
+        },
+      },
+      audit_trail: auditRes.data || [],
+    });
   })
 );
 
@@ -91,13 +190,44 @@ router.post(
   requireRole("admin"),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { resolution, notes } = req.body || {};
+    const { resolution, notes, partialAmount } = req.body || {};
+    const normalized = (resolution || "").toString().toUpperCase();
+    const allowed = new Set(["APPROVE", "REFUND", "PARTIAL", "ESCALATE"]);
+    if (!allowed.has(normalized)) {
+      throw new ApiError(
+        "resolution must be APPROVE|REFUND|PARTIAL|ESCALATE",
+        400,
+        "DISPUTE_INVALID_RESOLUTION"
+      );
+    }
+    if (!notes || !notes.toString().trim()) {
+      throw new ApiError("notes required", 400, "DISPUTE_NOTES_REQUIRED");
+    }
     const supabase = getSupabase();
+    const { data: current, error: currentError } = await supabase
+      .from("route_deviation_events")
+      .select("id,parcel_id,courier_id,resolution_status")
+      .eq("id", id)
+      .maybeSingle();
+    if (currentError) {
+      throw new ApiError(currentError.message, 500, "DISPUTE_LOOKUP_FAILED");
+    }
+    if (!current) {
+      throw new ApiError("Dispute not found", 404, "DISPUTE_NOT_FOUND");
+    }
+
+    const statusMap = {
+      APPROVE: "RESOLVED_APPROVED",
+      REFUND: "RESOLVED_REFUND",
+      PARTIAL: "RESOLVED_PARTIAL",
+      ESCALATE: "ESCALATED",
+    };
+
     const { error } = await supabase
       .from("route_deviation_events")
       .update({
-        resolution_status: resolution || "RESOLVED",
-        resolution_notes: notes || null,
+        resolution_status: statusMap[normalized],
+        resolution_notes: notes,
         resolved_at: new Date().toISOString(),
         resolved_by: req.user?.uid || null
       })
@@ -105,7 +235,25 @@ router.post(
     if (error) {
       throw new ApiError(error.message, 500, "DISPUTE_RESOLVE_FAILED");
     }
-    return res.json({ status: "ok", id });
+
+    const { error: auditError } = await supabase.from("dispute_resolution_audit").insert({
+      dispute_id: id,
+      parcel_id: current.parcel_id,
+      courier_id: current.courier_id,
+      admin_id: req.user?.uid || null,
+      decision: normalized,
+      notes: notes,
+      partial_amount: normalized === "PARTIAL" ? partialAmount ?? null : null,
+      metadata: {
+        previous_status: current.resolution_status || null,
+      },
+      created_at: new Date().toISOString()
+    });
+    if (auditError) {
+      throw new ApiError(auditError.message, 500, "DISPUTE_AUDIT_WRITE_FAILED");
+    }
+
+    return res.json({ status: "ok", id, resolution: normalized });
   })
 );
 

@@ -2,10 +2,9 @@ import "package:flutter/material.dart";
 
 import "../auth/auth_state.dart";
 import "../theme.dart";
-import "assigned_parcels_screen.dart";
-import "courier_dashboard_screen.dart";
-import "route_declaration_screen.dart";
-import "settings_screen.dart";
+import "dashboard_screen.dart";
+import "delivery_creation_flow_screen.dart";
+import "parcel_status_screen.dart";
 
 class NavigationHubScreen extends StatefulWidget {
   const NavigationHubScreen({super.key, required this.authState});
@@ -25,10 +24,9 @@ class _NavigationHubScreenState extends State<NavigationHubScreen> {
   void initState() {
     super.initState();
     _screens = [
-      CourierDashboardScreen(authState: widget.authState),
-      AssignedParcelsScreen(authState: widget.authState),
-      RouteDeclarationScreen(authState: widget.authState),
-      SettingsScreen(authState: widget.authState),
+      DashboardScreen(authState: widget.authState),
+      DeliveryCreationFlowScreen(authState: widget.authState),
+      ParcelStatusScreen(authState: widget.authState),
     ];
   }
 
@@ -59,15 +57,11 @@ class _NavigationHubScreenState extends State<NavigationHubScreen> {
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.local_shipping),
-              label: "Parcels",
+              label: "Deliveries",
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.route),
-              label: "Routes",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: "Settings",
+              icon: Icon(Icons.person),
+              label: "Account",
             ),
           ],
         ),
