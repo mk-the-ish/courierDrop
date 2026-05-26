@@ -382,6 +382,7 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
               itemCount: _vehicleImages.length,
               itemBuilder: (context, index) {
                 return Container(
+                  key: ValueKey(_vehicleImages[index]),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(dropCityBorderRadius),
                     border: Border.all(
@@ -404,9 +405,11 @@ class _CourierSignupStep4VehicleState extends State<CourierSignupStep4Vehicle> {
                         right: 4,
                         child: GestureDetector(
                           onTap: () {
-                            setState(
-                              () => _vehicleImages.removeAt(index),
-                            );
+                            setState(() {
+                              if (index < _vehicleImages.length) {
+                                _vehicleImages.removeAt(index);
+                              }
+                            });
                           },
                           child: Container(
                             decoration: BoxDecoration(

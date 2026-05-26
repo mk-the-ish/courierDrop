@@ -802,4 +802,81 @@ class ApiClient {
       throw Exception("Failed to submit courier profile: ${response.body}");
     }
   }
+
+  /// Creates a reusable route template
+  /// Route templates can be used multiple times; each usage creates a new corridor
+  Future<String> createRouteTemplate({
+    required String startLocation,
+    required String endLocation,
+    required List<dynamic> polylinePoints,
+    required bool allowMultipleParcels,
+    required int declaredEtaMinutes,
+    String? notes,
+  }) async {
+    final uri = Uri.parse("$baseUrl/couriers/route-templates");
+    final payload = {
+      "startLocation": startLocation,
+      "endLocation": endLocation,
+      "polylinePoints": polylinePoints,
+      "allowMultipleParcels": allowMultipleParcels,
+      "declaredEtaMinutes": declaredEtaMinutes,
+      "notes": notes ?? "",
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception("Failed to create route template: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>?;
+    final id = decoded?["id"] as String?;
+    if (id == null || id.isEmpty) {
+      throw Exception("Backend did not return route template id.");
+    }
+    return id;
+  }
+
+  /// Uses a route template by creating a new corridor instance
+  /// This creates a new corridor with its own ID for operational tracking
+  Future<String> createCorridorFromTemplate({
+    required String routeTemplateId,
+    required String plannedStartAtIso,
+  }) async {
+    final uri = Uri.parse("$baseUrl/couriers/routes/from-template");
+    final payload = {
+      "routeTemplateId": routeTemplateId,
+      "plannedStartAt": plannedStartAtIso,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: _headers(),
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception("Failed to create corridor from template: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>?;
+    final corridorId = decoded?["corridorId"] as String?;
+    if (corridorId == null || corridorId.isEmpty) {
+      throw Exception("Backend did not return corridor id.");
+    }
+    return corridorId;
+  }
+
+  Future<List<Map<String, dynamic>>> getRouteTemplates() async {
+    final uri = Uri.parse("$baseUrl/couriers/route-templates");
+    final response = await _client.get(uri, headers: _headers());
+    if (response.statusCode >= 400) {
+      throw Exception("Route template fetch failed: ${response.body}");
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = decoded["templates"] as List<dynamic>? ?? [];
+    return rows.map((item) => (item as Map).cast<String, dynamic>()).toList();
+  }
 }

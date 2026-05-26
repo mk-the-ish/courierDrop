@@ -8,10 +8,9 @@ const { parseWktPoint, haversineMeters } = require("../utils/geo");
 const { broadcastParcelStatus, broadcastHandshakeEvent } = require("../ws");
 const config = require("../config");
 const { requireRole, requireAnyRole } = require("../middleware/auth");
-const { enqueueNotification, sendPickupConfirmationSms, sendDeliveryConfirmationSms, sendRecipientHandoffSms } = require("../services/notification_service");
+const { enqueueNotification } = require("../services/notification_service");
 const { NOTIFICATION_EVENT_TYPES } = require("../services/notification_events");
 const { parcelClientRecipients } = require("../services/parcel_stakeholders");
-const { sendSmsE164 } = require("../utils/sms");
 
 const router = express.Router();
 const GPS_GATE_METERS = 50;
@@ -393,25 +392,6 @@ router.post(
         payload: { parcelId, status: "IN_TRANSIT" }
       });
 
-      // Send SMS pickup confirmation to customer
-      try {
-        const customerPhoneQuery = await supabase
-          .from("users")
-          .select("phone_number")
-          .eq("id", parcelOwner?.created_by)
-          .maybeSingle();
-        if (customerPhoneQuery.data?.phone_number) {
-          await sendPickupConfirmationSms(
-            parcelId,
-            req.user?.uid,
-            parcelOwner?.created_by,
-            customerPhoneQuery.data.phone_number
-          );
-        }
-      } catch (smsError) {
-        console.error('[Handshake] SMS pickup notification failed:', smsError);
-        // Non-blocking error - SMS will be in queue for retry
-      }
     }
     await sendToParcelTopic(parcelId, "Pickup complete", "Parcel is in transit.", {
       parcelId,
@@ -636,24 +616,15 @@ router.post(
       throw new ApiError(updateError.message, 500, "HANDSHAKE_UPDATE_FAILED");
     }
 
-    // Send SMS notification to recipient that delivery is ready
-    try {
-      const recipientPhoneQuery = await supabase
-        .from("users")
-        .select("phone_number")
-        .eq("id", req.user?.uid)
-        .maybeSingle();
-      if (recipientPhoneQuery.data?.phone_number) {
-        await sendRecipientHandoffSms(
-          parcelId,
-          null, // courier ID not yet known at this point
-          recipientPhoneQuery.data.phone_number
-        );
-      }
-    } catch (smsError) {
-      console.error('[Handshake] SMS recipient notification failed:', smsError);
-      // Non-blocking error
-    }
+    await enqueueNotification({
+      type: NOTIFICATION_EVENT_TYPES.RECIPIENT_DROPOFF_OTP_READY,
+      title: "Dropoff code ready",
+      body: "Show this code to the courier to complete handoff.",
+      recipients: [req.user?.uid],
+      entityType: "parcel",
+      entityId: parcelId,
+      payload: { parcelId, expiresAt: expires }
+    });
 
     return res.json({ parcelId, dropoffOtp: otp, expiresAt: expires });
   })
@@ -695,22 +666,19 @@ router.post(
     if (updateError) {
       throw new ApiError(updateError.message, 500, "HANDSHAKE_UPDATE_FAILED");
     }
-    const smsBody = `DropCity delivery verification code: ${otp}`;
-    const smsResult = await sendSmsE164(phoneE164.trim(), smsBody);
     await enqueueNotification({
       type: NOTIFICATION_EVENT_TYPES.MANUAL_DROPOFF_OTP_SENT,
       title: "Manual dropoff code sent",
-      body: "An SMS verification code was requested for your delivery.",
+      body: "A manual verification code was generated for courier-assisted handoff.",
       recipients: [req.user.uid],
       entityType: "parcel",
       entityId: parcelId,
-      payload: { parcelId, smsOk: smsResult.ok }
+      payload: { parcelId, otp, expiresAt: expires, phoneE164: phoneE164.trim() }
     });
     return res.json({
       status: "ok",
       parcelId,
-      smsSent: smsResult.ok,
-      smsSkipped: smsResult.skipped === true,
+      otp,
       expiresAt: expires
     });
   })

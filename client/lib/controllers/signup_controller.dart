@@ -20,6 +20,7 @@ class ClientSignupController extends ChangeNotifier {
   String? _error;
   String? _email;
   String? _password;
+  bool _completed = false;
 
   int get step => _step;
   bool get loading => _loading;
@@ -52,6 +53,9 @@ class ClientSignupController extends ChangeNotifier {
     required String idNumber,
     required String idImagePath,
   }) async {
+    if (_loading || _completed) {
+      return false;
+    }
     _loading = true;
     _error = null;
     notifyListeners();
@@ -59,12 +63,7 @@ class ClientSignupController extends ChangeNotifier {
       if (_email == null || _password == null) {
         throw Exception("Missing account credentials from step 1");
       }
-      await authState.signUp(
-        _email!,
-        _password!,
-        displayName: fullName,
-        role: "client",
-      );
+      await _signUpOrSignInIfAlreadyExists(fullName: fullName);
       final idImageUrl = await _toDataUrl(idImagePath);
       await apiClient.submitClientProfile(
         fullName: fullName,
@@ -72,6 +71,7 @@ class ClientSignupController extends ChangeNotifier {
         idNumber: idNumber,
         idImageUrl: idImageUrl,
       );
+      _completed = true;
       _step = 3;
       return true;
     } catch (e) {
@@ -83,7 +83,29 @@ class ClientSignupController extends ChangeNotifier {
     }
   }
 
+  Future<void> _signUpOrSignInIfAlreadyExists({
+    required String fullName,
+  }) async {
+    try {
+      await authState.signUp(
+        _email!,
+        _password!,
+        displayName: fullName,
+        role: "client",
+      );
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      final looksLikeExistingAccount =
+          msg.contains("already in use") || msg.contains("email_exists");
+      if (!looksLikeExistingAccount) {
+        rethrow;
+      }
+      await authState.signIn(_email!, _password!);
+    }
+  }
+
   void back() {
+    if (_completed) return;
     if (_step > 1) {
       _step -= 1;
       notifyListeners();

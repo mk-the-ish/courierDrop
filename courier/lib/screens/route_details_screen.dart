@@ -1,6 +1,5 @@
 import "package:flutter/material.dart";
 import "package:google_maps_flutter/google_maps_flutter.dart";
-import "package:uuid/uuid.dart";
 
 import "../auth/auth_state.dart";
 import "../theme.dart";
@@ -42,48 +41,33 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      // Step 1: Create corridor (route definition)
-      final corridorPayload = {
-        "clientId": const Uuid().v4(),
+      // Step 1: Create route TEMPLATE (without corridor, just the definition)
+      // This is the reusable template that the courier will use daily
+      final routeTemplatePayload = {
         "startLocation": "${widget.startPoint.latitude},${widget.startPoint.longitude}",
         "endLocation": "${widget.endPoint.latitude},${widget.endPoint.longitude}",
-        "windowStart": "00:00",
-        "windowEnd": "23:59",
+        "polylinePoints": widget.polyline
+            .map((point) => {"lat": point.latitude, "lng": point.longitude})
+            .toList(),
         "allowMultipleParcels": _allowMultipleParcels,
+        "declaredEtaMinutes": int.tryParse(_etaController.text.trim()) ?? 45,
         "notes": _notesController.text.trim(),
       };
 
-      final corridorId =
-          await widget.authState.apiClient.postRouteDeclaration(
-        clientId: corridorPayload["clientId"] as String,
-        startLocation: corridorPayload["startLocation"] as String,
-        endLocation: corridorPayload["endLocation"] as String,
-        windowStart: corridorPayload["windowStart"] as String,
-        windowEnd: corridorPayload["windowEnd"] as String,
-        allowMultipleParcels: corridorPayload["allowMultipleParcels"] as bool,
-        notes: corridorPayload["notes"] as String?,
-      );
-
-      // Step 2: Upload polyline/corridor line
-      if (widget.polyline.length >= 2) {
-        await widget.authState.apiClient.postCorridorLine(
-          corridorId: corridorId,
-          polyline: widget.polyline
-              .map((point) => {"lat": point.latitude, "lng": point.longitude})
-              .toList(),
-        );
-      }
-
-      // Step 3: Create courier route WITHOUT start time (user will set it when using)
-      await widget.authState.apiClient.createCourierRoute(
-        corridorId: corridorId,
-        plannedStartAtIso: null,
-        declaredEtaMinutes: int.tryParse(_etaController.text.trim()),
+      // This creates the reusable route template
+      // Each time the courier uses it, a new corridor will be created behind the scenes
+      await widget.authState.apiClient.createRouteTemplate(
+        startLocation: routeTemplatePayload["startLocation"] as String,
+        endLocation: routeTemplatePayload["endLocation"] as String,
+        polylinePoints: routeTemplatePayload["polylinePoints"] as List,
+        allowMultipleParcels: routeTemplatePayload["allowMultipleParcels"] as bool,
+        declaredEtaMinutes: routeTemplatePayload["declaredEtaMinutes"] as int,
+        notes: routeTemplatePayload["notes"] as String?,
       );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Route template created! Use it anytime.")),
+        const SnackBar(content: Text("Route Template Created. Use it anytime.")),
       );
 
       // Return success to route_declaration_screen
@@ -91,7 +75,7 @@ class _RouteDetailsScreenState extends State<RouteDetailsScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to create route: $e")),
+        SnackBar(content: Text("Failed to create route template: $e")),
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

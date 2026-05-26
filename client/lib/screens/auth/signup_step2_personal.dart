@@ -3,7 +3,12 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
 class ClientSignupStep2Personal extends StatefulWidget {
-  final Function(String fullName, String username, String idNumber, String idImagePath)
+  final Future<void> Function(
+    String fullName,
+    String username,
+    String idNumber,
+    String idImagePath,
+  )
       onComplete;
   final VoidCallback onBack;
 
@@ -43,22 +48,26 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
     }
   }
 
-  void _handleComplete() {
+  Future<void> _handleComplete() async {
+    if (_isLoading) return;
     if (_formKey.currentState!.validate() && _idImage != null) {
       setState(() => _isLoading = true);
       try {
-        widget.onComplete(
+        await widget.onComplete(
           _fullNameController.text.trim(),
           _usernameController.text.trim(),
           _idNumberController.text.trim(),
           _idImage!.path,
         );
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${e.toString()}')),
         );
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     } else if (_idImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(

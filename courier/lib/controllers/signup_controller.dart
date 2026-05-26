@@ -49,21 +49,20 @@ class CourierSignupController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Call backend signup endpoint for courier
-      final response = await _apiClient.signUp(
-        email: email,
-        password: password,
-        displayName: email.split('@')[0],
-      );
-
-      if (response.idToken.isNotEmpty) {
-        _email = email;
-        _password = password;
-        _currentStep = 2;
-        _isLoading = false;
-        notifyListeners();
-        return true;
+      final auth = await _signUpOrSignIn(email: email, password: password);
+      if (auth.idToken.isEmpty) {
+        throw Exception("Authentication token missing after signup.");
       }
+
+      _apiClient.setAuthToken(auth.idToken);
+      await _apiClient.setupUserRole(role: "courier");
+
+      _email = email;
+      _password = password;
+      _currentStep = 2;
+      _isLoading = false;
+      notifyListeners();
+      return true;
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -71,6 +70,27 @@ class CourierSignupController extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
     return false;
+  }
+
+  Future<AuthResponse> _signUpOrSignIn({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      return await _apiClient.signUp(
+        email: email,
+        password: password,
+        displayName: email.split("@")[0],
+      );
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      final alreadyExists =
+          msg.contains("already in use") || msg.contains("email_exists");
+      if (!alreadyExists) {
+        rethrow;
+      }
+      return await _apiClient.login(email: email, password: password);
+    }
   }
 
   // Step 2: Personal Info

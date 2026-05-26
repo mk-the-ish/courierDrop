@@ -15,7 +15,10 @@ class RouteDeclarationScreen extends StatefulWidget {
 }
 
 class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
+  List<Map<String, dynamic>> _templates = [];
   List<Map<String, dynamic>> _routes = [];
+  String _serviceState = "OFFLINE";
+  String? _selectedRouteId;
   bool _isLoading = true;
 
   @override
@@ -33,10 +36,18 @@ class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final routes = await widget.authState.apiClient.getCourierRoutes();
+      final templatesFuture = widget.authState.apiClient.getRouteTemplates();
+      final routesFuture = widget.authState.apiClient.getCourierRoutes();
+      final serviceStateFuture = widget.authState.apiClient.getCourierServiceState();
+      final templates = await templatesFuture;
+      final routes = await routesFuture;
+      final serviceState = await serviceStateFuture;
       if (!mounted) return;
       setState(() {
+        _templates = templates;
         _routes = routes;
+        _serviceState = serviceState["state"]?.toString() ?? "OFFLINE";
+        _selectedRouteId ??= _routes.isNotEmpty ? _routes.first["id"]?.toString() : null;
         _isLoading = false;
       });
     } catch (e) {
@@ -73,28 +84,9 @@ class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
     }
   }
 
-  Future<void> _updateRouteStatus(String routeId, String action) async {
-    try {
-      await widget.authState.apiClient.updateCourierRouteStatus(
-        routeId: routeId,
-        action: action,
-      );
-      await _loadRoutes();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Route ${action}d.")),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Route update failed: $e")),
-      );
-    }
-  }
-
-  Future<void> _selectRouteAsNext(Map<String, dynamic> route) async {
-    final routeId = route["id"]?.toString();
-    if (routeId == null) return;
+  Future<void> _selectRouteAsNext(Map<String, dynamic> routeTemplate) async {
+    final routeTemplateId = routeTemplate["id"]?.toString();
+    if (routeTemplateId == null) return;
 
     // First, show date/time picker for start time
     final now = DateTime.now();
@@ -120,7 +112,7 @@ class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
         title: const Text(
-          "Use This Route",
+          "Use This Route Template",
           style: TextStyle(color: dropCityTextLight),
         ),
         content: Column(
@@ -132,6 +124,11 @@ class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
               style: TextStyle(color: Colors.grey[400]),
             ),
             const SizedBox(height: 12),
+            Text(
+              "A new corridor will be created from this template.",
+              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+            ),
+            const SizedBox(height: 8),
             Text(
               "Ready to go?",
               style: TextStyle(color: Colors.grey[400]),
@@ -155,23 +152,72 @@ class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
     );
 
     if (confirmed == true) {
-      // Update route with start time and activate
+      // Create a new corridor from this route template
       try {
-        // Call API to set start time and activate
-        await _updateRouteStatus(routeId, "activate");
+        final corridorId = await widget.authState.apiClient.createCorridorFromTemplate(
+          routeTemplateId: routeTemplateId,
+          plannedStartAtIso: plannedStartAt.toIso8601String(),
+        );
         
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Route active! Starting at ${plannedStartAt.toString().split('.')[0]}"),
+            content: Text("Route scheduled. Corridor $corridorId created for ${plannedStartAt.toString().split('.')[0]}"),
           ),
         );
+        // Reload routes to show updated status
+        await _loadRoutes();
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to set route: $e")),
+          SnackBar(content: Text("Failed to use route template: $e")),
         );
       }
+    }
+  }
+
+  Future<void> _startSelectedRoute() async {
+    final selectedRoute = _routes.firstWhere(
+      (route) => route["id"]?.toString() == _selectedRouteId,
+      orElse: () => const <String, dynamic>{},
+    );
+    final routeId = selectedRoute["id"]?.toString();
+    final corridorId = selectedRoute["corridor_id"]?.toString();
+    if (routeId == null || routeId.isEmpty || corridorId == null || corridorId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Select a valid scheduled route first.")),
+      );
+      return;
+    }
+    try {
+      await widget.authState.apiClient.updateCourierRouteStatus(
+        routeId: routeId,
+        action: "activate",
+      );
+      await widget.authState.apiClient.startCourierTravel(corridorId);
+      await _loadRoutes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to start route: $e")),
+      );
+    }
+  }
+
+  Future<void> _endSelectedRoute() async {
+    if (_selectedRouteId == null || _selectedRouteId!.isEmpty) return;
+    try {
+      await widget.authState.apiClient.updateCourierRouteStatus(
+        routeId: _selectedRouteId!,
+        action: "complete",
+      );
+      await widget.authState.apiClient.endCourierTravel();
+      await _loadRoutes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to end route: $e")),
+      );
     }
   }
 
@@ -179,7 +225,7 @@ class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Routes"),
+        title: const Text("My Route Templates"),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -189,12 +235,14 @@ class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _routes.isEmpty
+          : _templates.isEmpty
               ? _buildEmptyState()
               : ListView(
                   padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
                   children: [
-                    ..._routes.map(_buildRouteCard),
+                    _buildRouteControlsCard(),
+                    const SizedBox(height: 12),
+                    ..._templates.map(_buildRouteCard),
                   ],
                 ),
       floatingActionButton: FloatingActionButton(
@@ -217,49 +265,87 @@ class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            "No routes declared yet",
+            "No route templates yet",
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
-            "Create a route to get started",
+            "Create a route template to reuse daily",
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: _createNewRoute,
             icon: const Icon(Icons.add),
-            label: const Text("Create Route"),
+            label: const Text("Create Route Template"),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildRouteControlsCard() {
+    final travelling = _serviceState == "TRAVELLING";
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Route Controls",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text("Current status: $_serviceState"),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedRouteId,
+              decoration: const InputDecoration(
+                labelText: "Scheduled route instance",
+                border: OutlineInputBorder(),
+              ),
+              items: _routes
+                  .map(
+                    (route) => DropdownMenuItem<String>(
+                      value: route["id"]?.toString(),
+                      child: Text(
+                        "${route["status"] ?? "PLANNED"} • ${(route["planned_start_at"]?.toString() ?? "-").replaceFirst("T", " ").split(".").first}",
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedRouteId = value),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: travelling ? null : _startSelectedRoute,
+                    child: const Text("Start Route"),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: travelling ? _endSelectedRoute : null,
+                    child: const Text("End Route"),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRouteCard(Map<String, dynamic> route) {
     final id = route["id"]?.toString() ?? "-";
-    final status = route["status"]?.toString() ?? "PLANNED";
-    final start = route["planned_start_at"]?.toString() ?? "-";
+    // Route templates don't have status like ACTIVE/COMPLETED - they're always reusable
     final eta = route["declared_eta_minutes"]?.toString() ?? "-";
-    final canActivate = status == "PLANNED";
-    final canComplete = status == "ACTIVE";
-    final canCancel = status == "PLANNED";
-    final canSelect = status == "ACTIVE" || status == "PLANNED";
-
-    Color badgeColor;
-    switch (status) {
-      case "ACTIVE":
-        badgeColor = Colors.green;
-        break;
-      case "COMPLETED":
-        badgeColor = Colors.blueGrey;
-        break;
-      case "CANCELLED":
-        badgeColor = Colors.red;
-        break;
-      default:
-        badgeColor = Colors.orange;
-    }
+    final notes = route["notes"]?.toString() ?? "";
 
     return Card(
       margin: const EdgeInsets.only(top: 8),
@@ -279,59 +365,40 @@ class _RouteDeclarationScreenState extends State<RouteDeclarationScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: badgeColor.withOpacity(0.15),
+                    color: Colors.blue.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    status,
-                    style: TextStyle(color: badgeColor, fontWeight: FontWeight.w700),
+                  child: const Text(
+                    "TEMPLATE",
+                    style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 6),
-            Text("Planned start: $start"),
             Text("Declared ETA: $eta min"),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: canActivate ? () => _updateRouteStatus(id, "activate") : null,
-                    child: const Text("Activate"),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: canComplete ? () => _updateRouteStatus(id, "complete") : null,
-                    child: const Text("Complete"),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: canCancel ? () => _updateRouteStatus(id, "cancel") : null,
-                    child: const Text("Cancel"),
-                  ),
-                ),
-              ],
-            ),
-            if (canSelect) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _selectRouteAsNext(route),
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text("Use This Route"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: dropCityOrangeAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
+            if (notes.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                "Notes: $notes",
+                style: const TextStyle(fontSize: 12),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _selectRouteAsNext(route),
+                icon: const Icon(Icons.check_circle),
+                label: const Text("Use This Route Template"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: dropCityOrangeAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
           ],
         ),
       ),

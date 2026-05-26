@@ -1,6 +1,6 @@
 # DropCity Platform Source of Truth
 
-Last updated: May 22, 2026  
+Last updated: May 26, 2026  
 Owner: Project team (update this file whenever core flows or APIs change)
 
 ## 1) What DropCity Is Supposed To Achieve
@@ -37,6 +37,7 @@ Core outcome:
 - Admin auth: Supabase.
 - Main persistence: Supabase/Postgres + PostGIS.
 - Push/in-app notifications: Firebase + backend notification pipeline.
+- Platform policy direction: operational user notifications are in-app/push first (SMS/email no longer required for core delivery lifecycle events).
 
 ### Real-time and Jobs
 - WebSocket channel for parcel status/tracking updates.
@@ -194,6 +195,7 @@ Practical domain mapping:
 - Dropoff:
   - in-app recipient flow supports verification and secure completion.
   - external recipient flow provides fallback + dispute/reporting path.
+- SMS dependency removed from handshake lifecycle notifications; handshake OTP/status updates now flow through in-app notification events.
 
 ### Tracking
 - Tracking endpoint stores location pulses with corridor/vector context.
@@ -237,11 +239,12 @@ Key entities:
 - `price_recommendations_log`, `route_pricing_history`
 - `eta_calculations_log`, `connectivity_map`, `zone_connectivity`
 - notifications/outbox tables, handshake events, checkpoints
+- immutable audit table for disputes: `dispute_resolution_audit` (append-only via DB triggers)
 
 ## 9) Deliverables Status (Implemented vs Pending)
 
 ### Implemented (high confidence)
-- Multi-step courier signup flow and profile capture screens.
+- Multi-step courier signup flow and profile capture screens (fixed type mismatches: year/capacity now sent as strings; auth token properly set after step1 signup).
 - Multi-step client signup flow.
 - Client 5-step delivery creation flow wired from dashboard.
 - Old parcel request flow removed/replaced by new client flow.
@@ -253,6 +256,7 @@ Key entities:
 - Tracking diagnostics persistence (per-pulse heuristic flags/confidence).
 - ETA service v1 and ETA logging with confidence score.
 - Sender ETA update notifications (throttled + significant delta logic).
+- Handshake notifications now in-app only for pickup complete, recipient OTP readiness, manual OTP generation, and delivery completion.
 - Pricing model v2 with factor logging.
 - Matching objective 8 constraints implemented in service + route path.
 - **Client app logo and navigation**: DropCity logo asset on splash/welcome screens; 3-tab bottom navigation (`Home`, `Deliveries`, `Account`) with theme colors (orange accent #FF6B35, dark background).
@@ -269,8 +273,27 @@ Key entities:
 - Device/OEM-specific background execution policy tuning and long-haul field validation still recommended.
 - Asset management: logo.png files need to be copied to `assets/images/` directories in both courier and client apps.
 
+### Recent Bug Fixes and Architecture Changes (May 22-26, 2026)
+
+#### Architecture Changes
+- **Route Template vs Corridor distinction** (May 26): 
+  - Route Template: Reusable daily route definition created once by courier, always shows as REUSABLE
+  - Corridor: Operational instance created each time a template is used, with its own unique ID
+  - UI now shows "My Route Templates" instead of "My Routes"
+  - Each time courier "uses" a template, a new corridor is created behind the scenes
+  - Template remains reusable indefinitely; courier never sees corridor complexity
+  - Changes: route_declaration_screen.dart (template cards + start/end controls), route_details_screen.dart (createRouteTemplate), api_client.dart (template methods), backend/src/routes/couriers.js (template + instantiation endpoints), backend/sql/026_route_templates.sql
+  - Implemented backend endpoints: POST /couriers/route-templates, GET /couriers/route-templates, POST /couriers/routes/from-template
+  - Detailed architecture in ROUTE_TEMPLATE_ARCHITECTURE.md
+
+#### Bug Fixes
+- **Courier signup step4 type error**: Fixed type mismatches in vehicle profile submission - `vehicle_year` and `vehicle_capacity_kg` now sent as strings (previously int/double), matching ApiClient.submitCourierProfile signature.
+- **Courier signup auth token missing**: Fixed AUTH_MISSING_TOKEN error by ensuring `_apiClient.setAuthToken(response.idToken)` is called after successful step1 signup, so subsequent API calls (steps 2-4) have valid authentication.
+- **Courier signup step4 GridView RangeError**: Fixed index out of bounds error when removing vehicle images from grid by adding `key: ValueKey(_vehicleImages[index])` to container and bounds checking in removal handler.
+- **Flutter background geolocation API**: Removed invalid `notificationTitle` and `notificationText` Config parameters; fixed `onLocation` callback to properly handle async operations without subscription return type.
+- **Courier onboarding auth role gate (`auth_role required`)**: Step 1 now guarantees auth token attachment and immediate `setup-role(courier)` call; if signup returns "email already in use", flow falls back to login and still applies courier role before advancing.
+
 ### Pending / likely next
-- Objective 9: admin conflict resolution screen and backend action endpoints alignment.
 - Google Places deep integration and location picker polish where still basic.
 - End-to-end integration testing + regression suite for critical flows.
 - Performance/reliability hardening (timeouts, retries, telemetry, rate limits).
@@ -281,12 +304,14 @@ Key entities:
 - Tracking updates must be resilient to intermittent connectivity.
 - Notification outbox must be processed by background job pipeline.
 - Admin should have enough evidence (photo/GPS/timestamps) for disputes.
+- Route templates should be reusable indefinitely; each use creates independent corridor for operations.
 
 ## 11) Known Risks and Constraints
 - Some repo documents are stale relative to current implementation.
 - Repo currently has unrelated dirty changes; avoid reverting unknown edits.
 - Mobile background behavior differs by Android OEM/device policies.
 - Connectivity assumptions vary by network/provider/device.
+- Route template -> corridor instantiation now exists backend-side; ensure 026_route_templates.sql is applied in each environment.
 
 ## 12) Agent Handoff Guidance
 If an agent has only this file:
@@ -294,6 +319,7 @@ If an agent has only this file:
 2. Use sections 5 and 6 to find screens/pages/endpoints quickly.
 3. Use sections 7 and 8 to understand architecture and data flow.
 4. For new changes, update this file first to keep it authoritative.
+5. For route template implementation, refer to `ROUTE_TEMPLATE_ARCHITECTURE.md` for full technical details.
 
 ## 13) Definition of “Source of Truth” for this Project
 This file is authoritative for:
@@ -302,3 +328,4 @@ This file is authoritative for:
 - gap direction and next priorities
 
 When code changes affect flows/endpoints/screens/status, update this file in the same PR/commit.
+
