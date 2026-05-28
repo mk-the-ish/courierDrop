@@ -122,6 +122,9 @@ class CourierTrackingService {
         samples: 2,
         timeout: 20,
       );
+      if (!position.coords.latitude.isFinite || !position.coords.longitude.isFinite) {
+        return;
+      }
       final timestamp = DateTime.now().toUtc().toIso8601String();
       for (final parcelId in _activeParcelIds) {
         final sent = await _sendLiveUpdate(
@@ -233,6 +236,10 @@ class CourierTrackingService {
     debugPrint("[Tracking.startBackgroundEngine] Starting BG geolocation engine");
     bg.BackgroundGeolocation.onLocation((location) async {
       if (!_isRunning || _activeParcelIds.isEmpty) {
+        return;
+      }
+      if (!location.coords.latitude.isFinite || !location.coords.longitude.isFinite) {
+        debugPrint("[Tracking.bgLocation] Ignored non-finite location sample");
         return;
       }
       debugPrint("[Tracking.bgLocation] Location update: lat=${location.coords.latitude}, lng=${location.coords.longitude}, accuracy=${location.coords.accuracy}m");

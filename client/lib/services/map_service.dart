@@ -1,7 +1,10 @@
+import "dart:async";
 import "dart:convert";
+import "dart:io";
 
-import "package:google_maps_flutter/google_maps_flutter.dart";
 import "package:http/http.dart" as http;
+import "package:http/retry.dart";
+import "package:latlong2/latlong.dart";
 
 class PlaceSuggestion {
   const PlaceSuggestion({
@@ -9,12 +12,14 @@ class PlaceSuggestion {
     required this.primaryText,
     required this.secondaryText,
     required this.fullText,
+    this.coordinates,
   });
 
   final String placeId;
   final String primaryText;
   final String secondaryText;
   final String fullText;
+  final LatLng? coordinates;
 }
 
 class RouteInfo {
@@ -30,92 +35,73 @@ class RouteInfo {
 }
 
 class MapService {
-  MapService({http.Client? client, String? apiKey})
-      : _client = client ?? http.Client(),
-        _apiKey = (apiKey ?? const String.fromEnvironment("MAPS_API_KEY")).trim();
+  MapService({http.Client? client})
+      : _client = RetryClient(
+          client ?? http.Client(),
+          retries: 3,
+          when: _shouldRetryResponse,
+          whenError: _shouldRetryError,
+          delay: _retryDelay,
+        );
 
   final http.Client _client;
-  final String _apiKey;
 
-  bool get isConfigured => _apiKey.isNotEmpty;
+  static bool _shouldRetryResponse(http.BaseResponse response) {
+    return response.statusCode == 429 || response.statusCode >= 500;
+  }
+
+  static bool _shouldRetryError(Object error, StackTrace stackTrace) {
+    return error is SocketException || error is TimeoutException;
+  }
+
+  static Duration _retryDelay(int retryCount) {
+    return Duration(milliseconds: 400 * (1 << retryCount));
+  }
 
   Future<List<PlaceSuggestion>> autocomplete(String query) async {
-    if (!isConfigured || query.trim().length < 3) {
+    if (query.trim().length < 3) {
       return const [];
     }
 
-    final response = await _client.post(
-      Uri.parse("https://places.googleapis.com/v1/places:autocomplete"),
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": _apiKey,
-        "X-Goog-FieldMask": "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat",
+    final uri = Uri.parse("https://nominatim.openstreetmap.org/search").replace(
+      queryParameters: {
+        "q": query.trim(),
+        "format": "jsonv2",
+        "addressdetails": "1",
+        "limit": "8",
+        "countrycodes": "zw",
       },
-      body: jsonEncode({"input": query.trim()}),
     );
-
+    final response = await _client
+        .get(uri, headers: {"User-Agent": "DropCity/1.0"})
+        .timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) {
       return const [];
     }
-
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    final suggestions = body["suggestions"] as List<dynamic>? ?? const [];
-
-    return suggestions
-        .map((item) {
-          final placePrediction =
-              (item as Map<String, dynamic>)["placePrediction"] as Map<String, dynamic>? ?? const {};
-          final structured =
-              placePrediction["structuredFormat"] as Map<String, dynamic>? ?? const {};
-          final text = placePrediction["text"] as Map<String, dynamic>? ?? const {};
-
-          final primary =
-              (structured["mainText"] as Map<String, dynamic>?)?["text"]?.toString() ?? "";
-          final secondary =
-              (structured["secondaryText"] as Map<String, dynamic>?)?["text"]?.toString() ?? "";
-          final fullText = text["text"]?.toString() ??
-              [primary, secondary].where((x) => x.isNotEmpty).join(", ");
-
-          return PlaceSuggestion(
-            placeId: placePrediction["placeId"]?.toString() ?? "",
-            primaryText: primary,
-            secondaryText: secondary,
-            fullText: fullText,
-          );
-        })
-        .where((s) => s.placeId.isNotEmpty)
-        .toList();
+    final body = jsonDecode(response.body) as List<dynamic>;
+    return body.map((item) {
+      final row = item as Map<String, dynamic>;
+      final lat = double.tryParse(row["lat"]?.toString() ?? "");
+      final lon = double.tryParse(row["lon"]?.toString() ?? "");
+      return PlaceSuggestion(
+        placeId: "${lat ?? 0},${lon ?? 0}",
+        primaryText: (row["display_name"]?.toString() ?? "").split(",").first.trim(),
+        secondaryText: row["display_name"]?.toString() ?? "",
+        fullText: row["display_name"]?.toString() ?? "",
+        coordinates: (lat != null && lon != null) ? LatLng(lat, lon) : null,
+      );
+    }).where((s) => s.coordinates != null).toList();
   }
 
   Future<LatLng?> getPlaceCoordinates(String placeId) async {
-    if (!isConfigured || placeId.isEmpty) {
+    if (placeId.isEmpty) {
       return null;
     }
-
-    final response = await _client.get(
-      Uri.parse("https://places.googleapis.com/v1/places/$placeId"),
-      headers: {
-        "X-Goog-Api-Key": _apiKey,
-        "X-Goog-FieldMask": "location",
-      },
-    );
-
-    if (response.statusCode != 200) {
-      return null;
-    }
-
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    final location = body["location"] as Map<String, dynamic>?;
-    if (location == null) {
-      return null;
-    }
-
-    final lat = (location["latitude"] as num?)?.toDouble();
-    final lng = (location["longitude"] as num?)?.toDouble();
-    if (lat == null || lng == null) {
-      return null;
-    }
-
+    final parts = placeId.split(",");
+    if (parts.length != 2) return null;
+    final lat = double.tryParse(parts[0]);
+    final lng = double.tryParse(parts[1]);
+    if (lat == null || lng == null) return null;
     return LatLng(lat, lng);
   }
 
@@ -123,71 +109,60 @@ class MapService {
     final fallback =
         "${coordinates.latitude.toStringAsFixed(5)}, ${coordinates.longitude.toStringAsFixed(5)}";
 
-    if (!isConfigured) {
-      return fallback;
-    }
-
-    final response = await _client.get(
+    final response = await _client
+        .get(
       Uri.parse(
-        "https://maps.googleapis.com/maps/api/geocode/json"
-        "?latlng=${coordinates.latitude},${coordinates.longitude}&key=$_apiKey",
+        "https://nominatim.openstreetmap.org/reverse"
+        "?lat=${coordinates.latitude}&lon=${coordinates.longitude}&format=jsonv2",
       ),
-    );
+      headers: {"User-Agent": "DropCity/1.0"},
+    )
+        .timeout(const Duration(seconds: 10));
 
     if (response.statusCode != 200) {
       return fallback;
     }
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
-    final results = body["results"] as List<dynamic>? ?? const [];
-    if (results.isEmpty) {
-      return fallback;
-    }
-
-    return (results.first as Map<String, dynamic>)["formatted_address"]?.toString() ?? fallback;
+    return body["display_name"]?.toString() ?? fallback;
   }
 
   Future<RouteInfo?> directions({
     required LatLng origin,
     required LatLng destination,
   }) async {
-    if (!isConfigured) {
-      return null;
-    }
-
-    final response = await _client.get(
+    final response = await _client
+        .get(
       Uri.parse(
-        "https://maps.googleapis.com/maps/api/directions/json"
-        "?origin=${origin.latitude},${origin.longitude}"
-        "&destination=${destination.latitude},${destination.longitude}"
-        "&mode=driving&key=$_apiKey",
+        "https://router.project-osrm.org/route/v1/driving/"
+        "${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}"
+        "?overview=full&geometries=polyline&alternatives=false&steps=false",
       ),
-    );
+    )
+        .timeout(const Duration(seconds: 12));
 
     if (response.statusCode != 200) {
       return null;
     }
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body["code"]?.toString() != "Ok") {
+      return null;
+    }
     final routes = body["routes"] as List<dynamic>? ?? const [];
     if (routes.isEmpty) {
       return null;
     }
 
     final route = routes.first as Map<String, dynamic>;
-    final overview = route["overview_polyline"] as Map<String, dynamic>? ?? const {};
-    final points = overview["points"]?.toString() ?? "";
-    final legs = route["legs"] as List<dynamic>? ?? const [];
-    final firstLeg = legs.isNotEmpty
-        ? legs.first as Map<String, dynamic>
-        : const <String, dynamic>{};
+    final geometry = route["geometry"]?.toString() ?? "";
+    final distanceMeters = (route["distance"] as num?)?.toDouble();
+    final durationSeconds = (route["duration"] as num?)?.toDouble();
 
     return RouteInfo(
-      polylinePoints: _decodePolyline(points),
-      distanceText:
-          (firstLeg["distance"] as Map<String, dynamic>?)?["text"]?.toString() ?? "",
-      durationText:
-          (firstLeg["duration"] as Map<String, dynamic>?)?["text"]?.toString() ?? "",
+      polylinePoints: _decodePolyline(geometry),
+      distanceText: distanceMeters == null ? "" : "${(distanceMeters / 1000).toStringAsFixed(1)} km",
+      durationText: durationSeconds == null ? "" : "${(durationSeconds / 60).ceil()} min",
     );
   }
 

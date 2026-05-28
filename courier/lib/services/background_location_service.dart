@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
+import 'package:geolocator/geolocator.dart';
 
 /**
  * Background Location Service
@@ -53,14 +55,19 @@ class BackgroundLocationService {
         desiredAccuracy: bg.Config.DESIRED_ACCURACY_NAVIGATION, // High accuracy, ~10m
         distanceFilter: 25.0, // Update every 25m (avoid excessive updates)
         stationaryRadius: 50.0, // Consider stationary if within 50m for 5 min
-        
+        stopTimeout: 5,
+        allowIdenticalLocations: false,
+        locationAuthorizationRequest: "Always",
+
         // Activity tracking
         activityType: bg.Config.ACTIVITY_TYPE_OTHER_NAVIGATION,
         activityRecognitionInterval: 5000, // Check activity every 5s
-        
+        motionTriggerDelay: 30000,
+
         // Stop conditions
         stopOnTerminate: false, // Keep tracking when app closes
         startOnBoot: true, // Auto-start on device reboot
+        scheduleUseAlarmManager: true,
         
         // Geofencing
         geofenceInitialTriggerEntry: true,
@@ -72,11 +79,11 @@ class BackgroundLocationService {
         notificationText: "Tracking your delivery in progress",
         notificationSmallIcon: "ic_launcher", // Android notification icon
         notificationLargeIcon: "ic_launcher",
-        notificationColor: "#00aced0",
+        notificationColor: "#00ACED",
         
         // HTTP logging (useful for debugging)
-        logLevel: bg.Config.LOG_LEVEL_VERBOSE,
-        debug: false, // Set to false for production
+        logLevel: kDebugMode ? bg.Config.LOG_LEVEL_VERBOSE : bg.Config.LOG_LEVEL_OFF,
+        debug: kDebugMode,
         
         // Geofence options
         maxRecordsToPersist: 500,
@@ -100,6 +107,10 @@ class BackgroundLocationService {
    */
   void _registerLocationCallback() {
     bg.BackgroundGeolocation.onLocation((bg.Location location) {
+      if (!location.latitude.isFinite || !location.longitude.isFinite) {
+        print('[BackgroundLocation] Ignoring non-finite location sample');
+        return;
+      }
       print('[BackgroundLocation] Location: ${location.latitude}, ${location.longitude}, accuracy: ${location.accuracy}m');
       
       // Call the provided callback
@@ -278,13 +289,20 @@ class BackgroundLocationService {
    */
   Future<bool> checkAndRequestPermission() async {
     try {
-      final permission = await bg.BackgroundGeolocation.checkStatus();
-      
-      if (!permission.hasPermission) {
-        final requestResult = await bg.BackgroundGeolocation.requestPermission();
-        return requestResult;
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return false;
       }
-      
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission != LocationPermission.always) {
+        return false;
+      }
+
       return true;
     } catch (e) {
       print('[BackgroundLocation] Permission check failed: $e');

@@ -6,10 +6,12 @@ import "package:geolocator/geolocator.dart";
 import "dart:io";
 
 import "package:image_picker/image_picker.dart";
+import "package:latlong2/latlong.dart";
 import "package:mobile_scanner/mobile_scanner.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
 import "../auth/auth_state.dart";
+import "../widgets/location_preview_map.dart";
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key, required this.authState});
@@ -392,6 +394,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               Expanded(
                 child: TextField(
                   controller: _latController,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     labelText: "Lat",
                     border: OutlineInputBorder(),
@@ -404,6 +407,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               Expanded(
                 child: TextField(
                   controller: _lngController,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     labelText: "Lng",
                     border: OutlineInputBorder(),
@@ -420,6 +424,21 @@ class _ProgressScreenState extends State<ProgressScreen> {
             icon: const Icon(Icons.my_location),
             label: Text(_isLocating ? "Locating..." : "Use current location"),
           ),
+          if (_latController.text.isNotEmpty &&
+              _lngController.text.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Builder(
+              builder: (context) {
+                final lat = double.tryParse(_latController.text.trim());
+                final lng = double.tryParse(_lngController.text.trim());
+                final point = (lat != null && lng != null) ? LatLng(lat, lng) : null;
+                return LocationPreviewMap(
+                  point: point,
+                  label: "Dropoff location preview",
+                );
+              },
+            ),
+          ],
           const SizedBox(height: 12),
           ElevatedButton(
             onPressed: isBusy ? null : _dropoff,

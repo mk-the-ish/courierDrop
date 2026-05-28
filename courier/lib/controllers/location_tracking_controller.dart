@@ -136,6 +136,11 @@ class LocationTrackingController extends ChangeNotifier {
    * Uploads location to backend
    */
   Future<void> _handleLocationUpdate(bg.Location location) async {
+    if (!location.latitude.isFinite || !location.longitude.isFinite) {
+      print('[LocationTracking] Ignored non-finite location update');
+      return;
+    }
+
     // Update current location
     final prevLat = _currentLatitude;
     final prevLng = _currentLongitude;
@@ -163,6 +168,7 @@ class LocationTrackingController extends ChangeNotifier {
    */
   Future<void> _uploadLocationToBackend(bg.Location location) async {
     if (_isUploading) return; // Avoid concurrent uploads
+    if (!location.latitude.isFinite || !location.longitude.isFinite) return;
 
     _isUploading = true;
     notifyListeners();
@@ -201,6 +207,9 @@ class LocationTrackingController extends ChangeNotifier {
   Future<({double lat, double lng, double accuracy})> getCurrentLocationSnapshot() async {
     try {
       final location = await locationService.getCurrentLocation();
+      if (!location.latitude.isFinite || !location.longitude.isFinite) {
+        throw Exception('Invalid location sample');
+      }
       return (
         lat: location.latitude,
         lng: location.longitude,

@@ -1,10 +1,12 @@
 import "dart:async";
 
 import "package:flutter/material.dart";
-import "package:google_maps_flutter/google_maps_flutter.dart";
+import "package:flutter_map/flutter_map.dart";
+import "package:latlong2/latlong.dart";
 
 import "../services/map_service.dart";
 import "../widgets/map_view.dart";
+import "../utils/map_coordinates.dart";
 
 class DeliveryPickerScreen extends StatefulWidget {
   const DeliveryPickerScreen({super.key});
@@ -17,7 +19,7 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
   final MapService _mapService = MapService();
   final TextEditingController _searchController = TextEditingController();
 
-  GoogleMapController? _controller;
+  MapController? _controller;
   LatLng _center = const LatLng(-17.8252, 31.0335);
 
   LatLng? _pickup;
@@ -28,6 +30,7 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
   String? _activeAddress;
 
   RouteInfo? _routeInfo;
+  int _routeRequestId = 0;
   bool _selectingPickup = true;
   bool _isResolvingAddress = false;
   bool _isSearching = false;
@@ -48,12 +51,14 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
     _cameraDebounce?.cancel();
     _searchDebounce?.cancel();
     _searchController.dispose();
-    _controller?.dispose();
     super.dispose();
   }
 
-  void _onCameraMove(CameraPosition position) {
-    _center = position.target;
+  void _onCameraMove(LatLng position) {
+    if (!isFiniteLatLng(position)) {
+      return;
+    }
+    _center = position;
   }
 
   void _onCameraIdle() {
@@ -66,9 +71,15 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
       return;
     }
 
-    setState(() {
-      _isResolvingAddress = true;
-    });
+    if (!isFiniteLatLng(_center)) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isResolvingAddress = true;
+      });
+    }
 
     final address = await _mapService.reverseGeocode(_center);
     if (!mounted) {
@@ -99,8 +110,16 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
       return;
     }
 
+    final requestId = ++_routeRequestId;
     final route = await _mapService.directions(origin: pickup, destination: dropoff);
-    if (!mounted) {
+    if (!mounted || requestId != _routeRequestId) {
+      return;
+    }
+
+    if (route == null) {
+      setState(() {
+        _routeInfo = null;
+      });
       return;
     }
 
@@ -116,19 +135,23 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
         return;
       }
 
-      setState(() {
-        _isSearching = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isSearching = true;
+        });
+      }
 
       final results = await _mapService.autocomplete(value);
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _suggestions = results;
-        _isSearching = false;
-      });
+      if (mounted) {
+        setState(() {
+          _suggestions = results;
+          _isSearching = false;
+        });
+      }
     });
   }
 
@@ -141,13 +164,11 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
     });
 
     final coordinates = await _mapService.getPlaceCoordinates(suggestion.placeId);
-    if (coordinates == null || _controller == null) {
+    if (coordinates == null || !isFiniteLatLng(coordinates) || _controller == null) {
       return;
     }
 
-    await _controller!.animateCamera(
-      CameraUpdate.newCameraPosition(CameraPosition(target: coordinates, zoom: 16)),
-    );
+    _controller!.move(coordinates, 16);
 
     _center = coordinates;
     await _resolveCenterAddress();
@@ -155,11 +176,13 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
 
   void _nextStep() {
     if (_selectingPickup && _pickup != null) {
-      setState(() {
-        _selectingPickup = false;
-        _activeAddress = _dropoffAddress;
-        _searchController.clear();
-      });
+      if (mounted) {
+        setState(() {
+          _selectingPickup = false;
+          _activeAddress = _dropoffAddress;
+          _searchController.clear();
+        });
+      }
       return;
     }
 
@@ -191,9 +214,10 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
     if (_pickup != null) {
       markers.add(
         Marker(
-          markerId: const MarkerId("pickup"),
-          position: _pickup!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          point: _pickup!,
+          width: 40,
+          height: 40,
+          child: const Icon(Icons.place, color: Colors.green, size: 36),
         ),
       );
     }
@@ -201,9 +225,10 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
     if (_dropoff != null) {
       markers.add(
         Marker(
-          markerId: const MarkerId("dropoff"),
-          position: _dropoff!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          point: _dropoff!,
+          width: 40,
+          height: 40,
+          child: const Icon(Icons.place, color: Colors.red, size: 36),
         ),
       );
     }
@@ -219,9 +244,8 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
 
     return {
       Polyline(
-        polylineId: const PolylineId("delivery_route"),
         points: route.polylinePoints,
-        width: 5,
+        strokeWidth: 5,
         color: Colors.teal,
       ),
     };

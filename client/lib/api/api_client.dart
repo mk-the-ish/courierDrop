@@ -305,6 +305,10 @@ class ApiClient {
       if (clientEtaMinutes != null) "clientEtaMinutes": clientEtaMinutes,
     };
 
+    // Note: Do NOT include base64 image data in JSON payload
+    // Images should be sent separately via multipart upload or stored separately
+    // Embedding base64 images in JSON causes "request entity too large" errors
+
     final response = await _client.post(
       uri,
       headers: _headers(),

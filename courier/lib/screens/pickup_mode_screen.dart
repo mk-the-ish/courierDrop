@@ -9,8 +9,10 @@ import "package:image_picker/image_picker.dart";
 import "package:mobile_scanner/mobile_scanner.dart";
 import "package:firebase_messaging/firebase_messaging.dart";
 import "package:shared_preferences/shared_preferences.dart";
+import "package:latlong2/latlong.dart";
 
 import "../auth/auth_state.dart";
+import "../widgets/location_preview_map.dart";
 
 class PickupModeScreen extends StatefulWidget {
   const PickupModeScreen({
@@ -629,6 +631,7 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
               Expanded(
                 child: TextField(
                   controller: _latController,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     labelText: "Lat (gate)",
                     border: OutlineInputBorder(),
@@ -641,6 +644,7 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
               Expanded(
                 child: TextField(
                   controller: _lngController,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     labelText: "Lng (gate)",
                     border: OutlineInputBorder(),
@@ -651,6 +655,19 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          if (_latController.text.isNotEmpty && _lngController.text.isNotEmpty)
+            Builder(
+              builder: (context) {
+                final lat = double.tryParse(_latController.text.trim());
+                final lng = double.tryParse(_lngController.text.trim());
+                final point = (lat != null && lng != null) ? LatLng(lat, lng) : null;
+                return LocationPreviewMap(
+                  point: point,
+                  label: "Pickup gate preview",
+                );
+              },
+            ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: isBusy || _routeStarted != true ? null : _registerMeetingPoint,

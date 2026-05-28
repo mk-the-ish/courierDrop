@@ -47,7 +47,7 @@ export default function LogsPage() {
       const token = getToken();
       if (!token) throw new Error('Not authenticated');
 
-      const res = await fetch(`${baseUrl}/admin/logs?limit=200&days=${days}`, {
+      const res = await fetch(`${baseUrl}/admin/errors?limit=200&days=${days}`, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
 

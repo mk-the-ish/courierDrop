@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../auth/auth_state.dart';
 import '../controllers/location_tracking_controller.dart';
+import '../utils/map_coordinates.dart';
 
 /**
  * Dropoff Screen (Client/Recipient)
@@ -31,7 +33,6 @@ class ClientDropoffScreen extends StatefulWidget {
 }
 
 class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
-  late GoogleMapController _mapController;
   bool _isVerifying = false;
   bool _gpsInRange = false;
   bool _otpConfirmed = false;
@@ -70,16 +71,20 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
         widget.dropoffLng,
       );
 
-      setState(() {
-        _distanceToDropoffMeters = distance;
-        _gpsInRange = distance <= widget.gateRadiusMeters;
-        _verificationError = null;
-      });
+      if (mounted) {
+        setState(() {
+          _distanceToDropoffMeters = distance;
+          _gpsInRange = distance <= widget.gateRadiusMeters;
+          _verificationError = null;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _verificationError = 'Failed to get location: $e';
-        _gpsInRange = false;
-      });
+      if (mounted) {
+        setState(() {
+          _verificationError = 'Failed to get location: $e';
+          _gpsInRange = false;
+        });
+      }
     }
   }
 
@@ -88,16 +93,22 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
    */
   Future<void> _verifyDropoffOtp() async {
     if (_enteredOtp.isEmpty) {
-      setState(() => _verificationError = 'Enter the OTP from your courier');
+      if (mounted) {
+        setState(() => _verificationError = 'Enter the OTP from your courier');
+      }
       return;
     }
 
     if (!_gpsInRange) {
-      setState(() => _verificationError = 'Not at delivery location. GPS verification failed.');
+      if (mounted) {
+        setState(() => _verificationError = 'Not at delivery location. GPS verification failed.');
+      }
       return;
     }
 
-    setState(() => _isVerifying = true);
+    if (mounted) {
+      setState(() => _isVerifying = true);
+    }
 
     try {
       final response = await widget.authState.apiClient.post(
@@ -112,6 +123,8 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
         },
       );
 
+      if (!mounted) return;
+
       if (response['status'] == 'ok') {
         setState(() => _otpConfirmed = true);
         
@@ -125,12 +138,18 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
           if (mounted) Navigator.of(context).pop(true);
         });
       } else {
-        setState(() => _verificationError = 'Verification failed: ${response['message'] ?? 'Unknown error'}');
+        if (mounted) {
+          setState(() => _verificationError = 'Verification failed: ${response['message'] ?? 'Unknown error'}');
+        }
       }
     } catch (e) {
-      setState(() => _verificationError = 'Error: $e');
+      if (mounted) {
+        setState(() => _verificationError = 'Error: $e');
+      }
     } finally {
-      setState(() => _isVerifying = false);
+      if (mounted) {
+        setState(() => _isVerifying = false);
+      }
     }
   }
 
@@ -173,29 +192,46 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
             Container(
               height: 250,
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
-              child: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(widget.dropoffLat, widget.dropoffLng),
-                  zoom: 18,
+              child: FlutterMap(
+                options: MapOptions(
+                  initialCenter: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
+                  initialZoom: 18,
                 ),
-                onMapCreated: (controller) => _mapController = controller,
-                circles: {
-                  Circle(
-                    circleId: CircleId('dropoff_gate'),
-                    center: LatLng(widget.dropoffLat, widget.dropoffLng),
-                    radius: widget.gateRadiusMeters,
-                    fillColor: Colors.purple.withOpacity(0.2),
-                    strokeColor: Colors.purple,
-                    strokeWidth: 2,
+                children: [
+                  TileLayer(
+                    urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    userAgentPackageName: "com.example.dropcity_client",
+                    tileProvider: NetworkTileProvider(
+                      silenceExceptions: true,
+                      cachingProvider: BuiltInMapCachingProvider.getOrCreateInstance(
+                        maxCacheSize: 250000000,
+                        overrideFreshAge: const Duration(days: 7),
+                      ),
+                    ),
                   ),
-                },
-                markers: {
-                  Marker(
-                    markerId: const MarkerId('dropoff'),
-                    position: LatLng(widget.dropoffLat, widget.dropoffLng),
-                    infoWindow: const InfoWindow(title: 'Delivery Zone'),
+                  CircleLayer(
+                    circles: [
+                      CircleMarker(
+                        point: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
+                        radius: widget.gateRadiusMeters,
+                        useRadiusInMeter: true,
+                        color: Colors.purple.withOpacity(0.2),
+                        borderColor: Colors.purple,
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
                   ),
-                },
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
+                        width: 40,
+                        height: 40,
+                        child: const Icon(Icons.location_on, color: Colors.purple, size: 36),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 24),

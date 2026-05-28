@@ -3,8 +3,10 @@ import "dart:io";
 import "package:flutter/material.dart";
 import "package:geolocator/geolocator.dart";
 import "package:image_picker/image_picker.dart";
+import "package:latlong2/latlong.dart";
 
 import "../auth/auth_state.dart";
+import "../widgets/location_preview_map.dart";
 
 class RecipientHandoffScreen extends StatefulWidget {
   const RecipientHandoffScreen({
@@ -112,6 +114,13 @@ class _RecipientHandoffScreenState extends State<RecipientHandoffScreen> {
                 height: 180,
                 fit: BoxFit.cover,
               ),
+            ),
+          ],
+          if (_lat != null && _lng != null) ...[
+            const SizedBox(height: 16),
+            LocationPreviewMap(
+              point: LatLng(_lat!, _lng!),
+              label: "Recipient location preview",
             ),
           ],
           const SizedBox(height: 16),

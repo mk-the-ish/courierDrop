@@ -1,6 +1,6 @@
 # DropCity Platform Source of Truth
 
-Last updated: May 26, 2026  
+Last updated: May 28, 2026  
 Owner: Project team (update this file whenever core flows or APIs change)
 
 ## 1) What DropCity Is Supposed To Achieve
@@ -42,6 +42,7 @@ Core outcome:
 ### Real-time and Jobs
 - WebSocket channel for parcel status/tracking updates.
 - Scheduler/background jobs for matching, scoring, cleanup, and tracking checks.
+- Map provider direction: both mobile apps now use OpenStreetMap-based flows for route drawing, location picking, reverse geocoding, and route previews. Google Maps is no longer the active mobile map provider.
 
 ## 4) Desired End-to-End Flows
 
@@ -209,7 +210,7 @@ Practical domain mapping:
   - declared ETA
   - distance/baseline speed ETA
   - historical corridor ETA
-  - map-provider ETA (Google Directions, when server API key is configured)
+  - map-provider ETA (OpenStreetMap OSRM, with Nominatim/route fallback where available)
 - Returns confidence label + confidence score + source breakdown.
 - Sender ETA update notifications are throttled and delta-aware.
 
@@ -264,14 +265,23 @@ Key entities:
 - Client navigation integrated (ClientNavigationHubScreen) with IndexedStack for efficient screen switching.
 - Courier navigation integrated (NavigationHubScreen) with proper screen management and WillPopScope.
 - Background tracking hardening for app-closed resilience upgraded on courier runtime using background geolocation engine.
-- Map-provider ETA source integration implemented (Google Directions, key-dependent graceful fallback).
+- Map-provider ETA source integration implemented (OpenStreetMap OSRM + Nominatim, keyless graceful fallback).
+- Google Maps removed from both client and courier mobile apps; OpenStreetMap now powers route drawing, pickup/dropoff map views, and location search flows.
+- Client map surfaces migrated to `flutter_map` with OSM tiles, Nominatim search, and OSRM routing.
+- Courier route declaration, pickup, and dropoff map surfaces migrated to `flutter_map` with OSM tiles, Nominatim search, and OSRM routing.
+- OpenStreetMap hardening applied to core map flows: built-in tile caching explicitly enabled, retry/backoff wrapped around OSM HTTP calls, and finite-coordinate guards added to prevent NaN camera/tile crashes.
+- Secondary location surfaces now also use the same OSM preview pattern where GPS is collected (client recipient handoff, client parcel status check-in, client progress dropoff, courier pickup mode).
+- Courier corridor routing now supports true multi-stop waypoint routing through all selected points, with ordered markers, auto-fit bounds, and multi-point OSRM path snapping.
 - Flutter background geolocation API corrections applied (removed invalid notificationTitle/Text params, fixed onLocation callback async handling).
+- Background tracking permission gate now requires true background-capable location permission for app-closed courier operation.
+- Background tracking config now includes stronger motion/scheduling settings (`stopTimeout`, `motionTriggerDelay`, `scheduleUseAlarmManager`, and Always authorization request) for production hardening.
 
 ### Partially implemented / still maturing
 - Full recipient/courier PIN-and-proof completion UX hardening across all edge cases.
 - Admin conflict resolution now includes dedicated UI + actions + audit trail; remaining work is policy tuning (SLA automation, refunds integration, escalation workflow routing).
-- Device/OEM-specific background execution policy tuning and long-haul field validation still recommended.
+- Device/OEM-specific background execution policy tuning and long-haul field validation still recommended for app-closed courier tracking.
 - Asset management: logo.png files need to be copied to `assets/images/` directories in both courier and client apps.
+- Remaining non-core location-picker surfaces should still be audited to ensure they use the same OSM provider pattern everywhere.
 
 ### Recent Bug Fixes and Architecture Changes (May 22-26, 2026)
 
@@ -292,12 +302,15 @@ Key entities:
 - **Courier signup step4 GridView RangeError**: Fixed index out of bounds error when removing vehicle images from grid by adding `key: ValueKey(_vehicleImages[index])` to container and bounds checking in removal handler.
 - **Flutter background geolocation API**: Removed invalid `notificationTitle` and `notificationText` Config parameters; fixed `onLocation` callback to properly handle async operations without subscription return type.
 - **Courier onboarding auth role gate (`auth_role required`)**: Step 1 now guarantees auth token attachment and immediate `setup-role(courier)` call; if signup returns "email already in use", flow falls back to login and still applies courier role before advancing.
+- **Client parcel creation "request entity too large" error** (May 26): Removed base64-encoded image data from parcel request JSON payload. Images were being embedded in `notes` field, causing request to exceed server size limits (100KB-1MB). Fix: Remove image from notes, upload images separately after parcel creation (future enhancement).
+- **Admin web app data fetch failures** (May 27): Admin dashboard unable to fetch data from backend despite data existing in database. Root cause: 5 endpoint path naming mismatches between frontend and backend. All 22 admin API endpoints audited; all 17 referenced database tables verified to exist. Mismatches fixed in admin/src/app/admin/alerts/page.tsx (4 endpoints: `/admin/alert-rules` → `/admin/alerts/rules`) and admin/src/app/admin/logs/page.tsx (1 endpoint: `/admin/logs` → `/admin/errors`). Full audit report in ADMIN_API_AUDIT_COMPLETE.md. Status: ✅ Fixed and verified.
 
 ### Pending / likely next
-- Google Places deep integration and location picker polish where still basic.
 - End-to-end integration testing + regression suite for critical flows.
 - Performance/reliability hardening (timeouts, retries, telemetry, rate limits).
 - Asset build verification and APK/IPA generation testing.
+- OS-level background tracking hardening for fully app-closed courier operation still needs production validation.
+- Android OEM battery-policy validation remains important because some devices may still suppress long-running background services despite the plugin config.
 
 ## 10) Operational Expectations
 - Matching job should continuously process unassigned requested parcels.
@@ -305,6 +318,8 @@ Key entities:
 - Notification outbox must be processed by background job pipeline.
 - Admin should have enough evidence (photo/GPS/timestamps) for disputes.
 - Route templates should be reusable indefinitely; each use creates independent corridor for operations.
+- Planned route start reminders are emitted to courier as local app notifications when planned start time is reached (`RouteStartReminderService`, one-time per route instance).
+- OpenStreetMap integration upgraded in courier route map flow: start/end search fields with Nominatim autocomplete + coordinate resolution, then OSRM route preview generation.
 
 ## 11) Known Risks and Constraints
 - Some repo documents are stale relative to current implementation.
@@ -312,6 +327,8 @@ Key entities:
 - Mobile background behavior differs by Android OEM/device policies.
 - Connectivity assumptions vary by network/provider/device.
 - Route template -> corridor instantiation now exists backend-side; ensure 026_route_templates.sql is applied in each environment.
+- Route start reminders are currently app-runtime driven (periodic sync loop); hard guarantee while fully app-closed still depends on deeper OS/background scheduling hardening.
+- OSM provider rate limits and tile availability are external dependencies; production rollout should include caching and graceful fallback behavior.
 
 ## 12) Agent Handoff Guidance
 If an agent has only this file:
@@ -328,4 +345,3 @@ This file is authoritative for:
 - gap direction and next priorities
 
 When code changes affect flows/endpoints/screens/status, update this file in the same PR/commit.
-

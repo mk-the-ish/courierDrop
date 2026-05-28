@@ -2,7 +2,7 @@ import "dart:convert";
 import "dart:io";
 
 import "package:flutter/foundation.dart";
-import "package:google_maps_flutter/google_maps_flutter.dart";
+import "package:latlong2/latlong.dart";
 
 import "../auth/auth_state.dart";
 
@@ -98,9 +98,11 @@ class DeliveryCreationController extends ChangeNotifier {
       final recipientNote = recipientMode == RecipientMode.external
           ? "recipient_name:$recipientName;recipient_phone:$recipientPhone"
           : "";
+      
+      // Build notes WITHOUT the image data to avoid "request entity too large" error
+      // Image should be uploaded separately if needed
       final notes = [
         description.trim(),
-        "parcel_image:${parcelImageDataUrl ?? ""}",
         recipientNote
       ].where((x) => x.isNotEmpty).join(" | ");
 
@@ -117,6 +119,11 @@ class DeliveryCreationController extends ChangeNotifier {
         weightKg: weightKg,
         clientEtaMinutes: etaMins,
       );
+
+      // TODO: Upload parcel image separately after parcel is created
+      // if (parcelImageDataUrl != null && parcelId != null) {
+      //   await authState.apiClient.uploadParcelImage(parcelId!, parcelImageDataUrl!);
+      // }
 
       final matches = await authState.apiClient.matchCorridors(
         originLat: originLatLng!.latitude,

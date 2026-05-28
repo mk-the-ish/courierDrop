@@ -58,7 +58,7 @@ export default function AlertsPage() {
       const token = getToken();
       if (!token) throw new Error('Not authenticated');
 
-      const res = await fetch(`${baseUrl}/admin/alert-rules`, {
+      const res = await fetch(`${baseUrl}/admin/alerts/rules`, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
 
@@ -90,8 +90,8 @@ export default function AlertsPage() {
       if (!token) throw new Error('Not authenticated');
 
       const url = editingId
-        ? `${baseUrl}/admin/alert-rules/${editingId}`
-        : `${baseUrl}/admin/alert-rules`;
+        ? `${baseUrl}/admin/alerts/rules/${editingId}`
+        : `${baseUrl}/admin/alerts/rules`;
 
       const method = editingId ? 'PATCH' : 'POST';
 
@@ -129,7 +129,7 @@ export default function AlertsPage() {
       const token = getToken();
       if (!token) throw new Error('Not authenticated');
 
-      const res = await fetch(`${baseUrl}/admin/alert-rules/${id}`, {
+      const res = await fetch(`${baseUrl}/admin/alerts/rules/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });

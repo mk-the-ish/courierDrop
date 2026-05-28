@@ -9,10 +9,12 @@ import "package:web_socket_channel/io.dart";
 import "package:geolocator/geolocator.dart";
 import "package:shared_preferences/shared_preferences.dart";
 import "package:mobile_scanner/mobile_scanner.dart";
+import "package:latlong2/latlong.dart";
 
 import "../auth/auth_state.dart";
 import "recipient_handoff_screen.dart";
 import "sender_handoff_fallback_screen.dart";
+import "../widgets/location_preview_map.dart";
 
 class ParcelStatusScreen extends StatefulWidget {
   const ParcelStatusScreen({
@@ -44,6 +46,8 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
   String _eventFilter = "all";
   bool _historyUnavailable = false;
   Map<String, dynamic>? _myProfile;
+  double? _lastCheckInLat;
+  double? _lastCheckInLng;
 
   static const _dismissKey = "dismiss_courier_accepted_banner";
 
@@ -184,6 +188,8 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
         lat: position.latitude,
         lng: position.longitude,
       );
+      _lastCheckInLat = position.latitude;
+      _lastCheckInLng = position.longitude;
       await _fetchStatus();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -749,6 +755,14 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
               title: const Text("Dropoff Verified At"),
               subtitle: Text(_parcel?["dropoff_verified_at"]?.toString() ?? "-"),
             ),
+            if (_lastCheckInLat != null && _lastCheckInLng != null) ...[
+              const SizedBox(height: 12),
+              LocationPreviewMap(
+                point: LatLng(_lastCheckInLat!, _lastCheckInLng!),
+                label: "Latest checkpoint capture",
+                height: 160,
+              ),
+            ],
             const Divider(),
             const Text(
               "Geofenced Checkpoints",

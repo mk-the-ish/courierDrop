@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import '../auth/auth_state.dart';
 import '../controllers/location_tracking_controller.dart';
+import '../utils/map_coordinates.dart';
 
 /**
  * Courier Dropoff Screen
@@ -34,7 +36,6 @@ class CourierDropoffScreen extends StatefulWidget {
 }
 
 class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
-  late GoogleMapController _mapController;
   bool _isAtLocation = false;
   bool _otpGenerated = false;
   String? _generatedOtp;
@@ -249,29 +250,46 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
             Container(
               height: 250,
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
-              child: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(widget.dropoffLat, widget.dropoffLng),
-                  zoom: 18,
+              child: FlutterMap(
+                options: MapOptions(
+                  initialCenter: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
+                  initialZoom: 18,
                 ),
-                onMapCreated: (controller) => _mapController = controller,
-                circles: {
-                  Circle(
-                    circleId: CircleId('delivery_gate'),
-                    center: LatLng(widget.dropoffLat, widget.dropoffLng),
-                    radius: widget.gateRadiusMeters,
-                    fillColor: Colors.green.withOpacity(0.2),
-                    strokeColor: Colors.green,
-                    strokeWidth: 2,
+                children: [
+                  TileLayer(
+                    urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    userAgentPackageName: "com.example.dropcity_courier",
+                    tileProvider: NetworkTileProvider(
+                      silenceExceptions: true,
+                      cachingProvider: BuiltInMapCachingProvider.getOrCreateInstance(
+                        maxCacheSize: 250000000,
+                        overrideFreshAge: const Duration(days: 7),
+                      ),
+                    ),
                   ),
-                },
-                markers: {
-                  Marker(
-                    markerId: const MarkerId('delivery'),
-                    position: LatLng(widget.dropoffLat, widget.dropoffLng),
-                    infoWindow: const InfoWindow(title: 'Delivery Location'),
+                  CircleLayer(
+                    circles: [
+                      CircleMarker(
+                        point: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
+                        radius: widget.gateRadiusMeters,
+                        useRadiusInMeter: true,
+                        color: Colors.green.withOpacity(0.2),
+                        borderColor: Colors.green,
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
                   ),
-                },
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
+                        width: 40,
+                        height: 40,
+                        child: const Icon(Icons.location_on, color: Colors.green, size: 36),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 24),

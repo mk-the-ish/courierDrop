@@ -19,6 +19,7 @@ import "screens/auth/welcome_screen.dart";
 import "screens/home_screen.dart";
 import "screens/navigation_hub_screen.dart";
 import "services/courier_tracking_service.dart";
+import "services/route_start_reminder_service.dart";
 import "theme.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
@@ -128,6 +129,7 @@ class _DropCityCourierAppState extends State<DropCityCourierApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreSession();
       _initPushNotifications();
+      _syncTrackingService();
 
       // High-performance operational state checking (PDC Architecture)
       _trackingStateTimer = Timer.periodic(
@@ -235,6 +237,8 @@ class _DropCityCourierAppState extends State<DropCityCourierApp>
     }
     try {
       final state = await widget.authState.apiClient.getCourierServiceState();
+      final routes = await widget.authState.apiClient.getCourierRoutes();
+      await RouteStartReminderService.instance.notifyIfDue(routes);
       final shouldRun = (state["state"]?.toString() ?? "") == "TRAVELLING";
       
       if (shouldRun == _trackingExpected) {
@@ -254,8 +258,15 @@ class _DropCityCourierAppState extends State<DropCityCourierApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _syncTrackingService();
+    switch (state) {
+      case AppLifecycleState.resumed:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+        _syncTrackingService();
+        break;
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        break;
     }
   }
 

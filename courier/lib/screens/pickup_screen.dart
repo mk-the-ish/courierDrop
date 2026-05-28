@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../auth/auth_state.dart';
 import '../controllers/location_tracking_controller.dart';
+import '../utils/map_coordinates.dart';
 
 /**
  * Pickup Screen
@@ -31,7 +33,6 @@ class PickupScreen extends StatefulWidget {
 }
 
 class _PickupScreenState extends State<PickupScreen> {
-  late GoogleMapController _mapController;
   bool _isVerifying = false;
   bool _gpsInRange = false;
   bool _pinConfirmed = false;
@@ -171,30 +172,47 @@ class _PickupScreenState extends State<PickupScreen> {
             Container(
               height: 250,
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
-              child: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(widget.checkpointLat, widget.checkpointLng),
-                  zoom: 18,
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: normalizeLatLng(LatLng(widget.checkpointLat, widget.checkpointLng)),
+                    initialZoom: 18,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                      userAgentPackageName: "com.example.dropcity_courier",
+                      tileProvider: NetworkTileProvider(
+                        silenceExceptions: true,
+                        cachingProvider: BuiltInMapCachingProvider.getOrCreateInstance(
+                          maxCacheSize: 250000000,
+                          overrideFreshAge: const Duration(days: 7),
+                        ),
+                      ),
+                    ),
+                    CircleLayer(
+                      circles: [
+                        CircleMarker(
+                          point: normalizeLatLng(LatLng(widget.checkpointLat, widget.checkpointLng)),
+                          radius: widget.gateRadiusMeters,
+                          useRadiusInMeter: true,
+                          color: Colors.blue.withOpacity(0.2),
+                          borderColor: Colors.blue,
+                          borderStrokeWidth: 2,
+                        ),
+                      ],
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: normalizeLatLng(LatLng(widget.checkpointLat, widget.checkpointLng)),
+                          width: 40,
+                          height: 40,
+                          child: const Icon(Icons.location_on, color: Colors.blue, size: 36),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                onMapCreated: (controller) => _mapController = controller,
-                circles: {
-                  Circle(
-                    circleId: CircleId('gate'),
-                    center: LatLng(widget.checkpointLat, widget.checkpointLng),
-                    radius: widget.gateRadiusMeters,
-                    fillColor: Colors.blue.withOpacity(0.2),
-                    strokeColor: Colors.blue,
-                    strokeWidth: 2,
-                  ),
-                },
-                markers: {
-                  Marker(
-                    markerId: const MarkerId('checkpoint'),
-                    position: LatLng(widget.checkpointLat, widget.checkpointLng),
-                    infoWindow: const InfoWindow(title: 'Pickup Gate'),
-                  ),
-                },
-              ),
             ),
             const SizedBox(height: 24),
 
