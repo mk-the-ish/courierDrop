@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node src/index.js",
     "start": "node src/index.js",
-    "watchdog:heartbeats": "node src/jobs/heartbeat_watchdog.js"
+    "watchdog:heartbeats": "node src/jobs/heartbeat_watchdog.js",
+    "seed:harare-demo": "node scripts/seed_harare_demo.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

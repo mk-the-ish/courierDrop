@@ -133,7 +133,9 @@ class DeliveryCreationController extends ChangeNotifier {
       );
       matchedCorridors = matches;
       if (matches.isNotEmpty) {
-        selectedCorridorId = matches.first["corridorId"]?.toString();
+        selectedCorridorId =
+            (matches.first["corridorId"] ?? matches.first["corridor_id"])
+                ?.toString();
         final rec = matches.first["recommendedPrice"];
         if (rec is num) {
           recommendedPrice = rec.toDouble();

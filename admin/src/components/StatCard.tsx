@@ -19,28 +19,28 @@ export default function StatCard({
   color = 'teal',
 }: StatCardProps) {
   const colorMap = {
-    teal: 'bg-transit-teal/10 text-transit-teal',
-    slate: 'bg-safe-slate/10 text-safe-slate',
-    amber: 'bg-alert-amber/10 text-alert-amber',
-    green: 'bg-green-100 text-green-600',
-    red: 'bg-red-100 text-red-600',
+    teal: 'bg-transit-teal/15 text-teal-300 border border-transit-teal/25',
+    slate: 'bg-white/8 text-slate-200 border border-white/10',
+    amber: 'bg-orange-accent/15 text-orange-300 border border-orange-accent/30',
+    green: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25',
+    red: 'bg-rose-500/15 text-rose-300 border border-rose-500/25',
   };
 
   return (
-    <div className="card p-6">
-      <div className="flex items-start justify-between">
+    <div className="bento-card p-5">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-gray-600 text-sm font-medium">{title}</p>
-          <p className="text-3xl font-bold text-safe-slate mt-2">{value}</p>
-          {description && <p className="text-xs text-gray-500 mt-2">{description}</p>}
+          <p className="micro-label">{title}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-50">{value}</p>
+          {description && <p className="mt-2 text-xs text-slate-400">{description}</p>}
           {trend !== undefined && (
-            <p className={`text-sm mt-2 ${trend > 0 ? 'text-heartbeat-active' : 'text-heartbeat-alert'}`}>
+            <p className={`mt-3 text-sm font-medium ${trend > 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
               {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
             </p>
           )}
         </div>
         {Icon && (
-          <div className={`p-3 rounded-lg ${colorMap[color]}`}>
+          <div className={`rounded-xl border px-3 py-3 ${colorMap[color]}`}>
             <Icon size={24} />
           </div>
         )}

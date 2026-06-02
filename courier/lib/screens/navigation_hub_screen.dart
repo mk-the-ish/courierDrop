@@ -44,32 +44,45 @@ class _NavigationHubScreenState extends State<NavigationHubScreen> {
       onWillPop: () async => false,
       child: Scaffold(
         body: _screens[_selectedIndex],
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onNavTapped,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.grey[900],
-          elevation: 8,
-          selectedItemColor: dropCityOrangeAccent,
-          unselectedItemColor: dropCityTextGrey,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: "Home",
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: Color(0x224B5563))),
+            color: dropCityObsidianDeep,
+          ),
+          child: SafeArea(
+            top: false,
+            child: BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: _onNavTapped,
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: dropCityObsidianDeep,
+              elevation: 0,
+              selectedItemColor: dropCityOrangeAccent,
+              unselectedItemColor: dropCityTextGrey,
+              showSelectedLabels: true,
+              showUnselectedLabels: true,
+              selectedFontSize: 12,
+              unselectedFontSize: 12,
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: "Home",
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.local_shipping),
+                  label: "Parcels",
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.route),
+                  label: "Routes",
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.settings),
+                  label: "Settings",
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.local_shipping),
-              label: "Parcels",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.route),
-              label: "Routes",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: "Settings",
-            ),
-          ],
+          ),
         ),
       ),
     );

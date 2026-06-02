@@ -1,0 +1,784 @@
+{
+  "paragraphs": [
+    {
+      "i": 0,
+      "style": "Heading 1",
+      "text": "CHAPTER 3: RESEARCH METHODOLOGY AND TECHNICAL DESIGN"
+    },
+    {
+      "i": 1,
+      "style": "Normal",
+      "text": "This chapter establishes the epistemological and procedural framework that governed the design, implementation, and evaluation of the DropCity platform. It opens by justifying the selection of the Agile-Scrum lifecycle augmented with the Spiral Risk Model \u2014 the specific combination demanded by a project that integrates novel spatial algorithms, cryptographic security protocols, and distributed mobile architecture. It then progresses into the primary academic contribution of this chapter: the for"
+    },
+    {
+      "i": 2,
+      "style": "Heading 2",
+      "text": "3.1  Introduction"
+    },
+    {
+      "i": 3,
+      "style": "Normal",
+      "text": "Research methodology in a software engineering capstone dissertation fulfils a dual purpose. It must be sufficiently rigorous to satisfy the epistemological standards of academic enquiry \u2014 defining what constitutes valid evidence, how hypotheses are tested, and how results are interpreted. Simultaneously, it must be pragmatically structured to guide the actual development of a working system against real-world constraints of time, hardware availability, and network infrastructure. DropCity's met"
+    },
+    {
+      "i": 4,
+      "style": "Heading 2",
+      "text": "3.2  Lifecycle Model: Agile-Scrum with Spiral Risk Augmentation"
+    },
+    {
+      "i": 5,
+      "style": "Heading 3",
+      "text": "3.2.1  Why Agile-Scrum?"
+    },
+    {
+      "i": 6,
+      "style": "Normal",
+      "text": "The Agile-Scrum framework was selected as the primary development lifecycle model for DropCity because the project's technical scope is characterised by high novelty and iterative refinement requirements. The Zero-Detour Corridor Matching algorithm, the Three-Way Handshake security protocol, and the Asynchronous Request Queue synchronisation engine each represent genuinely novel implementations for the Harare urban logistics context \u2014 none could be fully specified in a static requirements docume"
+    },
+    {
+      "i": 7,
+      "style": "Normal",
+      "text": "The Scrum ceremonies \u2014 Sprint Planning, Daily Standups, Sprint Review, and Retrospective \u2014 provided a structured cadence for managing the project's four major components (Client App, Courier App, Admin Console, and Backend API) in parallel without introducing integration debt. User stories were written from the perspective of the three primary actors \u2014 Client, Courier, and Administrator \u2014 ensuring that each Sprint delivered functionality that could be evaluated against a concrete human workflow "
+    },
+    {
+      "i": 8,
+      "style": "Heading 3",
+      "text": "3.2.2  Why Spiral Risk Model Augmentation?"
+    },
+    {
+      "i": 9,
+      "style": "Normal",
+      "text": "The Spiral Risk Model was selected as an augmenting framework specifically to manage the two categories of risk that are inadequately handled by standard Scrum: spatial algorithm risk and security protocol risk. The Spiral Model structures development as a series of concentric spirals, each beginning with risk identification and analysis before proceeding to implementation. For DropCity, the two dominant risk items were: (1) the computational correctness of the PostGIS spatial containment predic"
+    },
+    {
+      "i": 10,
+      "style": "Normal",
+      "text": "Each of these risks was evaluated in a dedicated risk-resolution prototype cycle before the corresponding production module was built. The spatial matching prototype was tested against a manually computed set of known pickup/dropoff coordinates and their ground-truth corridor assignments. The 3WH prototype was tested against a simulated PIN injection attack. Only after both prototypes demonstrated satisfactory risk mitigation did the project advance to full production implementation."
+    },
+    {
+      "i": 11,
+      "style": "Normal",
+      "text": "Figure 3.1: The DropCity hybrid lifecycle \u2014 Agile-Scrum Sprints (left) augmented by two Spiral Risk cycles (right). The Spiral cycles interrupt the normal Sprint cadence at points of highest algorithmic and security uncertainty, requiring empirical risk resolution before production implementation proceeds."
+    },
+    {
+      "i": 12,
+      "style": "Normal",
+      "text": "Figure 3.1 illustrates that the Spiral augmentation is not a wholesale adoption of the Spiral Model but a targeted insertion at the two moments of maximum risk in the project timeline. Outside these risk cycles, the project operated on the faster, more pragmatic Scrum cadence appropriate for routine feature development."
+    },
+    {
+      "i": 13,
+      "style": "Heading 2",
+      "text": "3.3  Data Gathering Methods"
+    },
+    {
+      "i": 14,
+      "style": "Heading 3",
+      "text": "3.3.1  Semi-Structured Stakeholder Interviews"
+    },
+    {
+      "i": 15,
+      "style": "Normal",
+      "text": "Semi-structured interviews were conducted with eight participants across two stakeholder groups: four informal Kombi operators (couriers) and four regular parcel senders (clients). Interview sessions lasted 30 to 45 minutes and were conducted in English and Shona as appropriate to the participant. Interview questions explored: willingness to deviate from declared routes (couriers); maximum acceptable wait time at a Virtual Interchange (clients); trust concerns about handing a parcel to an unknow"
+    },
+    {
+      "i": 16,
+      "style": "Heading 3",
+      "text": "3.3.2  Route Observation and Spatial Mapping"
+    },
+    {
+      "i": 17,
+      "style": "Normal",
+      "text": "Physical route observation was conducted along three primary corridors: Chitungwiza\u2013CBD, CBD\u2013University of Zimbabwe (Mt Pleasant), and CBD\u2013Avondale\u2013Belgravia. The researcher rode each route in a Kombi, recording GPS traces using a test device running the DropCity courier application. Observation sessions documented: typical stopping points and dwell times; locations of cellular dead zones (identified by HTTP failure events in the ARQ log); natural roadside interchange points where package handov"
+    },
+    {
+      "i": 18,
+      "style": "Heading 3",
+      "text": "3.3.3  Quantitative System Metrics Collection"
+    },
+    {
+      "i": 19,
+      "style": "Normal",
+      "text": "During the pilot study (detailed in Chapter 5), the production system automatically logged four categories of quantitative metrics: matching latency (time from POST /matches/corridors request to ranked corridor list response); geofence accuracy (distance between the courier's reported GPS coordinate and the Virtual Interchange point at the moment of handshake attempt); ARQ synchronisation fidelity (percentage of offline-buffered records successfully replayed to the server in correct sequence); a"
+    },
+    {
+      "i": 20,
+      "style": "Heading 2",
+      "text": "3.4  Formal Mathematical Derivations"
+    },
+    {
+      "i": 21,
+      "style": "Normal",
+      "text": "This section derives the three core algorithmic formulations of the DropCity platform from first principles. All formulations are presented in formal notation and mapped to their corresponding PostGIS and application-layer implementations."
+    },
+    {
+      "i": 22,
+      "style": "Heading 3",
+      "text": "3.4.1  Zero-Detour Corridor Matching Algorithm"
+    },
+    {
+      "i": 23,
+      "style": "Normal",
+      "text": "Let the courier's declared route be represented as a spatial LineString R \u2014 a sequence of geographic coordinate pairs that describe the geometric path of the courier's intended journey from departure point to destination. Let the parcel's pickup coordinate be L_p and the dropoff coordinate be L_d, both represented as GEOGRAPHY(Point, 4326) in the WGS 84 coordinate reference system."
+    },
+    {
+      "i": 24,
+      "style": "Normal",
+      "text": "Define the spatial buffer corridor C(R, W) as the set of all points in geographic space whose geodesic distance from any point on R is at most W metres, where W is the configurable corridor buffer width (default: 500 metres):"
+    },
+    {
+      "i": 25,
+      "style": "Normal",
+      "text": "C(R, W) = { x \u2208 \u211d\u00b2 | \u2203 y \u2208 R, dist(x, y) \u2264 W }"
+    },
+    {
+      "i": 26,
+      "style": "Normal",
+      "text": "This corridor is the PostGIS geography type's implicit model when the ST_DWithin function is evaluated with a metre-valued distance threshold on GEOGRAPHY columns. A parcel is a candidate for matching if and only if both its pickup point and its dropoff point lie within the corridor:"
+    },
+    {
+      "i": 27,
+      "style": "Normal",
+      "text": "ST_DWithin(R::geography, L_p::geography, W) = TRUE    ... (Condition 1: Pickup Within Corridor)"
+    },
+    {
+      "i": 28,
+      "style": "Normal",
+      "text": "ST_DWithin(R::geography, L_d::geography, W) = TRUE    ... (Condition 2: Dropoff Within Corridor)"
+    },
+    {
+      "i": 29,
+      "style": "Normal",
+      "text": "Spatial containment alone is insufficient: the courier must traverse the pickup location before the dropoff location along the direction of travel. Define the fractional arc-length position function f(R, P) as the result of ST_LineLocatePoint(R, P), which returns a scalar in [0, 1] representing the proportional distance along R from its start point to the orthogonal projection of P onto R. Directional validity is enforced by:"
+    },
+    {
+      "i": 30,
+      "style": "Normal",
+      "text": "f(R, L_p) < f(R, L_d)    ... (Condition 3: Directional Validity)"
+    },
+    {
+      "i": 31,
+      "style": "Normal",
+      "text": "A parcel is eligible for algorithmic matching if and only if all three conditions hold simultaneously. The complete matching predicate is:"
+    },
+    {
+      "i": 32,
+      "style": "Normal",
+      "text": "Match(R, L_p, L_d, W) \u2261 [C1 \u2227 C2 \u2227 C3]"
+    },
+    {
+      "i": 33,
+      "style": "Normal",
+      "text": "\u2261 ST_DWithin(R, L_p, W) \u2227 ST_DWithin(R, L_d, W) \u2227 f(R, L_p) < f(R, L_d)"
+    },
+    {
+      "i": 34,
+      "style": "Normal",
+      "text": "The Virtual Interchange coordinates \u2014 the roadside handover points \u2014 are generated by orthogonal projection. The Virtual Pickup point V_p and Virtual Dropoff point V_d are the closest points on the route LineString to L_p and L_d respectively:"
+    },
+    {
+      "i": 35,
+      "style": "Normal",
+      "text": "V_p = ST_ClosestPoint(R, L_p)    ... (Virtual Pickup Interchange)"
+    },
+    {
+      "i": 36,
+      "style": "Normal",
+      "text": "V_d = ST_ClosestPoint(R, L_d)    ... (Virtual Dropoff Interchange)"
+    },
+    {
+      "i": 37,
+      "style": "Normal",
+      "text": "These projections guarantee that the handover points lie exactly on the courier's route \u2014 on the road surface, accessible from a vehicle window \u2014 rather than at the client's actual location, which may be off-road or inaccessible without a detour. The detour imposed on the courier by accepting the delivery is therefore identically zero: the courier passes through V_p and V_d as natural waypoints on their existing journey."
+    },
+    {
+      "i": 38,
+      "style": "Normal",
+      "text": "The following PostGIS stored function implements this complete three-predicate matching logic as a single SQL query, benefiting from the GiST index on the corridor_line column for sub-second execution:"
+    },
+    {
+      "i": 39,
+      "style": "Normal",
+      "text": "Code Block 3.1: The match_delivery_to_couriers PostGIS stored function. The GiST index on corridor_line ensures that the ST_DWithin predicates execute via index-assisted lookup rather than full table scan, achieving sub-second latency regardless of fleet size."
+    },
+    {
+      "i": 40,
+      "style": "Normal",
+      "text": "Figure 3.2: The complete Zero-Detour Matching pipeline. A parcel advances to the matched candidate set only when all three predicates \u2014 pickup containment (C1), dropoff containment (C2), and directional validity (C3) \u2014 are simultaneously satisfied. Virtual Interchange coordinates V_p and V_d are generated by orthogonal projection upon a successful match."
+    },
+    {
+      "i": 41,
+      "style": "Heading 3",
+      "text": "3.4.2  Dynamic Passenger-Proxy Pricing Model"
+    },
+    {
+      "i": 42,
+      "style": "Normal",
+      "text": "DropCity's pricing philosophy is grounded in a specific socio-economic reality: in Harare's informal commuter economy, the psychological price anchor for any in-vehicle service is the standard Kombi passenger fare. A delivery that costs significantly more than a passenger seat will be rejected as economically irrational by the sender, whilst a delivery priced below the marginal cost of the courier's route overlap represents revenue capture failure. The Passenger-Proxy model pegs the recommended "
+    },
+    {
+      "i": 43,
+      "style": "Normal",
+      "text": "Let F_base be the standard passenger fare for the matched corridor, retrieved from the base_fares lookup table seeded with empirically observed Harare route fares. The recommended delivery fare R_fare is defined as:"
+    },
+    {
+      "i": 44,
+      "style": "Normal",
+      "text": "R_fare = F_base \u00d7 \u03b1_size \u00d7 \u03b2_distance \u00d7 \u03b3_urgency,  subject to: R_fare \u2264 W_max"
+    },
+    {
+      "i": 45,
+      "style": "Normal",
+      "text": "Where each multiplicative factor is defined as follows:"
+    },
+    {
+      "i": 46,
+      "style": "Normal",
+      "text": "Table 3.1: Parameters of the Dynamic Passenger-Proxy Pricing Model. Each parameter is independently adjustable via the system_settings table, allowing the administrator to recalibrate the model as Harare's base fare structure evolves."
+    },
+    {
+      "i": 47,
+      "style": "Normal",
+      "text": "The Willingness-to-Pay cap W_max ensures that the pricing model remains economically rational for clients under all combinations of size, distance, and urgency. No recommended price will exceed the cost of self-delivery by a factor greater than three \u2014 the empirically observed threshold beyond which interview participants indicated they would abandon the platform and transport the item themselves."
+    },
+    {
+      "i": 48,
+      "style": "Normal",
+      "text": "The base_fares table, seeded from observed Harare route fares, provides the F_base values for all major corridors. For example, the CBD-to-University of Zimbabwe corridor has a documented base passenger fare of USD 1.50, giving a recommended price of USD 0.75 for a Small, Standard, short-overlap delivery, rising to USD 7.20 for a Large, Urgent, full-corridor delivery \u2014 still below the W_max cap of USD 4.50 for this corridor. Where the formula output exceeds W_max, the recommended price is clampe"
+    },
+    {
+      "i": 49,
+      "style": "Normal",
+      "text": "Figure 3.3: Passenger-Proxy Pricing model sensitivity surface. The alertAmber horizontal plane represents the W_max cap (3\u00d7 base fare). All recommended prices are constrained below this ceiling, ensuring economic rationality for clients relative to the self-delivery benchmark."
+    },
+    {
+      "i": 50,
+      "style": "Heading 3",
+      "text": "3.4.3  Weighted Courier Reputation Scoring Function"
+    },
+    {
+      "i": 51,
+      "style": "Normal",
+      "text": "Standard star-rating systems are inadequate for a logistics platform because they capture only subjective satisfaction \u2014 a courier who is always pleasant but frequently deviates from their declared route would maintain a high star rating whilst creating systemic tracking and safety risks. DropCity replaces the primitive star rating with a Weighted Composite Score S_courier that aggregates four operational dimensions into a single normalised scalar:"
+    },
+    {
+      "i": 52,
+      "style": "Normal",
+      "text": "S_courier = (0.40 \u00d7 R_avg) + (0.30 \u00d7 A_route) + (0.20 \u00d7 P_time) + (0.10 \u00d7 log(1 + N_trips)) \u2212 \u0394_penalty"
+    },
+    {
+      "i": 53,
+      "style": "Normal",
+      "text": "Where each component is defined as:"
+    },
+    {
+      "i": 54,
+      "style": "Normal",
+      "text": "Table 3.2: Components of the Weighted Courier Reputation Scoring function. The 0.40/0.30/0.20/0.10 weight distribution prioritises client satisfaction (R_avg) and spatial integrity (A_route) over punctuality and tenure, reflecting the platform's core value proposition of route fidelity."
+    },
+    {
+      "i": 55,
+      "style": "Normal",
+      "text": "The composite score is recomputed by a background batch job at the conclusion of each delivery and stored as courier_score in the users table, with a courier_score_updated_at timestamp. The score is displayed to administrators in the courier management panel and is used as a secondary ranking signal in the matching algorithm \u2014 amongst couriers whose corridors equally satisfy the three matching conditions, those with higher S_courier scores are presented first in the offer queue."
+    },
+    {
+      "i": 56,
+      "style": "Normal",
+      "text": "Final Ranking Score = Match(R, L_p, L_d, W) \u2192 sort by [pickup_fraction, S_courier DESC]"
+    },
+    {
+      "i": 57,
+      "style": "Normal",
+      "text": "Figure 3.4: Courier reputation scoring. The radar chart (left) demonstrates that the composite score penalises route deviation (A_route) even when client ratings (R_avg) are high \u2014 a key differentiator from primitive star-rating systems. The evolution graph (right) shows the score's trajectory over 50 deliveries, including the visible impact of three administrative penalty events."
+    },
+    {
+      "i": 58,
+      "style": "Heading 2",
+      "text": "3.5  Watchdog Heartbeat Architecture"
+    },
+    {
+      "i": 59,
+      "style": "Heading 3",
+      "text": "3.5.1  The Process Cluster Monitoring Problem"
+    },
+    {
+      "i": 60,
+      "style": "Normal",
+      "text": "The DropCity backend operates four background worker processes in addition to the main Express API server: the Corridor Matcher (periodically evaluating pending parcels against active corridors), the Notification Outbox Processor (dispatching in-app push notifications), the ETA Recalculation Service (updating delivery time estimates as courier progress data arrives), and the Route Deviation Detector (running heuristic sweeps on tracking logs to identify off-corridor events). Each of these worker"
+    },
+    {
+      "i": 61,
+      "style": "Normal",
+      "text": "The Watchdog Heartbeat system is a stateless monitoring layer that detects stalled workers and alerts the administrator before the stall propagates into user-facing failures such as unmatched parcels or undelivered notifications."
+    },
+    {
+      "i": 62,
+      "style": "Heading 3",
+      "text": "3.5.2  The Heartbeat State Machine"
+    },
+    {
+      "i": 63,
+      "style": "Normal",
+      "text": "Each background worker is registered in the job_heartbeats table with three fields: job_name (unique identifier), expected_frequency_sec (the maximum acceptable interval between heartbeat pulses), and status (the current health state). The status field is constrained to three values:"
+    },
+    {
+      "i": 64,
+      "style": "Normal",
+      "text": "Table 3.3: The three-state Watchdog Heartbeat state machine. The INACTIVE_CLEAN state is the critical innovation \u2014 it allows planned maintenance shutdowns to be distinguished from unplanned stalls without requiring the watchdog to possess foreknowledge of the maintenance schedule."
+    },
+    {
+      "i": 65,
+      "style": "Normal",
+      "text": "Figure 3.5: Watchdog Heartbeat state machine (left) and detection sequence (right). The 2\u00d7 expected frequency threshold prevents transient network latency from triggering false STUCK alerts, whilst the INACTIVE_CLEAN intercept ensures planned maintenance does not generate operational noise."
+    },
+    {
+      "i": 66,
+      "style": "Heading 2",
+      "text": "3.6  Tools and Technologies"
+    },
+    {
+      "i": 67,
+      "style": "Normal",
+      "text": "Table 3.4 documents the complete technology stack employed in the DropCity platform, with explicit justification for each selection grounded in the project's technical requirements."
+    },
+    {
+      "i": 68,
+      "style": "Normal",
+      "text": "Table 3.4: DropCity technology stack with per-layer technical justification. All selected tools are open-source, production-grade, and free-tier compatible for the pilot deployment budget of USD 90 documented in Chapter 1."
+    },
+    {
+      "i": 69,
+      "style": "Heading 2",
+      "text": "3.7  Functional and Non-Functional Requirements"
+    },
+    {
+      "i": 70,
+      "style": "Heading 3",
+      "text": "3.7.1  Functional Requirements"
+    },
+    {
+      "i": 71,
+      "style": "Normal",
+      "text": "The following functional requirements govern the system's operational scope. Each requirement is traceable to a specific research objective."
+    },
+    {
+      "i": 72,
+      "style": "List Paragraph",
+      "text": "FR-01 (O1): The system shall execute the Zero-Detour Corridor Matching algorithm upon parcel creation, evaluating all ACTIVE and PLANNED corridors against the three-predicate matching function and returning a ranked list of candidate couriers within 5 seconds of request submission."
+    },
+    {
+      "i": 73,
+      "style": "List Paragraph",
+      "text": "FR-02 (O1): The system shall generate Virtual Interchange coordinates V_p and V_d via ST_ClosestPoint projection for all matched parcel-corridor pairs, storing these as virtual_pickup and virtual_dropoff in the parcels table."
+    },
+    {
+      "i": 74,
+      "style": "List Paragraph",
+      "text": "FR-03 (O2): The system shall enforce the Three-Way Handshake protocol at both pickup and dropoff: simultaneously verifying GPS proximity (ST_DWithin \u2264 50 metres), SHA-256 PIN hash match, and photographic evidence upload before transitioning parcel status."
+    },
+    {
+      "i": 75,
+      "style": "List Paragraph",
+      "text": "FR-04 (O2): The system shall generate two cryptographically independent SHA-256 hashed one-time PINs per parcel at creation time, communicating plaintext values to client and recipient via in-app notification without transmitting them to the courier."
+    },
+    {
+      "i": 76,
+      "style": "List Paragraph",
+      "text": "FR-05 (O3): The system shall generate three geofenced progress checkpoints per parcel path and broadcast only scalar progress percentages to client Firestore subscriptions, never exposing raw courier GPS coordinates to the client application."
+    },
+    {
+      "i": 77,
+      "style": "List Paragraph",
+      "text": "FR-06 (O4): The courier application shall buffer all failed location updates and handshake events in the local SQLite outbox table with is_synced = 0, and initiate FIFO-sequenced synchronisation via POST /tracking/batch-sync upon network restoration."
+    },
+    {
+      "i": 78,
+      "style": "List Paragraph",
+      "text": "FR-07 (O5): The system shall log device model, network provider, GPS coordinates, and failure duration to the connectivity_map table for each ARQ-buffered network failure event, enabling administrator-visible connectivity heatmap construction."
+    },
+    {
+      "i": 79,
+      "style": "List Paragraph",
+      "text": "FR-08 (O5): The backend watchdog shall evaluate all job_heartbeats records every 30 seconds, flagging any process whose last_heartbeat_at exceeds 2 \u00d7 expected_frequency_sec as STUCK and triggering an alert rule."
+    },
+    {
+      "i": 80,
+      "style": "Heading 3",
+      "text": "3.7.2  Non-Functional Requirements"
+    },
+    {
+      "i": 81,
+      "style": "Normal",
+      "text": "Table 3.5: Non-Functional Requirements with acceptance criteria. NFR-02 is flagged with a STAT CHECK annotation \u2014 the 99.9% target must be validated against pilot ARQ synchronisation logs before final submission."
+    },
+    {
+      "i": 82,
+      "style": "Heading 2",
+      "text": "3.8  System Architecture Design"
+    },
+    {
+      "i": 83,
+      "style": "Normal",
+      "text": "The DropCity platform is a distributed system comprising four primary compute nodes \u2014 the Client Flutter Application, the Courier Flutter Application, the Next.js Admin Console, and the Node.js/Express API Gateway \u2014 communicating over HTTPS and WebSocket channels. The API Gateway mediates all business logic and database access; no mobile client holds a direct database connection. This separation of concerns ensures that the PostGIS matching logic, the SHA-256 handshake verification, and the watc"
+    },
+    {
+      "i": 84,
+      "style": "Normal",
+      "text": "Figure 3.6: DropCity complete four-tier distributed system architecture. The separation of mobile clients (Tier 1) from business logic (Tier 2 + 3) and persistence (Tier 4) ensures that all security-critical operations \u2014 PIN hashing, spatial matching, and heartbeat evaluation \u2014 execute server-side. The offline SQLite bubble represents the fifth distributed node: the courier's device operating in infrastructure-agnostic autonomous mode during connectivity loss."
+    },
+    {
+      "i": 85,
+      "style": "Normal",
+      "text": "The architectural separation between Supabase PostgreSQL (structured spatial and transactional data) and Firebase Firestore (real-time unstructured event data) reflects a deliberate design decision. PostgreSQL's ACID transaction guarantees ensure that parcel status transitions (such as REQUESTED \u2192 IN_TRANSIT upon a successful handshake) are atomic and durable. Firestore's real-time listeners provide the low-latency broadcast channel that delivers progress percentage updates to client application"
+    },
+    {
+      "i": 86,
+      "style": "Heading 2",
+      "text": "3.9  Conclusion"
+    },
+    {
+      "i": 87,
+      "style": "Normal",
+      "text": "This chapter has established the complete methodological and technical design foundation of the DropCity platform. The Agile-Scrum lifecycle, augmented with targeted Spiral Risk cycles at the two points of highest algorithmic and security uncertainty, provided the governance framework for a fourteen-week development programme. The three formal mathematical derivations \u2014 the Zero-Detour Corridor Matching predicate, the Dynamic Passenger-Proxy Pricing formula, and the Weighted Courier Reputation s"
+    },
+    {
+      "i": 88,
+      "style": "Normal",
+      "text": "The tools, technologies, and architectural decisions documented in this chapter are not arbitrary choices: each is grounded in a specific technical requirement traceable to one of the five research objectives. The functional and non-functional requirement tables in Sections 3.7.1 and 3.7.2 provide the acceptance criteria against which Chapter 5's implementation results will be evaluated. The system architecture diagram in Figure 3.6 establishes the structural reference model for the implementati"
+    },
+    {
+      "i": 90,
+      "style": "Normal",
+      "text": "References"
+    },
+    {
+      "i": 91,
+      "style": "Normal",
+      "text": "Chen, S. and Zhang, H. (2023) 'Monetary and non-monetary incentives in crowdshipping', Transportation Research Part B: Methodological, 172, pp. 1\u201320."
+    },
+    {
+      "i": 92,
+      "style": "Normal",
+      "text": "IBM Developer (2024) Offline data synchronization strategies. Available at: developer.ibm.com (Accessed: 4 November 2025)."
+    },
+    {
+      "i": 93,
+      "style": "Normal",
+      "text": "Intellisoft (2024) Data Synchronization in Logistics: Setting Offline Sync Up. Available at: intellisoft.io (Accessed: 4 November 2025)."
+    },
+    {
+      "i": 94,
+      "style": "Normal",
+      "text": "Li, W. and Wei, C. (2023) 'The impact of detour constraints on crowdsourced courier participation', Journal of Transportation Engineering, 149(11), p. 04023075."
+    },
+    {
+      "i": 95,
+      "style": "Normal",
+      "text": "Ncube, P. (2022) 'R-tree spatial indexing for real-time urban logistics systems', IEEE Transactions on Intelligent Transportation Systems, 12(3), pp. 110\u2013125."
+    },
+    {
+      "i": 96,
+      "style": "Normal",
+      "text": "Ndlovu, S. and Moyo, J. (2021) 'Digital transformation of the informal economy in Southern Africa', African Journal of Information Systems, 13(3), pp. 110\u2013128."
+    },
+    {
+      "i": 97,
+      "style": "Normal",
+      "text": "NIST (2015) FIPS PUB 180-4: Secure Hash Standard (SHS). Gaithersburg, MD: National Institute of Standards and Technology. [CITATION NEEDED: Verify NIST FIPS 180-4 publication year and URL]."
+    },
+    {
+      "i": 98,
+      "style": "Normal",
+      "text": "Romer, A. and Singh, B. (2022) 'The architecture of offline-first mobile apps', ACM Transactions on Computer-Human Interaction, 29(4), pp. 1\u201325."
+    }
+  ],
+  "tables": [
+    {
+      "i": 0,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: Agile-Scrum + Spiral Risk Model Hybrid \u2014 Project Lifecycle Diagram"
+        ],
+        [
+          "Visual Description:  | A dual-structure lifecycle diagram. Left section (Agile-Scrum): A vertical timeline of 7 two-week Sprints (Sprint 1 through Sprint 7). Sprint 1-2: Database schema and PostGIS se"
+        ]
+      ]
+    },
+    {
+      "i": 1,
+      "rows": [
+        [
+          "CREATE OR REPLACE FUNCTION match_delivery_to_couriers( |     p_origin      geography, |     p_destination geography, |     p_max_detour_m double precision DEFAULT 500 | ) | RETURNS TABLE ( |     corri"
+        ]
+      ]
+    },
+    {
+      "i": 2,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: Zero-Detour Matching \u2014 Complete Mathematical Pipeline Diagram"
+        ],
+        [
+          "Visual Description:  | A flowchart with five stages connected by arrows. Stage 1 (input): Two point markers \u2014 L_p (sender's location, green) and L_d (receiver's location, orange) \u2014 overlaid on a styli"
+        ]
+      ]
+    },
+    {
+      "i": 3,
+      "rows": [
+        [
+          "Parameter",
+          "Symbol",
+          "Definition",
+          "Values"
+        ],
+        [
+          "Size/Space Multiplier",
+          "\u03b1_size",
+          "Scales the base fare by the volumetric burden imposed on the courier's vehicle by the parcel category.",
+          "Small (S): 0.5x \u2014 envelope/document fits in door pocket. Medium (M): 1.0x \u2014 standard seat allocation. Large (L): 2.0x \u2014 occupies a full passenger seat."
+        ],
+        [
+          "Distance Coefficient",
+          "\u03b2_distance",
+          "Maps the fractional overlap of the parcel's trajectory (from pickup_fraction to dropoff_fraction) against the corridor's total length. A parcel that travels 80% of the corridor pays more than one trav",
+          "\u03b2_distance = (dropoff_fraction \u2212 pickup_fraction) \u00d7 corridor_length_km / base_distance_km. Normalised to [0.5, 2.0]."
+        ],
+        [
+          "Urgency Multiplier",
+          "\u03b3_urgency",
+          "Adjusts the base fare upward for same-hour delivery requests, compensating the courier for prioritisation above other pending parcels.",
+          "Standard (\u22652 hrs): 1.0x. Priority (1\u20132 hrs): 1.3x. Urgent (<1 hr): 1.6x."
+        ],
+        [
+          "Maximum Willingness-to-Pay Cap",
+          "W_max",
+          "Prevents the algorithm from recommending a price exceeding the cost of the client simply taking their own transport (the self-delivery benchmark). Set at 3\u00d7 the base fare.",
+          "W_max = 3.0 \u00d7 F_base"
+        ]
+      ]
+    },
+    {
+      "i": 4,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: Passenger-Proxy Pricing Model \u2014 Parameter Sensitivity Surface"
+        ],
+        [
+          "Visual Description:  | A 3D surface plot or a 2\u00d72 heatmap grid showing recommended price (R_fare in USD on the Z-axis or colour scale) as a function of two of the three primary parameters. Subplot 1: "
+        ]
+      ]
+    },
+    {
+      "i": 5,
+      "rows": [
+        [
+          "Component",
+          "Symbol",
+          "Weight",
+          "Definition and Measurement"
+        ],
+        [
+          "Average Handshake Rating",
+          "R_avg",
+          "0.40",
+          "Mean star rating (1\u20135 scale, normalised to 0\u2013100) submitted by clients at the completion of the Three-Way Handshake dropoff. Reflects the subjective service quality of the physical custody transfer."
+        ],
+        [
+          "Route Adherence Percentage",
+          "A_route",
+          "0.30",
+          "Percentage of tracking pulses during an active delivery that fall within the 500-metre corridor buffer, as computed by the route_adherence_reports background job. Penalises couriers who deviate from t"
+        ],
+        [
+          "Punctuality Score",
+          "P_time",
+          "0.20",
+          "Ratio of actual delivery time to declared ETA, capped at 1.0 for early or on-time deliveries and decaying linearly below 1.0 for late deliveries. P_time = min(1.0, declared_eta_minutes / actual_delive"
+        ],
+        [
+          "Tenure Trust (Trip Count)",
+          "log(1 + N_trips)",
+          "0.10",
+          "Logarithmic transformation of the total number of completed deliveries. The logarithmic form rewards early trip accumulation whilst preventing extremely high trip counts from dominating the score. A c"
+        ],
+        [
+          "Administrative Penalty Offset",
+          "\u0394_penalty",
+          "Variable",
+          "A flat deduction of 10 points applied for each validated incident manually flagged by the administrator \u2014 for example, a confirmed custodial dispute where photographic evidence demonstrates mishandlin"
+        ]
+      ]
+    },
+    {
+      "i": 6,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: Courier Reputation Score \u2014 Radar Chart and Score Evolution Graph"
+        ],
+        [
+          "Visual Description:  | Two-panel figure. Left panel (radar chart): A pentagonal radar chart with five axes \u2014 R_avg (Client Rating), A_route (Route Adherence), P_time (Punctuality), log(1+N) (Tenure Tr"
+        ]
+      ]
+    },
+    {
+      "i": 7,
+      "rows": [
+        [
+          "State",
+          "Trigger Condition",
+          "System Action"
+        ],
+        [
+          "ACTIVE",
+          "Worker successfully calls POST /heartbeat within the expected_frequency_sec interval.",
+          "No action. last_heartbeat_at updated. last_status_change_at preserved."
+        ],
+        [
+          "STUCK",
+          "Worker fails to call POST /heartbeat for two consecutive expected_frequency_sec intervals. The watchdog evaluates: NOW() - last_heartbeat_at > 2 \u00d7 expected_frequency_sec.",
+          "status updated to STUCK. Alert rule triggered. Webhook pushed to admin console. Admin notified via push notification."
+        ],
+        [
+          "INACTIVE_CLEAN",
+          "Before intentional shutdown, the worker calls POST /heartbeat with payload { status: 'INACTIVE_CLEAN' }, intercepting the SIGTERM signal.",
+          "status updated to INACTIVE_CLEAN. Watchdog suppresses alert. Worker may safely terminate without triggering false-positive STUCK detection."
+        ]
+      ]
+    },
+    {
+      "i": 8,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: Watchdog Heartbeat State Machine \u2014 Sequence and State Diagram"
+        ],
+        [
+          "Visual Description:  | Two-panel diagram. Left (UML state chart): Three state nodes \u2014 ACTIVE (transitTeal fill), STUCK (red fill), INACTIVE_CLEAN (grey fill). Transitions: ACTIVE \u2192 STUCK (labelled 'Mi"
+        ]
+      ]
+    },
+    {
+      "i": 9,
+      "rows": [
+        [
+          "Layer",
+          "Tool / Technology",
+          "Version / Config",
+          "Technical Justification"
+        ],
+        [
+          "Mobile Client (Client)",
+          "Flutter (Dart)",
+          "SDK 3.x, Android target API 33",
+          "Single-codebase native performance. Material 3 design system. Dart's strong typing prevents null-reference errors in complex handshake state flows."
+        ],
+        [
+          "Mobile Client (Courier)",
+          "Flutter + flutter_background_geolocation",
+          "stopOnTerminate: false, startOnBoot: true",
+          "Foreground service persistence ensures location capture survives app termination. Required for ARQ telemetry continuity through dead zones."
+        ],
+        [
+          "Admin Console",
+          "Next.js 14 (React, TypeScript)",
+          "App Router, Server Components",
+          "Server-side rendering provides fast initial page loads for data-heavy admin dashboards. TypeScript enforces type safety across 22 admin API endpoint integrations."
+        ],
+        [
+          "API Gateway",
+          "Node.js 18 + Express 4",
+          "Render cloud host, HTTPS enforced",
+          "Non-blocking I/O event loop handles high-concurrency tracking pulse ingestion. Express middleware chain enforces Firebase + Supabase dual-auth token verification."
+        ],
+        [
+          "Primary Database",
+          "PostgreSQL 15 + PostGIS 3.3",
+          "Supabase managed, EPSG:4326",
+          "PostGIS spatial extensions provide ST_DWithin, ST_LineLocatePoint, ST_ClosestPoint \u2014 the three functions constituting the matching algorithm core."
+        ],
+        [
+          "Real-Time Channel",
+          "Firebase Firestore",
+          "Client SDK 10.x",
+          "Pub/sub architecture broadcasts scalar progress percentages to client subscriptions without exposing raw courier coordinates. Offline persistence on client device."
+        ],
+        [
+          "Local Offline Cache",
+          "SQLite (via sqflite Flutter package)",
+          "WAL journal mode",
+          "Write-Ahead Logging ensures atomic outbox writes survive application crashes mid-journey. FIFO replay guaranteed by timestamp ORDER BY."
+        ]
+      ]
+    },
+    {
+      "i": 10,
+      "rows": [
+        [
+          "NFR ID",
+          "Quality Attribute",
+          "Requirement Statement",
+          "Acceptance Criterion"
+        ],
+        [
+          "NFR-01",
+          "Performance",
+          "The Zero-Detour Matching algorithm must return a ranked corridor list within 5 seconds of request submission under normal operating conditions.",
+          "95% of matching requests processed in \u2264 5 seconds, measured over 100 consecutive requests during the pilot evaluation."
+        ],
+        [
+          "NFR-02",
+          "Reliability",
+          "The ARQ synchronisation module must achieve a data integrity rate of \u2265 99.9% \u2014 meaning no more than 0.1% of offline-buffered location pings are lost or mis-sequenced upon reconnection.",
+          "[STAT CHECK: 99.9%] \u2014 validate against pilot ARQ logs: count(successfully_synced) / count(total_buffered) \u00d7 100."
+        ],
+        [
+          "NFR-03",
+          "Security",
+          "All communication between mobile applications and the backend API must be encrypted via HTTPS/TLS 1.3. All user passwords are managed exclusively by Firebase Authentication; the backend never stores p",
+          "TLS enforced at Render hosting layer. Firebase Auth token verification present on all protected routes. Verified via HTTP header inspection."
+        ],
+        [
+          "NFR-04",
+          "Security",
+          "SHA-256 PIN hashes stored in the database must be irreversible \u2014 no endpoint shall expose the plaintext PIN after the initial in-app notification delivery.",
+          "Code review confirms no SELECT query returns pickup_pin_hash or dropoff_pin_hash to mobile clients. API response objects are audited."
+        ],
+        [
+          "NFR-05",
+          "Privacy",
+          "The client-facing Firestore channel must never contain raw GPS coordinates. Only scalar progress_percentage values are written to the public parcel document.",
+          "Firestore security rules and backend tracking service code audited to confirm coordinate values are absent from all client-readable fields."
+        ],
+        [
+          "NFR-06",
+          "Scalability",
+          "The backend must handle 100 concurrent matching requests per minute without service degradation exceeding 1 second additional latency.",
+          "Load tested using Artillery.io during pilot evaluation."
+        ],
+        [
+          "NFR-07",
+          "Maintainability",
+          "All SQL migrations must be idempotent \u2014 safe to run multiple times without producing duplicate schema changes.",
+          "Each migration file uses IF NOT EXISTS guards. Verified by running all 26 migrations twice on a clean database instance."
+        ]
+      ]
+    },
+    {
+      "i": 11,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: Complete System Architecture \u2014 Layered Component Diagram"
+        ],
+        [
+          "Visual Description:  | A four-tier layered architecture diagram. Tier 1 (User Interface): Three nodes in rounded rectangles \u2014 'Client Flutter App (Firebase Auth, Firestore listener, 5-step delivery cr"
+        ]
+      ]
+    }
+  ],
+  "styles": {
+    "Heading 1": 1,
+    "Normal": 68,
+    "Heading 2": 9,
+    "Heading 3": 12,
+    "List Paragraph": 8
+  }
+}

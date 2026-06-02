@@ -5,7 +5,6 @@ import "../auth/auth_state.dart";
 import "../services/courier_tracking_service.dart";
 import "../services/tracking_outbox.dart";
 
-
 class CourierDashboardScreen extends StatefulWidget {
   const CourierDashboardScreen({super.key, required this.authState});
 
@@ -20,7 +19,6 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   String? _error;
   List<Map<String, dynamic>> _assigned = const [];
   List<Map<String, dynamic>> _pending = const [];
-  List<Map<String, dynamic>> _corridors = const [];
   List<Map<String, dynamic>> _routes = const [];
   Map<String, dynamic>? _vehicle;
   int _trackingQueueCount = 0;
@@ -31,7 +29,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   List<Map<String, dynamic>> _deviationAlerts = const [];
   String _serviceState = "OFFLINE";
   String? _activeRouteId;
-  String? _selectedRouteId; // declared route id
+  String? _selectedRouteId;
   List<Map<String, dynamic>> _notifications = const [];
   int _unreadNotifications = 0;
 
@@ -49,17 +47,14 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
     try {
       final assignedFuture = widget.authState.apiClient.getAssignedParcels();
       final pendingFuture = widget.authState.apiClient.getPendingParcels();
-      final corridorsFuture = widget.authState.apiClient.getMyCorridors();
       final routesFuture = widget.authState.apiClient.getCourierRoutes();
 
       final assigned = await assignedFuture;
       final pending = await pendingFuture;
-      final corridors = await corridorsFuture;
       final routes = await routesFuture;
       final alerts = await widget.authState.apiClient.getMyTrackingAlerts();
       final serviceState = await widget.authState.apiClient.getCourierServiceState();
-      final notifications =
-          await widget.authState.apiClient.getMyNotifications(limit: 30);
+      final notifications = await widget.authState.apiClient.getMyNotifications(limit: 30);
 
       Map<String, dynamic>? vehicle;
       try {
@@ -68,29 +63,27 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
         vehicle = null;
       }
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _assigned = assigned;
         _pending = pending;
-        _corridors = corridors;
         _routes = routes;
         _vehicle = vehicle;
         _deviationAlerts = alerts;
         _serviceState = serviceState["state"]?.toString() ?? "OFFLINE";
         _activeRouteId = serviceState["current_route_id"]?.toString();
+
         final activeDeclaredRoute = _routes.cast<Map<String, dynamic>?>().firstWhere(
               (route) => (route?["status"]?.toString() ?? "") == "ACTIVE",
               orElse: () => null,
             );
         final activeDeclaredRouteId = activeDeclaredRoute?["id"]?.toString();
-
         if (activeDeclaredRouteId != null && activeDeclaredRouteId.isNotEmpty) {
           _selectedRouteId = activeDeclaredRouteId;
         } else {
           _selectedRouteId ??= _routes.isNotEmpty ? _routes.first["id"]?.toString() : null;
         }
+
         _notifications = notifications;
         _unreadNotifications = notifications
             .where((item) => (item["status"]?.toString() ?? "") == "unread")
@@ -98,9 +91,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
       });
       await _loadTrackingHealth();
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() => _error = error.toString());
     } finally {
       if (mounted) {
@@ -123,20 +114,15 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      "Notifications",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
+                    const Text("Notifications", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     TextButton(
                       onPressed: () async {
-                        await widget.authState.apiClient
-                            .markAllNotificationsRead();
+                        await widget.authState.apiClient.markAllNotificationsRead();
                         if (mounted) Navigator.of(context).pop();
                         await _loadDashboard();
                       },
                       child: const Text("Mark all read"),
-                    )
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -153,8 +139,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                                     onPressed: () async {
                                       final id = item["id"]?.toString();
                                       if (id == null || id.isEmpty) return;
-                                      await widget.authState.apiClient
-                                          .markNotificationRead(id);
+                                      await widget.authState.apiClient.markNotificationRead(id);
                                       if (mounted) Navigator.of(context).pop();
                                       await _loadDashboard();
                                     },
@@ -181,18 +166,13 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
       final deadLetterCount = await outbox.deadLetterCount();
       await outbox.close();
       final prefs = await SharedPreferences.getInstance();
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _trackingQueueCount = count;
         _trackingDeadLetterCount = deadLetterCount;
-        _trackingLastSyncAt =
-            prefs.getString(CourierTrackingService.prefLastSyncAt);
-        _trackingLastError =
-            prefs.getString(CourierTrackingService.prefLastError);
-        _trackingRunning =
-            prefs.getBool(CourierTrackingService.prefIsRunning) ?? false;
+        _trackingLastSyncAt = prefs.getString(CourierTrackingService.prefLastSyncAt);
+        _trackingLastError = prefs.getString(CourierTrackingService.prefLastError);
+        _trackingRunning = prefs.getBool(CourierTrackingService.prefIsRunning) ?? false;
       });
     } catch (_) {
       // Keep dashboard usable even if health read fails.
@@ -201,57 +181,16 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
 
   int _countByStatus(List<Map<String, dynamic>> parcels, String status) {
     final wanted = status.toUpperCase();
-    return parcels
-        .where((item) => (item["status"]?.toString().toUpperCase() ?? "") == wanted)
-        .length;
-  }
-
-  int _activeRoutesCount() {
-    return _routes.where((route) => (route["status"]?.toString() ?? "") == "ACTIVE").length;
-  }
-
-  Map<String, dynamic>? _nextRoute() {
-    final now = DateTime.now().toUtc();
-    final candidates = _routes.where((route) {
-      final start = DateTime.tryParse(route["planned_start_at"]?.toString() ?? "");
-      return start != null && start.isAfter(now);
-    }).toList();
-    candidates.sort((a, b) {
-      final aStart = DateTime.tryParse(a["planned_start_at"]?.toString() ?? "") ?? now;
-      final bStart = DateTime.tryParse(b["planned_start_at"]?.toString() ?? "") ?? now;
-      return aStart.compareTo(bStart);
-    });
-    return candidates.isEmpty ? null : candidates.first;
-  }
-
-  String _formatWindow(String? isoValue) {
-    if (isoValue == null || isoValue.isEmpty) {
-      return "-";
-    }
-    final date = DateTime.tryParse(isoValue)?.toLocal();
-    if (date == null) {
-      return "-";
-    }
-    final h = date.hour.toString().padLeft(2, "0");
-    final m = date.minute.toString().padLeft(2, "0");
-    return "${date.year}-${date.month.toString().padLeft(2, "0")}-${date.day.toString().padLeft(2, "0")} $h:$m";
+    return parcels.where((item) => (item["status"]?.toString().toUpperCase() ?? "") == wanted).length;
   }
 
   String _formatTrackingFreshness(String? isoValue) {
-    if (isoValue == null || isoValue.isEmpty) {
-      return "No successful sync yet";
-    }
+    if (isoValue == null || isoValue.isEmpty) return "No successful sync yet";
     final parsed = DateTime.tryParse(isoValue)?.toLocal();
-    if (parsed == null) {
-      return "No successful sync yet";
-    }
+    if (parsed == null) return "No successful sync yet";
     final diff = DateTime.now().difference(parsed);
-    if (diff.inSeconds < 60) {
-      return "Synced just now";
-    }
-    if (diff.inMinutes < 60) {
-      return "Synced ${diff.inMinutes}m ago";
-    }
+    if (diff.inSeconds < 60) return "Synced just now";
+    if (diff.inMinutes < 60) return "Synced ${diff.inMinutes}m ago";
     return "Synced ${diff.inHours}h ago";
   }
 
@@ -292,10 +231,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
       return;
     }
     try {
-      await widget.authState.apiClient.updateCourierRouteStatus(
-        routeId: routeId,
-        action: "activate",
-      );
+      await widget.authState.apiClient.updateCourierRouteStatus(routeId: routeId, action: "activate");
       await widget.authState.apiClient.startCourierTravel(corridorId);
       await _loadDashboard();
     } catch (error) {
@@ -328,11 +264,9 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
   Widget build(BuildContext context) {
     final inTransit = _countByStatus(_assigned, "IN_TRANSIT");
     final completed = _countByStatus(_assigned, "COMPLETED");
-    final activeRoutes = _activeRoutesCount();
-    final nextRoute = _nextRoute();
-    final queueTop = _pending.isEmpty ? null : _pending.first;
     final vehicleType = _vehicle?["vehicleType"]?.toString();
     final plate = _vehicle?["licensePlate"]?.toString();
+    final activeRoutes = _routes.where((route) => (route["status"]?.toString() ?? "") == "ACTIVE").length;
 
     return Scaffold(
       appBar: AppBar(
@@ -360,14 +294,35 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
           child: ListView(
             padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
             children: [
-              const Text(
-                "Route Management",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Live courier activity and route readiness",
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Route Management",
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Live courier activity and route readiness",
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _InfoChip(label: "Active routes", value: activeRoutes.toString()),
+                          _InfoChip(label: "Assigned", value: _assigned.length.toString()),
+                          _InfoChip(label: "Pending", value: _pending.length.toString()),
+                          _InfoChip(label: "Tracking", value: _trackingRunning ? "Live" : "Paused"),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               if (_isLoading)
@@ -377,7 +332,6 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                 ),
               if (_error != null)
                 Card(
-                  color: Colors.red.shade50,
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Text(
@@ -386,60 +340,6 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                     ),
                   ),
                 ),
-              Card(
-                color: Colors.blue.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _StatTile(
-                        icon: Icons.route,
-                        iconColor: Colors.blue,
-                        value: activeRoutes,
-                        label: "Active Routes",
-                      ),
-                      _StatTile(
-                        icon: Icons.local_shipping,
-                        iconColor: Colors.indigo,
-                        value: _assigned.length,
-                        label: "Assigned",
-                      ),
-                      _StatTile(
-                        icon: Icons.inventory,
-                        iconColor: Colors.orange,
-                        value: _pending.length,
-                        label: "Pending",
-                      ),
-                      _StatTile(
-                        icon: Icons.check_circle,
-                        iconColor: Colors.green,
-                        value: completed,
-                        label: "Completed",
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.two_wheeler),
-                  title: const Text("Courier Setup"),
-                  subtitle: Text(
-                    vehicleType == null
-                        ? "Vehicle info not available"
-                        : "$vehicleType${plate == null ? "" : " • $plate"}",
-                  ),
-                  trailing: Text(
-                    vehicleType == null ? "Check" : "Ready",
-                    style: TextStyle(
-                      color: vehicleType == null ? Colors.orange : Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 12),
               Card(
                 child: Padding(
@@ -447,31 +347,28 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "Service State",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      const Text("Service State", style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       Text("Current state: $_serviceState"),
-                      if (_activeRouteId != null && _activeRouteId!.isNotEmpty)
-                        Text("Active route: $_activeRouteId"),
+                      Text(
+                        vehicleType == null
+                            ? "Vehicle info not available"
+                            : "Vehicle: $vehicleType${plate == null ? "" : " • $plate"}",
+                      ),
+                      if (_activeRouteId != null && _activeRouteId!.isNotEmpty) Text("Active route: $_activeRouteId"),
                       const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: _serviceState == "ONLINE"
-                                  ? () => _toggleOnline(false)
-                                  : null,
+                              onPressed: _serviceState == "ONLINE" ? () => _toggleOnline(false) : null,
                               child: const Text("Go OFFLINE"),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: _serviceState == "OFFLINE"
-                                  ? () => _toggleOnline(true)
-                                  : null,
+                              onPressed: _serviceState == "OFFLINE" ? () => _toggleOnline(true) : null,
                               child: const Text("Go ONLINE"),
                             ),
                           ),
@@ -489,7 +386,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                               (route) => DropdownMenuItem<String>(
                                 value: route["id"]?.toString(),
                                 child: Text(
-                                  "Route ${((route["id"]?.toString() ?? "-").length > 6 ? (route["id"]?.toString() ?? "-").substring(0, 6) : (route["id"]?.toString() ?? "-"))} • ${route["status"] ?? "PLANNED"}",
+                                  "Route ${(route["id"]?.toString() ?? "-").length > 6 ? (route["id"]?.toString() ?? "-").substring(0, 6) : (route["id"]?.toString() ?? "-")} • ${route["status"] ?? "PLANNED"}",
                                 ),
                               ),
                             )
@@ -523,16 +420,6 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
               const SizedBox(height: 12),
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.timelapse),
-                  title: const Text("Transit Workload"),
-                  subtitle: Text(
-                    "In transit: $inTransit • Pending approvals: ${_pending.length}",
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
                   leading: Icon(
                     _trackingLastError == null ? Icons.health_and_safety : Icons.warning,
                     color: _trackingLastError == null ? Colors.teal : Colors.orange,
@@ -557,8 +444,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
-                      if (_deviationAlerts.isEmpty)
-                        const Text("No recent route deviations."),
+                      if (_deviationAlerts.isEmpty) const Text("No recent route deviations."),
                       ..._deviationAlerts.take(3).map((alert) {
                         final type = alert["deviation_type"]?.toString() ?? "-";
                         final parcelId = alert["parcel_id"]?.toString() ?? "-";
@@ -577,35 +463,18 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
               ),
               const SizedBox(height: 12),
               Card(
-                child: ListTile(
-                  leading: const Icon(Icons.event_available),
-                  title: const Text("Next Route Window"),
-                  subtitle: nextRoute == null
-                      ? const Text("No upcoming route windows")
-                      : Text(
-                          "Route ${nextRoute["id"]?.toString() ?? "-"} • ${nextRoute["status"] ?? "PLANNED"}\n"
-                          "Planned start: ${_formatWindow(nextRoute["planned_start_at"]?.toString())}",
-                        ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.priority_high),
-                  title: const Text("Top Queue Parcel"),
-                  subtitle: queueTop == null
-                      ? const Text("No pending parcel approvals")
-                      : Text(
-                          "Parcel ${queueTop["id"] ?? "-"} • Rank ${queueTop["queueRank"] ?? "-"}\n"
-                          "${queueTop["origin"] ?? "-"} → ${queueTop["destination"] ?? "-"}",
-                        ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    "Workload: $inTransit parcels in transit • ${_pending.length} approvals awaiting action",
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
                 ),
               ),
             ],
           ),
         ),
       ),
-
     );
   }
 }
@@ -635,6 +504,33 @@ class _StatTile extends StatelessWidget {
         ),
         Text(label, style: const TextStyle(color: Colors.grey)),
       ],
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withOpacity(0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(width: 8),
+          Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 }

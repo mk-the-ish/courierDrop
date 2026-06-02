@@ -289,6 +289,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final nextEtaMinutes = (_stats["nextEtaMinutes"] as num?)?.toInt();
     final nextEtaParcelId = _stats["nextEtaParcelId"]?.toString();
     final nextEtaConfidence = _stats["nextEtaConfidence"]?.toString();
+    final totalParcels = _intStat("total");
+    final pendingParcels = _intStat("pending");
+    final assignedParcels = _intStat("assigned");
+    final inTransitParcels = _intStat("inTransit");
 
     return Scaffold(
       appBar: AppBar(
@@ -322,14 +326,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: ListView(
             padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
             children: [
-              const Text(
-                "Parcel Management",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Live activity for your deliveries",
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Parcel Management",
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Live activity for your deliveries",
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _InfoChip(label: "Total", value: totalParcels.toString()),
+                          _InfoChip(label: "Pending", value: pendingParcels.toString()),
+                          _InfoChip(label: "Assigned", value: assignedParcels.toString()),
+                          _InfoChip(label: "In transit", value: inTransitParcels.toString()),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               if (_isLoading)
@@ -339,7 +364,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               if (_error != null)
                 Card(
-                  color: Colors.red.shade50,
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Text(
@@ -349,7 +373,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               Card(
-                color: Colors.teal.shade50,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
@@ -401,7 +424,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (_latestEtaUpdate != null) ...[
                 const SizedBox(height: 12),
                 Card(
-                  color: Colors.orange.shade50,
                   child: ListTile(
                     leading: const Icon(Icons.update, color: Colors.orange),
                     title: Text(_latestEtaUpdate?["title"]?.toString() ?? "ETA updated"),
@@ -424,20 +446,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.inventory_2_outlined),
-                  title: const Text("Total parcels"),
-                  trailing: Text(
-                    "${_intStat("total")}",
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 16),
               const Text(
                 "Your Parcels",
@@ -448,8 +456,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const Card(
                   child: Padding(
                     padding: EdgeInsets.all(16),
-                    child: Text(
-                        "No parcels yet. Request your first parcel below."),
+                    child: Text("No parcels yet. Request your first parcel below."),
                   ),
                 ),
               ..._parcels.take(5).map((parcel) {
@@ -480,9 +487,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Parcel $id",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  "Parcel $id",
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              _confidenceBadge(parcel["etaConfidence"]?.toString()),
+                            ],
                           ),
                           const SizedBox(height: 6),
                           Text("Status: $status"),
@@ -491,16 +505,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Expanded(
                                 child: Text("ETA: ${_formatEta(etaMinutes)}"),
                               ),
-                              _confidenceBadge(
-                                  parcel["etaConfidence"]?.toString()),
                             ],
                           ),
+                          const SizedBox(height: 6),
                           Text("From: $origin"),
                           Text("To: $destination"),
                           const SizedBox(height: 6),
                           const Text(
                             "Tap to open live status",
-                            style: TextStyle(color: Colors.teal),
+                            style: TextStyle(color: Colors.orange),
                           ),
                         ],
                       ),
@@ -523,6 +536,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
         },
         icon: const Icon(Icons.add),
         label: const Text("New Parcel"),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withOpacity(0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(width: 8),
+          Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }

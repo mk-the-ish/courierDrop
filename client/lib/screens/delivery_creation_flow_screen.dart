@@ -544,7 +544,8 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
         ] else ...[
           const SizedBox(height: 12),
           ...c.matchedCorridors.map((m) {
-            final corridorId = m["corridorId"]?.toString() ?? "";
+            final corridorId =
+                (m["corridorId"] ?? m["corridor_id"])?.toString() ?? "";
             final courierName = m["courierName"]?.toString() ?? "Courier";
             final rating = (m["courierRating"] as num?)?.toDouble();
             final recPrice = (m["recommendedPrice"] as num?)?.toDouble();

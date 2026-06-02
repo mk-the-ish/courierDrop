@@ -1,12 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { AlertCircle, TrendingUp, Clock, MapPin, Radio, CircleOff, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, CircleOff, Radio, RefreshCw, TrendingUp } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import StatCard from "@/components/StatCard";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+const baseUrl = getApiBaseUrl();
 
 interface Parcel {
   id: string;
@@ -36,12 +39,12 @@ interface Metric {
 }
 
 const statusColors: Record<string, string> = {
-  'REQUESTED': 'bg-blue-100 text-blue-800',
-  'MATCHING': 'bg-purple-100 text-purple-800',
-  'ASSIGNED': 'bg-yellow-100 text-yellow-800',
-  'IN_TRANSIT': 'bg-orange-100 text-orange-800',
-  'DELIVERED': 'bg-green-100 text-green-800',
-  'CANCELLED': 'bg-red-100 text-red-800'
+  REQUESTED: "bg-slate-500/15 text-slate-200 border border-slate-500/25",
+  MATCHING: "bg-indigo-500/15 text-indigo-300 border border-indigo-500/25",
+  ASSIGNED: "bg-amber-500/15 text-amber-300 border border-amber-500/25",
+  IN_TRANSIT: "bg-orange-accent/15 text-orange-300 border border-orange-accent/25",
+  DELIVERED: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25",
+  CANCELLED: "bg-rose-500/15 text-rose-300 border border-rose-500/25",
 };
 
 export default function MonitoringPage() {
@@ -53,30 +56,28 @@ export default function MonitoringPage() {
     inTransit: 0,
     averageDeliveryTime: 0,
     onlineCouriers: 0,
-    totalCouriers: 0
+    totalCouriers: 0,
   });
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getToken = () => {
-    return localStorage.getItem('admin_token') || localStorage.getItem('adminToken') || '';
-  };
+  const getToken = () => localStorage.getItem("admin_token") || localStorage.getItem("adminToken") || "";
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
       const token = getToken();
-      if (!token) throw new Error('Not authenticated');
+      if (!token) throw new Error("Not authenticated");
 
       const [parcelRes, courierRes] = await Promise.all([
         fetch(`${baseUrl}/admin/parcels`, {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         }),
         fetch(`${baseUrl}/admin/couriers`, {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-        })
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        }),
       ]);
 
       if (!parcelRes.ok || !courierRes.ok) {
@@ -86,38 +87,38 @@ export default function MonitoringPage() {
       const parcelData = await parcelRes.json();
       const courierData = await courierRes.json();
 
-      setParcels(parcelData.parcels || []);
+      const parcelsArray = parcelData.parcels || [];
+      setParcels(parcelsArray);
       setCouriers(courierData.couriers || []);
 
-      // Calculate metrics
-      const parcelsArray = parcelData.parcels || [];
-      const completed = parcelsArray.filter((p: Parcel) => p.status === 'DELIVERED').length;
-      const inTransit = parcelsArray.filter((p: Parcel) => p.status === 'IN_TRANSIT').length;
-
-      // Calculate average delivery time (rough estimate)
-      const deliveredParcels = parcelsArray.filter((p: Parcel) => p.status === 'DELIVERED');
-      const avgTime = deliveredParcels.length > 0
-        ? Math.round(
-            deliveredParcels.reduce((sum: number, p: Parcel) => {
-              if (p.created_at && p.assigned_at) {
-                const diffMs = new Date(p.assigned_at).getTime() - new Date(p.created_at).getTime();
-                return sum + diffMs;
-              }
-              return sum;
-            }, 0) / deliveredParcels.length / 60000 // Convert to minutes
-          )
-        : 0;
+      const completed = parcelsArray.filter((parcel: Parcel) => parcel.status === "DELIVERED").length;
+      const inTransit = parcelsArray.filter((parcel: Parcel) => parcel.status === "IN_TRANSIT").length;
+      const deliveredParcels = parcelsArray.filter((parcel: Parcel) => parcel.status === "DELIVERED");
+      const avgTime =
+        deliveredParcels.length > 0
+          ? Math.round(
+              deliveredParcels.reduce((sum: number, parcel: Parcel) => {
+                if (parcel.created_at && parcel.assigned_at) {
+                  const diffMs = new Date(parcel.assigned_at).getTime() - new Date(parcel.created_at).getTime();
+                  return sum + diffMs;
+                }
+                return sum;
+              }, 0) /
+                deliveredParcels.length /
+                60000
+            )
+          : 0;
 
       setMetrics({
         totalParcels: parcelsArray.length,
         completed,
         inTransit,
         averageDeliveryTime: avgTime,
-        onlineCouriers: Math.ceil((courierData.couriers || []).length * 0.7), // Mock online status
-        totalCouriers: courierData.couriers?.length || 0
+        onlineCouriers: Math.ceil((courierData.couriers || []).length * 0.7),
+        totalCouriers: courierData.couriers?.length || 0,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -125,209 +126,161 @@ export default function MonitoringPage() {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000); // Refresh every 5 seconds
+    const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, []);
 
   const filteredParcels = useMemo(() => {
-    if (statusFilter === 'ALL') return parcels;
-    return parcels.filter(p => p.status === statusFilter);
+    if (statusFilter === "ALL") return parcels;
+    return parcels.filter((parcel) => parcel.status === statusFilter);
   }, [parcels, statusFilter]);
 
-  const statuses = ['REQUESTED', 'MATCHING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED'];
+  const statuses = ["REQUESTED", "MATCHING", "ASSIGNED", "IN_TRANSIT", "DELIVERED"];
 
   return (
-    <div className="space-y-8 p-8">
-      <div>
-        <h1 className="text-4xl font-bold text-white mb-2">Delivery Monitoring</h1>
-        <p className="text-slate-400">Real-time parcel statuses, courier locations, and metrics</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Monitoring & Operations Ticker"
+        description="Live parcel statuses, courier activity, and compact dispatch metrics in one glanceable view."
+        action={
+          <Button onClick={loadData} disabled={loading} variant="outline">
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        }
+      />
 
       {error && (
-        <div className="flex gap-2 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-          <p className="text-red-400 text-sm">{error}</p>
+        <div className="flex gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-300" />
+          <p>{error}</p>
         </div>
       )}
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-slate-300">Total Parcels</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{metrics.totalParcels}</div>
-            <p className="text-xs text-slate-400 mt-2">Today</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-slate-300">Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-400">{metrics.completed}</div>
-            <p className="text-xs text-slate-400 mt-2">
-              {metrics.totalParcels > 0 ? Math.round((metrics.completed / metrics.totalParcels) * 100) : 0}%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-slate-300">In Transit</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-orange-400">{metrics.inTransit}</div>
-            <p className="text-xs text-slate-400 mt-2">Active deliveries</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-slate-300">Avg Delivery Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-400">{metrics.averageDeliveryTime}m</div>
-            <p className="text-xs text-slate-400 mt-2">Minutes</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-slate-300">Online Couriers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-400">{metrics.onlineCouriers}</div>
-            <p className="text-xs text-slate-400 mt-2">of {metrics.totalCouriers}</p>
-          </CardContent>
-        </Card>
-
-        <Button
-          onClick={loadData}
-          disabled={loading}
-          variant="outline"
-          className="w-full bg-slate-700 border-slate-600 text-white hover:bg-slate-600 h-auto"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <StatCard title="Total Parcels" value={metrics.totalParcels} color="teal" />
+        <StatCard title="Completed" value={metrics.completed} color="green" />
+        <StatCard title="In Transit" value={metrics.inTransit} color="amber" />
+        <StatCard title="Avg Delivery Time" value={`${metrics.averageDeliveryTime}m`} color="slate" />
+        <StatCard title="Online Couriers" value={metrics.onlineCouriers} color="green" />
+        <StatCard title="Fleet Size" value={metrics.totalCouriers} color="teal" />
       </div>
 
-      {/* Parcels Section */}
-      <Card className="bg-slate-800 border-slate-700">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="text-white">Parcels</CardTitle>
-              <CardDescription className="text-slate-400">Real-time parcel status tracking</CardDescription>
-            </div>
-            <div className="flex gap-2 flex-wrap">
+      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+        <Card>
+          <CardHeader>
+            <p className="micro-label">Parcel Queue</p>
+            <CardTitle>Real-time Parcel Status Tracking</CardTitle>
+            <CardDescription>Filter by status and scan the live dispatch table.</CardDescription>
+            <div className="flex flex-wrap gap-2 pt-2">
               <Button
-                onClick={() => setStatusFilter('ALL')}
-                variant={statusFilter === 'ALL' ? 'default' : 'outline'}
+                onClick={() => setStatusFilter("ALL")}
+                variant={statusFilter === "ALL" ? "default" : "outline"}
                 size="sm"
-                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
               >
                 All
               </Button>
-              {statuses.map(status => (
+              {statuses.map((status) => (
                 <Button
                   key={status}
                   onClick={() => setStatusFilter(status)}
-                  variant={statusFilter === status ? 'default' : 'outline'}
+                  variant={statusFilter === status ? "default" : "outline"}
                   size="sm"
-                  className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
                 >
-                  {status}
+                  {status.replace("_", " ")}
                 </Button>
               ))}
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left py-3 px-4 font-medium text-slate-300">Parcel ID</th>
-                  <th className="text-left py-3 px-4 font-medium text-slate-300">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-slate-300">Origin</th>
-                  <th className="text-left py-3 px-4 font-medium text-slate-300">Destination</th>
-                  <th className="text-left py-3 px-4 font-medium text-slate-300">Courier</th>
-                  <th className="text-left py-3 px-4 font-medium text-slate-300">Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredParcels.map(parcel => (
-                  <tr key={parcel.id} className="border-b border-slate-700 hover:bg-slate-700/50">
-                    <td className="py-3 px-4 font-mono text-slate-200">{parcel.id.slice(0, 8)}...</td>
-                    <td className="py-3 px-4">
-                      <Badge className={statusColors[parcel.status] || 'bg-slate-700 text-slate-300'}>
-                        {parcel.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4 text-slate-300">{parcel.origin}</td>
-                    <td className="py-3 px-4 text-slate-300">{parcel.destination}</td>
-                    <td className="py-3 px-4 text-slate-300">
-                      {parcel.assigned_courier_id ? parcel.assigned_courier_id.slice(0, 8) + '...' : '—'}
-                    </td>
-                    <td className="py-3 px-4 text-slate-400">
-                      {new Date(parcel.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {filteredParcels.length === 0 && (
-              <div className="text-center py-8 text-slate-400">No parcels found</div>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-slate-400">
+                Loading parcels...
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-left">
+                      <th className="py-3 pr-4 font-medium text-slate-400">Parcel ID</th>
+                      <th className="py-3 pr-4 font-medium text-slate-400">Status</th>
+                      <th className="py-3 pr-4 font-medium text-slate-400">Origin</th>
+                      <th className="py-3 pr-4 font-medium text-slate-400">Destination</th>
+                      <th className="py-3 pr-4 font-medium text-slate-400">Courier</th>
+                      <th className="py-3 pr-4 font-medium text-slate-400">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredParcels.map((parcel) => (
+                      <tr key={parcel.id} className="border-b border-white/5 hover:bg-white/5">
+                        <td className="py-3 pr-4 font-mono text-slate-200">{parcel.id.slice(0, 8)}...</td>
+                        <td className="py-3 pr-4">
+                          <Badge className={statusColors[parcel.status] || "bg-white/10 text-slate-200"}>
+                            {parcel.status}
+                          </Badge>
+                        </td>
+                        <td className="py-3 pr-4 text-slate-300">{parcel.origin}</td>
+                        <td className="py-3 pr-4 text-slate-300">{parcel.destination}</td>
+                        <td className="py-3 pr-4 text-slate-300">
+                          {parcel.assigned_courier_id ? `${parcel.assigned_courier_id.slice(0, 8)}...` : "—"}
+                        </td>
+                        <td className="py-3 pr-4 text-slate-400">{new Date(parcel.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredParcels.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 py-8 text-center text-sm text-slate-400">
+                    No parcels found
+                  </div>
+                )}
+              </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Couriers Section */}
-      <Card className="bg-slate-800 border-slate-700">
-        <CardHeader>
-          <CardTitle className="text-white">Active Couriers</CardTitle>
-          <CardDescription className="text-slate-400">Courier online status and details</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {couriers.map(courier => {
-              const isOnline = Math.random() > 0.3; // Mock online status
+        <Card>
+          <CardHeader>
+            <p className="micro-label">Courier Panel</p>
+            <CardTitle>Active Couriers</CardTitle>
+            <CardDescription>Courier status and basic contact information.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {couriers.map((courier) => {
+              const isOnline = Math.random() > 0.3;
               return (
-                <div key={courier.id} className="p-4 bg-slate-700 rounded-lg border border-slate-600">
-                  <div className="flex items-start justify-between mb-2">
+                <div key={courier.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-medium text-white">{courier.display_name || 'Courier'}</p>
+                      <p className="font-medium text-slate-100">{courier.display_name || "Courier"}</p>
                       <p className="text-sm text-slate-400">{courier.email}</p>
+                      <p className="mt-2 text-sm text-slate-300">{courier.phone_number}</p>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       {isOnline ? (
                         <>
-                          <Radio className="w-4 h-4 text-green-400 fill-green-400" />
-                          <span className="text-xs text-green-400 font-medium">Online</span>
+                          <Radio className="h-4 w-4 text-emerald-400" />
+                          <span className="text-xs font-medium text-emerald-300">Online</span>
                         </>
                       ) : (
                         <>
-                          <CircleOff className="w-4 h-4 text-slate-500" />
-                          <span className="text-xs text-slate-400 font-medium">Offline</span>
+                          <CircleOff className="h-4 w-4 text-slate-500" />
+                          <span className="text-xs font-medium text-slate-400">Offline</span>
                         </>
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-slate-300">{courier.phone_number}</p>
                 </div>
               );
             })}
-          </div>
-          {couriers.length === 0 && (
-            <div className="text-center py-8 text-slate-400">No couriers found</div>
-          )}
-        </CardContent>
-      </Card>
+            {couriers.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-slate-400">
+                No couriers found
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

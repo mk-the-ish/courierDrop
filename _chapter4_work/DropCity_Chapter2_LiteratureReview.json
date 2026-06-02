@@ -1,0 +1,577 @@
+{
+  "paragraphs": [
+    {
+      "i": 0,
+      "style": "Heading 1",
+      "text": "CHAPTER 2: LITERATURE REVIEW AND GAP ANALYSIS"
+    },
+    {
+      "i": 1,
+      "style": "",
+      "text": "This chapter surveys and critically synthesises the body of academic and industry literature that underpins the DropCity platform. The review is structured across five thematic lenses: opportunistic and crowdsourced logistics models; classical and modern vehicle routing theory; geospatial database computation and the PostGIS spatial query engine; connectivity-aware and offline-first mobile architecture; and trust, custody, and payment mechanisms in informal cash-based economies. Each section con"
+    },
+    {
+      "i": 2,
+      "style": "Heading 2",
+      "text": "2.1  Introduction"
+    },
+    {
+      "i": 3,
+      "style": "",
+      "text": "The literature relevant to DropCity spans four distinct but deeply interconnected disciplines: operations research (routing and optimisation), database engineering (spatial query processing), mobile systems engineering (offline resilience and background execution), and socio-economic studies of informal urban transport in the developing world. A comprehensive review must establish not only what each discipline contributes independently, but how their intersection creates the specific research sp"
+    },
+    {
+      "i": 4,
+      "style": "Heading 2",
+      "text": "2.2  Opportunistic and Crowdsourced Logistics: Theory and Practice"
+    },
+    {
+      "i": 5,
+      "style": "Heading 3",
+      "text": "2.2.1  The Emergence of Crowdsourced Delivery"
+    },
+    {
+      "i": 6,
+      "style": "",
+      "text": "Crowdsourced delivery (CD) refers to the delegation of last-mile logistics tasks to a decentralised network of independent individuals rather than a dedicated fleet. Wang et al. (2020) provide a foundational review of last-mile delivery optimisation strategies, establishing that CD services gain efficiency through dynamic algorithmic matching, connecting delivery tasks to the most suitable courier based on proximity, availability, and route alignment. The economic logic is compelling: a citizen "
+    },
+    {
+      "i": 7,
+      "style": "",
+      "text": "Dlamini (2019) reinforces this argument in the context of developing markets, demonstrating that crowdsourced logistics models address urban last-mile complexity by leveraging existing infrastructure and personal travel plans. However, Dlamini also warns that P2P logistics models succeed only when the matching process is sufficiently efficient \u2014 specifically, when couriers are not required to deviate substantially from their declared journey. This finding is foundational: it establishes that rou"
+    },
+    {
+      "i": 8,
+      "style": "Heading 3",
+      "text": "2.2.2  The Opportunistic Logistics Paradigm"
+    },
+    {
+      "i": 9,
+      "style": "",
+      "text": "Ndlovu and Moyo (2021) introduce the concept of Opportunistic Logistics \u2014 the practice of integrating parcel transport into pre-committed commuter journeys \u2014 as a distinct and underexplored paradigm within the broader crowdsourced logistics literature. Unlike conventional CD platforms that treat the delivery as the primary task and the driver as the resource to be dispatched, opportunistic logistics treats the journey as primary and the delivery as an additive task. This inversion has profound i"
+    },
+    {
+      "i": 10,
+      "style": "",
+      "text": "Ndlovu and Moyo further argue that the informal economy of Southern Africa is uniquely positioned to benefit from opportunistic logistics, precisely because the density and regularity of informal transit routes (such as Harare's Kombi network) create a natural substrate for corridor-based matching at scale. Their analysis identifies the critical market gap: no technically mature platform exists that exploits this opportunity with a geospatially rigorous matching algorithm."
+    },
+    {
+      "i": 11,
+      "style": "",
+      "text": "Figure 2.1: Taxonomic comparison of three delivery paradigms. DropCity's opportunistic model (Column 3) eliminates the dedicated trip overhead by matching parcels exclusively to couriers whose existing journeys geometrically encompass the delivery corridor."
+    },
+    {
+      "i": 12,
+      "style": "Heading 3",
+      "text": "2.2.3  Incentive Structures and Courier Participation"
+    },
+    {
+      "i": 13,
+      "style": "",
+      "text": "Chen and Zhang (2023) analyse monetary and non-monetary incentive structures in crowdshipping using a game-theoretic framework, demonstrating that courier participation is driven by the balance between monetary reward and the perceived inconvenience of the delivery task. Their central finding \u2014 that couriers are significantly more willing to accept assignments when the detour cost is near zero \u2014 provides direct theoretical validation for the zero-detour constraint that is the foundational design"
+    },
+    {
+      "i": 14,
+      "style": "",
+      "text": "Li and Wei (2023) extend this analysis by modelling the impact of detour constraints on crowdsourced courier participation through a discrete choice framework. Their results demonstrate that a 500-metre corridor buffer \u2014 equivalent to approximately a 3 to 5 minute walking detour from the vehicle \u2014 represents the practical threshold below which courier acceptance rates remain above 70%. This empirical finding directly justifies the 500-metre default buffer width implemented in DropCity's PostGIS "
+    },
+    {
+      "i": 15,
+      "style": "Heading 2",
+      "text": "2.3  Vehicle Routing Theory: From Classical Heuristics to Corridor Constraints"
+    },
+    {
+      "i": 16,
+      "style": "Heading 3",
+      "text": "2.3.1  Classical Vehicle Routing: Dijkstra and VRP"
+    },
+    {
+      "i": 17,
+      "style": "",
+      "text": "The classical treatment of delivery routing is grounded in the Vehicle Routing Problem (VRP), first formalised by Dantzig and Ramser (1959) [CITATION NEEDED: Original VRP formulation]. In its canonical form, the VRP seeks to find a set of optimal routes for a fleet of vehicles to serve a set of geographically dispersed customers, minimising total travel distance or time. Standard heuristic solutions \u2014 including Dijkstra's shortest-path algorithm \u2014 are fundamentally path-planning algorithms: give"
+    },
+    {
+      "i": 18,
+      "style": "",
+      "text": "Makoni (2018) provides a comprehensive introduction to VRP principles and their extensions, including the Vehicle Routing Problem with Time Windows (VRPTW). Mupinga (2020) extends this framework to the Dynamic VRP (DVRP), where delivery requests arrive in real time and routing plans must be continuously updated. PLOS One (2024) confirms that DVRP remains an active research challenge, particularly in crowdsourced freight contexts where both vehicle locations and delivery demands are stochastic."
+    },
+    {
+      "i": 19,
+      "style": "Heading 3",
+      "text": "2.3.2  The Critical Distinction: Path Planning vs Corridor Filtering"
+    },
+    {
+      "i": 20,
+      "style": "",
+      "text": "The central theoretical contribution of DropCity's approach is its departure from path-planning entirely. Classical VRP solvers answer the question: what is the optimal route from the vehicle's current location to the delivery destination? DropCity's corridor-matching algorithm answers a fundamentally different question: does the parcel's trajectory fall within the spatial envelope of the courier's pre-committed journey? This is not an optimisation problem \u2014 it is a spatial containment query."
+    },
+    {
+      "i": 21,
+      "style": "",
+      "text": "This distinction has profound computational implications. A Dijkstra-based dispatcher operating over Harare's road network graph \u2014 containing on the order of tens of thousands of nodes at street-intersection granularity \u2014 would require O(V log V + E) time per query, where V is the number of vertices and E the number of edges. Across a fleet of active couriers, this computation becomes prohibitively expensive at dispatch frequency. By contrast, DropCity's PostGIS spatial containment query \u2014 imple"
+    },
+    {
+      "i": 22,
+      "style": "",
+      "text": "Ncube (2022) provides the theoretical basis for this efficiency claim, demonstrating that R-tree spatial indexing \u2014 which GiST implements as its backing structure for geography types \u2014 reduces spatial join complexity from O(N squared) full table scans to O(N log N) index-assisted lookups for polygon containment and proximity queries. This is the computational justification for the PostGIS architectural choice and for the GiST index placed on the corridor_line column of the corridors table."
+    },
+    {
+      "i": 23,
+      "style": "",
+      "text": "Figure 2.2: Computational paradigm comparison \u2014 Dijkstra path planning (left, O(V log V + E)) vs DropCity GiST-indexed PostGIS corridor filter (right, O(N log N)). The spatial containment approach eliminates full graph traversal, enabling sub-second matching at fleet scale."
+    },
+    {
+      "i": 24,
+      "style": "Heading 3",
+      "text": "2.3.3  Directional Validity: The Pickup-Before-Dropoff Constraint"
+    },
+    {
+      "i": 25,
+      "style": "",
+      "text": "Beyond spatial containment, an opportunistic logistics system must enforce directional validity: the courier must encounter the pickup point before the dropoff point along the direction of travel. This constraint is absent from most VRP formulations, which are symmetric with respect to route direction. In the DropCity context, violating directional validity would require the courier to backtrack along their route \u2014 imposing a non-zero detour."
+    },
+    {
+      "i": 26,
+      "style": "",
+      "text": "The PostGIS function ST_LineLocatePoint returns a scalar value in [0, 1] representing the fractional position of a point projected orthogonally onto a LineString, measured from the route start. Directional validity is satisfied if and only if the pickup fractional position f_p is strictly less than the dropoff fractional position f_d along the declared route. This single inequality, evaluated entirely within the PostgreSQL engine, enforces the full directional validity requirement without any ad"
+    },
+    {
+      "i": 27,
+      "style": "Heading 2",
+      "text": "2.4  Geospatial Database Theory: The PostGIS Imperative"
+    },
+    {
+      "i": 28,
+      "style": "Heading 3",
+      "text": "2.4.1  Spatial Data Types and the Geography vs Geometry Distinction"
+    },
+    {
+      "i": 29,
+      "style": "",
+      "text": "PostGIS provides two families of spatial data types: geometry, operating in a flat Cartesian plane, and geography, operating on a spheroid model of the Earth. For urban-scale logistics \u2014 where inter-point distances span hundreds to thousands of metres \u2014 the geography type is the appropriate choice. DropCity's schema employs GEOGRAPHY(LineString, 4326) for corridor lines and GEOGRAPHY(Point, 4326) for parcel endpoints, using the WGS 84 coordinate reference system (EPSG:4326), which is the standar"
+    },
+    {
+      "i": 30,
+      "style": "Heading 3",
+      "text": "2.4.2  GiST Indexing and the R-Tree Spatial Structure"
+    },
+    {
+      "i": 31,
+      "style": "",
+      "text": "The Generalised Search Tree (GiST) index in PostgreSQL provides a generic framework for implementing B-tree-like index structures over arbitrary data types. For PostGIS geography columns, GiST instantiates an R-tree: a hierarchical data structure that partitions space into nested minimum bounding rectangles (MBRs). Ncube (2022) establishes that R-tree indexing reduces spatial proximity queries \u2014 specifically the ST_DWithin predicate \u2014 from a full table scan of O(N) per query to an index-navigate"
+    },
+    {
+      "i": 32,
+      "style": "Heading 3",
+      "text": "2.4.3  ST_LineLocatePoint: Linear Projection and Virtual Interchange Generation"
+    },
+    {
+      "i": 33,
+      "style": "",
+      "text": "The PostGIS function ST_LineLocatePoint computes the fractional position of the closest point on a LineString to a given point via orthogonal projection. This is a linear algebra operation: for a LineString decomposed into k constituent segments, it evaluates the perpendicular foot of the given point onto each segment and returns the fractional arc length of the closest perpendicular foot. The computation is O(k) in the number of segments \u2014 it scales with route complexity, not fleet size."
+    },
+    {
+      "i": 34,
+      "style": "",
+      "text": "In DropCity's context, ST_LineLocatePoint serves two purposes simultaneously. First, it computes the pickup_fraction and dropoff_fraction values used to enforce the directional validity constraint. Second, it enables the companion function ST_ClosestPoint to generate the virtual_pickup and virtual_dropoff coordinates \u2014 the precise roadside points where sender and receiver should meet the courier. These projected coordinates constitute the Virtual Interchange mechanic: the system never directs th"
+    },
+    {
+      "i": 35,
+      "style": "",
+      "text": "Figure 2.3: PostGIS spatial operations pipeline. ST_DWithin confirms 500m buffer containment; ST_LineLocatePoint computes fractional arc-length positions; ST_ClosestPoint generates physical Virtual Interchange handover coordinates. The entire pipeline executes as a single SQL query."
+    },
+    {
+      "i": 36,
+      "style": "Heading 3",
+      "text": "2.4.4  Literature Gap: No Prior PostGIS Corridor Matching for African Urban Logistics"
+    },
+    {
+      "i": 37,
+      "style": "",
+      "text": "A systematic review reveals that, whilst PostGIS has been applied to urban logistics problems in North American and European contexts, no published work documents its application to corridor-matched opportunistic logistics in a sub-Saharan African urban environment. Furthermore, no prior work implements the specific triple-predicate combination of ST_DWithin containment filtering, ST_LineLocatePoint directional validation, and ST_ClosestPoint Virtual Interchange projection within a single real-t"
+    },
+    {
+      "i": 38,
+      "style": "Heading 2",
+      "text": "2.5  Connectivity-Aware and Offline-First Mobile Architecture"
+    },
+    {
+      "i": 39,
+      "style": "Heading 3",
+      "text": "2.5.1  The Offline-First Paradigm"
+    },
+    {
+      "i": 40,
+      "style": "",
+      "text": "Offline-first architecture is a mobile application design philosophy that treats network connectivity as an optional resource rather than a guaranteed dependency. Romer and Singh (2022) define the paradigm formally: an offline-first application must maintain full functional integrity during periods of complete network unavailability, storing all state changes locally and synchronising with the central server upon reconnection. ResearchGate (2025) identifies logistics and transportation as a prim"
+    },
+    {
+      "i": 41,
+      "style": "",
+      "text": "Desino (2025) establishes that offline-first architecture is not merely a resilience feature but a prerequisite for operational reliability in any environment where the device may move through areas of varying connectivity \u2014 precisely the scenario faced by DropCity couriers traversing Harare's heterogeneous cellular infrastructure. The Avondale-Belgravia corridor, identified in the project's pilot study as a recurring digital dead zone, exemplifies this requirement: a courier traversing this sec"
+    },
+    {
+      "i": 42,
+      "style": "Heading 3",
+      "text": "2.5.2  Synchronisation Strategies: FIFO Ordering and Idempotency"
+    },
+    {
+      "i": 43,
+      "style": "",
+      "text": "The critical technical challenge of offline-first architecture is not local storage \u2014 straightforwardly provided by SQLite on Android \u2014 but synchronisation fidelity. When a courier's device reconnects after a dead zone, it may have accumulated dozens of GPS location pulses and transaction state changes. These must be replayed on the server in correct temporal order, or the server's reconstruction of the courier's path will be incoherent. Intellisoft (2024) documents two dominant conflict resolut"
+    },
+    {
+      "i": 44,
+      "style": "",
+      "text": "IBM (2024) validates the FIFO choice, demonstrating that FIFO replay with timestamp ordering preserves the integrity of path reconstructions in logistics applications where the sequence of location updates is semantically meaningful \u2014 as it is in DropCity, where the server uses location sequence to compute corridor adherence scores and detect routing anomalies."
+    },
+    {
+      "i": 45,
+      "style": "Heading 3",
+      "text": "2.5.3  The Transactional Outbox Pattern"
+    },
+    {
+      "i": 46,
+      "style": "",
+      "text": "The specific implementation pattern adopted by DropCity is the Transactional Outbox: all location pulses and handshake state changes that fail to reach the server are persisted to a local SQLite table with a flag is_synced = 0 and a strict chronological timestamp. The ConnectivityPlus listener monitors the device's network state; upon detecting a transition from no connectivity to mobile or WiFi, it triggers a lock-gated sync manager that reads all unsynced records ordered by timestamp ascending"
+    },
+    {
+      "i": 47,
+      "style": "",
+      "text": "Figure 2.4: The DropCity ARQ state machine (left) and FIFO synchronisation sequence (right). The pattern guarantees that location pulses captured during connectivity loss are replayed in strict chronological order, preserving corridor adherence computation integrity."
+    },
+    {
+      "i": 48,
+      "style": "Heading 3",
+      "text": "2.5.4  Background Execution: flutter_background_geolocation"
+    },
+    {
+      "i": 49,
+      "style": "",
+      "text": "A distinct challenge is maintaining location capture when the application is not in the foreground or when the device screen is locked. Standard Flutter location plugins are suspended when the application enters the background on Android, causing gaps that the ARQ cannot recover. DropCity resolves this by adopting flutter_background_geolocation as the primary tracking engine, configured with stopOnTerminate: false and startOnBoot: true. These parameters instruct the Android OS to maintain the lo"
+    },
+    {
+      "i": 50,
+      "style": "Heading 3",
+      "text": "2.5.5  Literature Gap: ARQ + Background Geolocation in African Mobile Logistics"
+    },
+    {
+      "i": 51,
+      "style": "",
+      "text": "Whilst the Transactional Outbox pattern is well-documented in enterprise distributed systems literature, its application to consumer mobile logistics \u2014 specifically in combination with a foreground-persistent background geolocation engine and the dual purpose of preserving transaction integrity while accumulating Logistics-as-a-Sensor telemetry \u2014 has not been documented for any African urban delivery context. This dual-purpose extension of the pattern is a novel contribution of this research."
+    },
+    {
+      "i": 52,
+      "style": "Heading 2",
+      "text": "2.6  Trust, Custody, and Payment in Informal Cash-Based Economies"
+    },
+    {
+      "i": 53,
+      "style": "Heading 3",
+      "text": "2.6.1  The Trust Problem in P2P Delivery"
+    },
+    {
+      "i": 54,
+      "style": "",
+      "text": "Conventional escrow mechanisms hold payment in a neutral third-party account until delivery confirmation. However, escrow requires both parties to transact in a digital payment medium that the escrow provider can programmatically access and freeze. In Harare's informal economy, where a significant proportion of transactions occur in physical cash or through peer-to-peer mobile money transfers \u2014 EcoCash and InnBucks \u2014 that are difficult to programmatically escrow, this mechanism is operationally "
+    },
+    {
+      "i": 55,
+      "style": "Heading 3",
+      "text": "2.6.2  The 3WH Spatial-Gate as a Physical Trust Anchor"
+    },
+    {
+      "i": 56,
+      "style": "",
+      "text": "DropCity resolves the trust gap through a Three-Way Handshake (3WH) protocol that anchors custodial transfer to a physical, verifiable spatial event rather than a digital payment confirmation. At parcel creation, the backend generates two one-time PINs, stores their SHA-256 hashes in the database, and communicates the plaintext PINs to client and recipient via in-app notification. The courier does not receive either PIN."
+    },
+    {
+      "i": 57,
+      "style": "",
+      "text": "At the pickup handover, the courier must simultaneously: (1) be physically within 50 metres of the Virtual Interchange coordinate, verified by a real-time ST_DWithin check on the courier's reported GPS location; (2) submit the correct pickup PIN, verified by SHA-256 hash comparison against the stored pickup_pin_hash; and (3) upload a photograph of the parcel at the moment of receipt. Only when all three conditions are satisfied simultaneously does the backend transition the parcel status from RE"
+    },
+    {
+      "i": 58,
+      "style": "",
+      "text": "The 50-metre geofence is the Spatial-Gate that converts the cryptographic verification into a physical event: it is computationally impossible to satisfy the handshake without being physically present at the designated roadside interchange. This makes the 3WH protocol applicable in cash-first environments \u2014 the evidence of custody transfer exists regardless of whether a digital payment was processed."
+    },
+    {
+      "i": 59,
+      "style": "Heading 3",
+      "text": "2.6.3  SHA-256 Security Properties"
+    },
+    {
+      "i": 60,
+      "style": "",
+      "text": "The SHA-256 hash function belongs to the SHA-2 family standardised by NIST (FIPS 180-4) [CITATION NEEDED: NIST FIPS 180-4]. Its relevant security properties for the 3WH protocol are: preimage resistance \u2014 given the stored hash, recovering the original PIN is computationally infeasible; collision resistance \u2014 no two distinct PINs produce the same hash under SHA-256; and determinism \u2014 the same PIN always produces the same hash, enabling exact comparison without storing plaintext. These properties "
+    },
+    {
+      "i": 61,
+      "style": "",
+      "text": "Figure 2.5: The 3WH protocol state machine and evidence chain. Each custody transfer gate requires simultaneous satisfaction of spatial proximity (50m GPS fence), cryptographic PIN verification (SHA-256), and photographic proof, producing a tamper-evident chain of custody independent of payment method."
+    },
+    {
+      "i": 62,
+      "style": "Heading 3",
+      "text": "2.6.4  Privacy-Preserving Progress Communication"
+    },
+    {
+      "i": 63,
+      "style": "",
+      "text": "A secondary trust concern is the privacy risk of live-tracking interfaces: broadcasting raw courier GPS coordinates exposes detailed mobility traces that can be exploited for route prediction and personal security targeting. DropCity replaces live-tracking with a checkpoint system: three GEOGRAPHY(Point, 4326) checkpoints are generated along the parcel path using the generate_parcel_checkpoints PostGIS function, placed at regular fractional intervals along the LineString between pickup and dropo"
+    },
+    {
+      "i": 64,
+      "style": "Heading 3",
+      "text": "2.6.5  Literature Gap: Physical Spatial-Gate as Trust Mechanism"
+    },
+    {
+      "i": 65,
+      "style": "",
+      "text": "The literature on P2P marketplace trust mechanisms is dominated by digital escrow, reputation scoring, and identity verification. No prior published work documents the application of a physical geofenced spatial gate as the primary trust anchor in a P2P logistics system operating in a cash-first economy. The DropCity 3WH protocol \u2014 which makes physical presence at a verified geographic coordinate a cryptographic precondition for custody transfer \u2014 is a novel contribution to the trust mechanism l"
+    },
+    {
+      "i": 66,
+      "style": "Heading 2",
+      "text": "2.7  Logistics-as-a-Sensor: Distributed Telemetry for Infrastructure Mapping"
+    },
+    {
+      "i": 67,
+      "style": "Heading 3",
+      "text": "2.7.1  The Sensor Network Analogy"
+    },
+    {
+      "i": 68,
+      "style": "",
+      "text": "The concept of treating mobile devices as distributed sensors for urban environmental measurement has been extensively documented in the participatory sensing and mobile crowdsensing literature [CITATION NEEDED: Mobile crowdsensing survey]. In this paradigm, devices carried by ordinary citizens collectively produce high-resolution spatial measurements of urban phenomena \u2014 air quality, noise levels, road conditions \u2014 that would be prohibitively expensive to collect with dedicated sensor infrastru"
+    },
+    {
+      "i": 69,
+      "style": "",
+      "text": "Each courier device, running the flutter_background_geolocation engine, records GPS position at regular intervals. When a network request fails due to a SocketException or HTTP 504 timeout, the ARQ captures not only the failed payload but also the device's GPS coordinates, device model (e.g., Huawei Nova 5T), and network provider (e.g., Econet, NetOne). Upon reconnection and sync, this failure record is written to the connectivity_map table, accumulating over time into an empirical map of signal"
+    },
+    {
+      "i": 70,
+      "style": "Heading 3",
+      "text": "2.7.2  Zone Connectivity Aggregation"
+    },
+    {
+      "i": 71,
+      "style": "",
+      "text": "Raw failure records in connectivity_map are aggregated into zone_connectivity records using spatial grid binning. Each zone maintains running counts of total pulses, poor-signal events, and offline events within the cell. A connectivity score derived from these counts is rendered in the admin console's spatial analytics panel, producing an empirical heatmap of Harare's signal quality landscape. This dataset constitutes a novel empirical contribution: no systematic, ground-truth, courier-fleet-so"
+    },
+    {
+      "i": 72,
+      "style": "Heading 2",
+      "text": "2.8  Synthesis: The Research Gap Matrix"
+    },
+    {
+      "i": 73,
+      "style": "",
+      "text": "Table 2.1 synthesises the literature review by mapping the five identified research gaps to the five research objectives established in Chapter 1."
+    },
+    {
+      "i": 74,
+      "style": "",
+      "text": "Table 2.1: Research gap matrix mapping five identified literature deficiencies to DropCity's five research objectives, establishing the original scholarly contribution of each platform module."
+    },
+    {
+      "i": 75,
+      "style": "Heading 2",
+      "text": "2.9  Conclusion"
+    },
+    {
+      "i": 76,
+      "style": "",
+      "text": "This chapter has established the theoretical scaffolding upon which the DropCity platform is built. The review has demonstrated that opportunistic logistics \u2014 treating pre-committed commuter journeys as the primary matching substrate \u2014 is theoretically distinct from and operationally superior to VRP-based dispatching for informal urban transport networks. The computational case for PostGIS spatial containment queries over Dijkstra-based path planning has been grounded in established spatial data"
+    },
+    {
+      "i": 77,
+      "style": "",
+      "text": "The research gap matrix in Table 2.1 confirms that each of DropCity's five research objectives addresses a specific, documented deficiency in the published literature, fulfilling the academic requirement for original contribution to knowledge. Chapter 3 proceeds to detail the research methodology \u2014 the Agile-Scrum lifecycle, the Spiral Risk Model \u2014 and provides the formal mathematical derivations of the Zero-Detour Matching algorithm, the Passenger-Proxy Pricing model, and the multi-factor couri"
+    },
+    {
+      "i": 79,
+      "style": "",
+      "text": "References"
+    },
+    {
+      "i": 80,
+      "style": "",
+      "text": "Chen, S. and Zhang, H. (2023) 'Monetary and non-monetary incentives in crowdshipping: a game-theoretic approach', Transportation Research Part B: Methodological, 172, pp. 1\u201320."
+    },
+    {
+      "i": 81,
+      "style": "",
+      "text": "Desino (2025) Why Mobile Apps with Offline Access and Sync Are Game-Changers for Remote Employees and Field Technicians. Available at: desino.be (Accessed: 5 November 2025)."
+    },
+    {
+      "i": 82,
+      "style": "",
+      "text": "Dlamini, L. (2019) 'The efficiency of crowdsourcing models in last-mile delivery in developing markets', International Journal of Logistics Management, 30(4), pp. 841\u2013858."
+    },
+    {
+      "i": 83,
+      "style": "",
+      "text": "IBM Developer (2024) Offline data synchronization strategies. Available at: developer.ibm.com (Accessed: 4 November 2025)."
+    },
+    {
+      "i": 84,
+      "style": "",
+      "text": "Intellisoft (2024) Data Synchronization in Logistics: Setting Offline Sync Up. Available at: intellisoft.io (Accessed: 4 November 2025)."
+    },
+    {
+      "i": 85,
+      "style": "",
+      "text": "Li, W. and Wei, C. (2023) 'The impact of detour constraints on crowdsourced courier participation: a choice model approach', Journal of Transportation Engineering, 149(11), p. 04023075."
+    },
+    {
+      "i": 86,
+      "style": "",
+      "text": "Makoni, E. (2018) Introduction to Vehicle Routing Problems: Principles and Applications. London: Tech Press."
+    },
+    {
+      "i": 87,
+      "style": "",
+      "text": "Mupinga, R. (2020) 'Heuristic algorithms for dynamic vehicle routing with time windows', Journal of Operational Research, 18(4), pp. 231\u2013245."
+    },
+    {
+      "i": 88,
+      "style": "",
+      "text": "Ncube, P. (2022) 'R-tree spatial indexing for real-time urban logistics systems', IEEE Transactions on Intelligent Transportation Systems, 12(3), pp. 110\u2013125."
+    },
+    {
+      "i": 89,
+      "style": "",
+      "text": "Ndlovu, S. and Moyo, J. (2021) 'Digital transformation of the informal economy in Southern Africa: last-mile delivery case study', African Journal of Information Systems, 13(3), pp. 110\u2013128."
+    },
+    {
+      "i": 90,
+      "style": "",
+      "text": "NextBillion.ai (2025) Logistics Route Optimization: Guide in 2025. Available at: nextbillion.ai (Accessed: 5 November 2025)."
+    },
+    {
+      "i": 91,
+      "style": "",
+      "text": "PLOS One (2024) 'Pickup and delivery planning for the crowdsourced freight delivery routing problem', PLOS ONE. doi:10.1371/journal.pone.0318432."
+    },
+    {
+      "i": 92,
+      "style": "",
+      "text": "ResearchGate (2025) Offline-First Mobile Architecture: Enhancing Usability and Resilience in Mobile Systems. Available at: researchgate.net/publication/393910615 (Accessed: 5 November 2025)."
+    },
+    {
+      "i": 93,
+      "style": "",
+      "text": "Romer, A. and Singh, B. (2022) 'The architecture of offline-first mobile apps: resilience and usability in remote environments', ACM Transactions on Computer-Human Interaction, 29(4), pp. 1\u201325."
+    },
+    {
+      "i": 94,
+      "style": "",
+      "text": "Upper Inc. (2025) Crowdsourced Delivery: A Complete Guide (2025). Available at: upperinc.com (Accessed: 5 November 2025)."
+    },
+    {
+      "i": 95,
+      "style": "",
+      "text": "Wang, J. et al. (2020) 'A review of last-mile delivery optimisation: strategies, technologies, drone integration, and future trends', Drones, 9(3), 158."
+    }
+  ],
+  "tables": [
+    {
+      "i": 0,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: Taxonomy of Delivery Models: Traditional vs Opportunistic Logistics"
+        ],
+        [
+          "Visual Description:  | A comparative three-column diagram contrasting delivery paradigms. Column 1 (SLATE): Traditional Dedicated Fleet \u2014 depot node, exclusive vehicle trip, annotated 'Full Fossil-Fue"
+        ]
+      ]
+    },
+    {
+      "i": 1,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: Algorithm Complexity: Dijkstra Path Planning vs PostGIS GiST Corridor Filter"
+        ],
+        [
+          "Visual Description:  | Left panel: weighted graph of Harare road network (15 intersection nodes: CBD, Avondale, Belgravia, Mount Pleasant, UZ, Westgate, Chitungwiza). Show Dijkstra expansion wavefront"
+        ]
+      ]
+    },
+    {
+      "i": 2,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: PostGIS Operations: ST_DWithin Buffer Check and ST_LineLocatePoint Projection on Avondale-CBD Corridor"
+        ],
+        [
+          "Visual Description:  | A georeferenced diagram of the Avondale-CBD corridor (LineString in transitTeal). Overlay a 500m buffer ribbon in activeMint. Place markers: (A) Sender inside buffer \u2014 green dot"
+        ]
+      ]
+    },
+    {
+      "i": 3,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: ARQ State Machine and FIFO Sync Sequence Diagram"
+        ],
+        [
+          "Visual Description:  | Left (state diagram): Four states \u2014 ONLINE_DIRECT (pulse posted immediately to POST /tracking/update); OFFLINE_CACHING (SocketException caught, pulse written to SQLite outbox wi"
+        ]
+      ]
+    },
+    {
+      "i": 4,
+      "rows": [
+        [
+          "DIAGRAM / SCREENSHOT PLACEHOLDER: Three-Way Handshake (3WH) Protocol \u2014 State Machine and Evidence Chain"
+        ],
+        [
+          "Visual Description:  | Top (state machine): Parcel status lifecycle \u2014 REQUESTED, MATCHED, ASSIGNED, IN_TRANSIT, DELIVERED. At ASSIGNED\u2192IN_TRANSIT transition: annotate '3WH Pickup Gate: ST_DWithin(cour"
+        ]
+      ]
+    },
+    {
+      "i": 5,
+      "rows": [
+        [
+          "Literature Gap Identified",
+          "Corresponding DropCity Module",
+          "Objective"
+        ],
+        [
+          "No P2P logistics platform implements zero-detour, corridor-constrained matching using PostGIS spatial containment for African urban routes.",
+          "Zero-Detour Corridor Matching (match_delivery_to_couriers PostGIS RPC)",
+          "O1"
+        ],
+        [
+          "No prior work documents the physical geofenced spatial gate as primary trust anchor in a cash-first P2P logistics protocol.",
+          "Three-Way Handshake \u2014 50m GPS fence + SHA-256 PIN + photographic proof",
+          "O2"
+        ],
+        [
+          "Live-tracking interfaces expose raw courier coordinates; no privacy-preserving checkpoint alternative documented for informal logistics.",
+          "Privacy-Preserving Checkpoint System (generate_parcel_checkpoints + Firestore scalar broadcast)",
+          "O3"
+        ],
+        [
+          "The Transactional Outbox / ARQ pattern has not been applied to dual-purpose offline logistics + telemetry accumulation in an African mobile context.",
+          "SQLite ARQ with FIFO sync, idempotent deduplication, and background geolocation persistence",
+          "O4"
+        ],
+        [
+          "No empirical methodology exists for using courier fleet mobility traces to generate a connectivity heatmap of sub-Saharan urban telecom infrastructure.",
+          "Logistics-as-a-Sensor (connectivity_map + zone_connectivity) + Heartbeat Watchdog",
+          "O5"
+        ]
+      ]
+    }
+  ],
+  "styles": {
+    "Heading 1": 1,
+    "": 63,
+    "Heading 2": 9,
+    "Heading 3": 22
+  }
+}

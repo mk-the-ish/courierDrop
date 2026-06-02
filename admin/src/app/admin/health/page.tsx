@@ -5,9 +5,10 @@ import { Activity } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import StatCard from "@/components/StatCard";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
-const baseUrl =
-  process.env.NEXT_PUBLIC_API_URL || "https://dropcity-backend.onrender.com";
+const baseUrl = getApiBaseUrl();
 
 type Heartbeat = {
   job_name: string;
@@ -16,11 +17,6 @@ type Heartbeat = {
   status: string;
 };
 
-function adminToken() {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("admin_token") || localStorage.getItem("adminToken") || "";
-}
-
 export default function HealthPage() {
   const [heartbeats, setHeartbeats] = useState<Heartbeat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,10 +24,7 @@ export default function HealthPage() {
   useEffect(() => {
     const run = async () => {
       try {
-        const token = adminToken();
-        const res = await fetch(`${baseUrl}/health/heartbeats`, {
-          cache: "no-store",
-        });
+        const res = await fetch(`${baseUrl}/health/heartbeats`, { cache: "no-store" });
         const data = await res.json();
         setHeartbeats(data.heartbeats || []);
       } finally {
@@ -50,50 +43,54 @@ export default function HealthPage() {
     });
   }, [heartbeats]);
 
+  const activeCount = computed.filter((hb) => hb.derivedStatus === "ACTIVE").length;
+
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="space-y-6">
       <PageHeader
         title="System Health"
-        description="Live heartbeat monitor for background jobs"
+        description="A compact heartbeat monitor for background jobs and service liveness."
       />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard title="Jobs Monitored" value={computed.length} icon={Activity} color="teal" />
+        <StatCard title="Active" value={activeCount} icon={Activity} color="green" />
+        <StatCard title="Stale" value={computed.length - activeCount} icon={Activity} color="red" />
+      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Job Heartbeats
-          </CardTitle>
+          <p className="micro-label">Heartbeat Table</p>
+          <CardTitle>Job Pulse Status</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground">Loading...</p>
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-slate-400">
+              Loading heartbeat records...
+            </div>
           ) : computed.length === 0 ? (
-            <p className="text-muted-foreground">No heartbeat records found.</p>
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-slate-400">
+              No heartbeat records found.
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b">
-                    <th className="py-2 text-left">Job</th>
-                    <th className="py-2 text-left">Last Pulse</th>
-                    <th className="py-2 text-left">Expected Freq</th>
-                    <th className="py-2 text-left">Derived</th>
+                  <tr className="border-b border-white/10 text-left">
+                    <th className="py-3 pr-4 font-medium text-slate-400">Job</th>
+                    <th className="py-3 pr-4 font-medium text-slate-400">Last Pulse</th>
+                    <th className="py-3 pr-4 font-medium text-slate-400">Expected Freq</th>
+                    <th className="py-3 pr-4 font-medium text-slate-400">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {computed.map((hb) => (
-                    <tr key={hb.job_name} className="border-b">
-                      <td className="py-2">{hb.job_name}</td>
-                      <td className="py-2">{hb.lastPulseSeconds}s ago</td>
-                      <td className="py-2">{hb.expected_frequency_sec}s</td>
-                      <td className="py-2">
-                        <Badge
-                          className={
-                            hb.derivedStatus === "ZOMBIE"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-green-100 text-green-700"
-                          }
-                        >
+                    <tr key={hb.job_name} className="border-b border-white/5 hover:bg-white/5">
+                      <td className="py-3 pr-4 text-slate-100">{hb.job_name}</td>
+                      <td className="py-3 pr-4 text-slate-300">{hb.lastPulseSeconds}s ago</td>
+                      <td className="py-3 pr-4 text-slate-300">{hb.expected_frequency_sec}s</td>
+                      <td className="py-3 pr-4">
+                        <Badge variant={hb.derivedStatus === "ZOMBIE" ? "error" : "success"}>
                           {hb.derivedStatus}
                         </Badge>
                       </td>

@@ -1,12 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { AlertCircle, Plus, Trash2, Edit2, Bell, Mail } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Bell, Mail, Plus, Trash2, Edit2 } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import StatCard from "@/components/StatCard";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+const baseUrl = getApiBaseUrl();
 
 interface AlertRule {
   id: string;
@@ -20,16 +23,16 @@ interface AlertRule {
 }
 
 const conditionTypes = [
-  { value: 'delivery_time_exceeded', label: 'Delivery Time Exceeded (minutes)' },
-  { value: 'offline_courier', label: 'Courier Offline (minutes)' },
-  { value: 'low_rating', label: 'Low Rating (score)' },
-  { value: 'failed_handshake', label: 'Failed Handshake Detection' },
-  { value: 'gps_gate_violation', label: 'GPS Gate Violation' }
+  { value: "delivery_time_exceeded", label: "Delivery Time Exceeded (minutes)" },
+  { value: "offline_courier", label: "Courier Offline (minutes)" },
+  { value: "low_rating", label: "Low Rating (score)" },
+  { value: "failed_handshake", label: "Failed Handshake Detection" },
+  { value: "gps_gate_violation", label: "GPS Gate Violation" },
 ];
 
 const notificationChannels = [
-  { value: 'sms', label: 'SMS', icon: Bell },
-  { value: 'email', label: 'Email', icon: Mail }
+  { value: "sms", label: "SMS", icon: Bell },
+  { value: "email", label: "Email", icon: Mail },
 ];
 
 export default function AlertsPage() {
@@ -38,28 +41,26 @@ export default function AlertsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    condition_type: 'delivery_time_exceeded',
+    name: "",
+    condition_type: "delivery_time_exceeded",
     condition_value: 30,
-    notification_channel: 'sms',
-    recipient: '',
-    is_active: true
+    notification_channel: "sms",
+    recipient: "",
+    is_active: true,
   });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const getToken = () => {
-    return localStorage.getItem('admin_token') || localStorage.getItem('adminToken') || '';
-  };
+  const getToken = () => localStorage.getItem("admin_token") || localStorage.getItem("adminToken") || "";
 
   const loadRules = async () => {
     setLoading(true);
     setError(null);
     try {
       const token = getToken();
-      if (!token) throw new Error('Not authenticated');
+      if (!token) throw new Error("Not authenticated");
 
       const res = await fetch(`${baseUrl}/admin/alerts/rules`, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
 
       if (!res.ok) {
@@ -73,7 +74,7 @@ export default function AlertsPage() {
       const data = await res.json();
       setRules(data.rules || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load alert rules');
+      setError(err instanceof Error ? err.message : "Failed to load alert rules");
     } finally {
       setLoading(false);
     }
@@ -81,67 +82,59 @@ export default function AlertsPage() {
 
   const saveRule = async () => {
     if (!formData.name || !formData.recipient) {
-      setError('Please fill in all fields');
+      setError("Please fill in all fields");
       return;
     }
 
     try {
       const token = getToken();
-      if (!token) throw new Error('Not authenticated');
+      if (!token) throw new Error("Not authenticated");
 
-      const url = editingId
-        ? `${baseUrl}/admin/alerts/rules/${editingId}`
-        : `${baseUrl}/admin/alerts/rules`;
-
-      const method = editingId ? 'PATCH' : 'POST';
+      const url = editingId ? `${baseUrl}/admin/alerts/rules/${editingId}` : `${baseUrl}/admin/alerts/rules`;
+      const method = editingId ? "PATCH" : "POST";
 
       const res = await fetch(url, {
         method,
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       });
 
-      if (!res.ok) {
-        throw new Error(`Failed to save rule: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Failed to save rule: ${res.status}`);
 
       await loadRules();
       setShowForm(false);
       setEditingId(null);
       setFormData({
-        name: '',
-        condition_type: 'delivery_time_exceeded',
+        name: "",
+        condition_type: "delivery_time_exceeded",
         condition_value: 30,
-        notification_channel: 'sms',
-        recipient: '',
-        is_active: true
+        notification_channel: "sms",
+        recipient: "",
+        is_active: true,
       });
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save rule');
+      setError(err instanceof Error ? err.message : "Failed to save rule");
     }
   };
 
   const deleteRule = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this rule?')) return;
+    if (!confirm("Are you sure you want to delete this rule?")) return;
 
     try {
       const token = getToken();
-      if (!token) throw new Error('Not authenticated');
+      if (!token) throw new Error("Not authenticated");
 
       const res = await fetch(`${baseUrl}/admin/alerts/rules/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
 
-      if (!res.ok) {
-        throw new Error(`Failed to delete rule: ${res.status}`);
-      }
-
+      if (!res.ok) throw new Error(`Failed to delete rule: ${res.status}`);
       await loadRules();
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete rule');
+      setError(err instanceof Error ? err.message : "Failed to delete rule");
     }
   };
 
@@ -152,7 +145,7 @@ export default function AlertsPage() {
       condition_value: rule.condition_value,
       notification_channel: rule.notification_channel,
       recipient: rule.recipient,
-      is_active: rule.is_active
+      is_active: rule.is_active,
     });
     setEditingId(rule.id);
     setShowForm(true);
@@ -162,141 +155,143 @@ export default function AlertsPage() {
     loadRules();
   }, []);
 
-  const conditionTypeLabel = conditionTypes.find(t => t.value === formData.condition_type)?.label || '';
+  const activeCount = useMemo(() => rules.filter((rule) => rule.is_active).length, [rules]);
 
   return (
-    <div className="space-y-8 p-8">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-4xl font-bold text-white mb-2">Alert Rules</h1>
-          <p className="text-slate-400">Configure automated delivery alerts and notifications</p>
-        </div>
-        <Button
-          onClick={() => {
-            setShowForm(!showForm);
-            setEditingId(null);
-            setFormData({
-              name: '',
-              condition_type: 'delivery_time_exceeded',
-              condition_value: 30,
-              notification_channel: 'sms',
-              recipient: '',
-              is_active: true
-            });
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Rule
-        </Button>
+    <div className="space-y-6">
+      <PageHeader
+        title="Alert Rules"
+        description="Configure automated delivery alerts and notifications in a compact, glanceable control surface."
+        action={
+          <Button
+            onClick={() => {
+              setShowForm(!showForm);
+              setEditingId(null);
+              setFormData({
+                name: "",
+                condition_type: "delivery_time_exceeded",
+                condition_value: 30,
+                notification_channel: "sms",
+                recipient: "",
+                is_active: true,
+              });
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Rule
+          </Button>
+        }
+      />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard title="Total Rules" value={rules.length} color="teal" />
+        <StatCard title="Active Rules" value={activeCount} color="green" />
+        <StatCard title="Paused Rules" value={rules.length - activeCount} color="amber" />
       </div>
 
       {error && (
-        <div className="flex gap-2 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-          <p className="text-red-400 text-sm">{error}</p>
+        <div className="flex gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-300" />
+          <p>{error}</p>
         </div>
       )}
 
-      {/* Form */}
       {showForm && (
-        <Card className="bg-slate-800 border-slate-700">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white">
-              {editingId ? 'Edit Alert Rule' : 'Create Alert Rule'}
-            </CardTitle>
+            <p className="micro-label">{editingId ? "Edit Rule" : "Create Rule"}</p>
+            <CardTitle>{editingId ? "Edit Alert Rule" : "Create Alert Rule"}</CardTitle>
+            <CardDescription>
+              Define the trigger and route the notification to the correct recipient channel.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Rule Name</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., High Delivery Time Alert"
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-              />
-            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <label className="block text-sm font-medium text-slate-300">Rule Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., High Delivery Time Alert"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-slate-100 placeholder:text-slate-500 focus:border-orange-accent focus:outline-none"
+                />
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Condition Type</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-300">Condition Type</label>
                 <select
                   value={formData.condition_type}
                   onChange={(e) => setFormData({ ...formData, condition_type: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-slate-100 focus:border-orange-accent focus:outline-none"
                 >
-                  {conditionTypes.map(ct => (
-                    <option key={ct.value} value={ct.value}>{ct.label}</option>
+                  {conditionTypes.map((conditionType) => (
+                    <option key={conditionType.value} value={conditionType.value}>
+                      {conditionType.label}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Threshold Value</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-300">Threshold Value</label>
                 <input
                   type="number"
                   value={formData.condition_value}
                   onChange={(e) => setFormData({ ...formData, condition_value: parseInt(e.target.value) })}
                   placeholder="30"
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-slate-100 placeholder:text-slate-500 focus:border-orange-accent focus:outline-none"
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Notification Channel</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-300">Notification Channel</label>
                 <select
                   value={formData.notification_channel}
                   onChange={(e) => setFormData({ ...formData, notification_channel: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-slate-100 focus:border-orange-accent focus:outline-none"
                 >
-                  {notificationChannels.map(nc => (
-                    <option key={nc.value} value={nc.value}>{nc.label}</option>
+                  {notificationChannels.map((channel) => (
+                    <option key={channel.value} value={channel.value}>
+                      {channel.label}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Recipient (Phone/Email)</label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-300">Recipient (Phone/Email)</label>
                 <input
                   type="text"
                   value={formData.recipient}
                   onChange={(e) => setFormData({ ...formData, recipient: e.target.value })}
                   placeholder="+1234567890"
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-slate-100 placeholder:text-slate-500 focus:border-orange-accent focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
               <input
                 type="checkbox"
                 id="is_active"
                 checked={formData.is_active}
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-blue-600"
+                className="h-4 w-4 rounded border-white/20 bg-white/5 text-orange-accent"
               />
               <label htmlFor="is_active" className="text-sm font-medium text-slate-300">
-                Rule is Active
+                Rule is active
               </label>
             </div>
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-2">
+              <Button onClick={saveRule}>{editingId ? "Update Rule" : "Create Rule"}</Button>
               <Button
-                onClick={saveRule}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {editingId ? 'Update Rule' : 'Create Rule'}
-              </Button>
-              <Button
+                variant="outline"
                 onClick={() => {
                   setShowForm(false);
                   setEditingId(null);
                 }}
-                variant="outline"
-                className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
               >
                 Cancel
               </Button>
@@ -305,56 +300,52 @@ export default function AlertsPage() {
         </Card>
       )}
 
-      {/* Rules List */}
-      <Card className="bg-slate-800 border-slate-700">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white">Active Rules ({rules.length})</CardTitle>
-          <CardDescription className="text-slate-400">Manage your alert rules</CardDescription>
+          <p className="micro-label">Rules Library</p>
+          <CardTitle>Active Rules</CardTitle>
+          <CardDescription>Manage the operational alert set used by the logistics stack.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {rules.map(rule => (
-              <div key={rule.id} className="p-4 bg-slate-700 rounded-lg border border-slate-600 flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-medium text-white">{rule.name}</h3>
-                    {rule.is_active ? (
-                      <Badge className="bg-green-500/20 text-green-400 border-0">Active</Badge>
-                    ) : (
-                      <Badge className="bg-slate-600 text-slate-300 border-0">Inactive</Badge>
-                    )}
+          {loading ? (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-slate-400">
+              Loading alert rules...
+            </div>
+          ) : rules.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-slate-400">
+              No alert rules found.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {rules.map((rule) => (
+                <div
+                  key={rule.id}
+                  className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-slate-100">{rule.name}</h3>
+                      <Badge variant={rule.is_active ? "success" : "secondary"}>
+                        {rule.is_active ? "Active" : "Paused"}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {conditionTypes.find((type) => type.value === rule.condition_type)?.label || rule.condition_type} •
+                      {rule.condition_value} • {rule.notification_channel?.toUpperCase?.() ?? "UNKNOWN"} → {rule.recipient}
+                    </p>
                   </div>
-                  <p className="text-sm text-slate-300">
-                    {conditionTypes.find(t => t.value === rule.condition_type)?.label} {rule.condition_type === 'failed_handshake' ? '' : `≥ ${rule.condition_value}`}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-2">
-                    Notify via {rule.notification_channel.toUpperCase()} to {rule.recipient}
-                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => editRule(rule)}>
+                      <Edit2 className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => deleteRule(rule.id)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => editRule(rule)}
-                    size="sm"
-                    variant="outline"
-                    className="bg-slate-600 border-slate-500 text-slate-200 hover:bg-slate-500"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    onClick={() => deleteRule(rule.id)}
-                    size="sm"
-                    variant="outline"
-                    className="bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-          {rules.length === 0 && (
-            <div className="text-center py-8 text-slate-400">
-              No alert rules configured. Create one to get started.
+              ))}
             </div>
           )}
         </CardContent>

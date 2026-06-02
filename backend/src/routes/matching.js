@@ -43,10 +43,15 @@ router.post(
     const matches =
       (data || []).map((row) => ({
         corridor_id: row.corridor_id,
+        corridorId: row.corridor_id,
         pickup_fraction: row.pickup_fraction,
+        pickupFraction: row.pickup_fraction,
         dropoff_fraction: row.dropoff_fraction,
+        dropoffFraction: row.dropoff_fraction,
         pickup_point: parseWktPoint(row.pickup_point),
-        dropoff_point: parseWktPoint(row.dropoff_point)
+        pickupPoint: parseWktPoint(row.pickup_point),
+        dropoff_point: parseWktPoint(row.dropoff_point),
+        dropoffPoint: parseWktPoint(row.dropoff_point)
       })) || [];
 
     return res.json({ matches });

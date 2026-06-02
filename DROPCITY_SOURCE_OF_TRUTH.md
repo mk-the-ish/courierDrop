@@ -1,6 +1,6 @@
 # DropCity Platform Source of Truth
 
-Last updated: May 28, 2026  
+Last updated: May 30, 2026  
 Owner: Project team (update this file whenever core flows or APIs change)
 
 ## 1) What DropCity Is Supposed To Achieve
@@ -245,6 +245,11 @@ Key entities:
 ## 9) Deliverables Status (Implemented vs Pending)
 
 ### Implemented (high confidence)
+- Shared DropCity brand palette standardized across Admin, Client, and Courier apps: orange accent (`#FF6B35`), orange light (`#FFA500`), dark gradient surfaces, and text colors adjusted so light surfaces use dark readable text instead of grey-on-white.
+- Admin web console restyled into a compact dark bento/dashboard system that matches the supplied design pattern and screenshots; sidebar, headers, stat cards, tables, and operational pages now share one visual language.
+- Client and courier app navigation shells polished with darker, cleaner bottom bars and more consistent accent treatment.
+- Client dashboard simplified with a compact summary hero, fewer redundant cards, and clearer parcel cards.
+- Courier dashboard simplified with a compact summary hero, cleaner service-state presentation, and removed duplicate workload cards.
 - Multi-step courier signup flow and profile capture screens (fixed type mismatches: year/capacity now sent as strings; auth token properly set after step1 signup).
 - Multi-step client signup flow.
 - Client 5-step delivery creation flow wired from dashboard.
@@ -264,6 +269,7 @@ Key entities:
 - **Courier app logo and navigation**: DropCity logo asset on splash/welcome screens; 4-tab bottom navigation (`Home`, `Routes`, `Parcels`, `Settings`) with consolidated navigation; dashboard cleaned up (removed action buttons, settings icon moved to nav); pickup mode button moved to parcels screen.
 - Client navigation integrated (ClientNavigationHubScreen) with IndexedStack for efficient screen switching.
 - Courier navigation integrated (NavigationHubScreen) with proper screen management and WillPopScope.
+- Mobile theme files now expose the shared DropCity palette consistently, including light-theme text contrast fixes so white cards remain readable.
 - Background tracking hardening for app-closed resilience upgraded on courier runtime using background geolocation engine.
 - Map-provider ETA source integration implemented (OpenStreetMap OSRM + Nominatim, keyless graceful fallback).
 - Google Maps removed from both client and courier mobile apps; OpenStreetMap now powers route drawing, pickup/dropoff map views, and location search flows.
@@ -271,12 +277,16 @@ Key entities:
 - Courier route declaration, pickup, and dropoff map surfaces migrated to `flutter_map` with OSM tiles, Nominatim search, and OSRM routing.
 - OpenStreetMap hardening applied to core map flows: built-in tile caching explicitly enabled, retry/backoff wrapped around OSM HTTP calls, and finite-coordinate guards added to prevent NaN camera/tile crashes.
 - Secondary location surfaces now also use the same OSM preview pattern where GPS is collected (client recipient handoff, client parcel status check-in, client progress dropoff, courier pickup mode).
-- Courier corridor routing now supports true multi-stop waypoint routing through all selected points, with ordered markers, auto-fit bounds, and multi-point OSRM path snapping.
+- Courier corridor routing now supports true multi-stop waypoint routing through all selected points, with ordered markers, auto-fit bounds, multi-point OSRM path snapping, and explicit insert-after-stop selection so intermediate waypoints can be placed between existing stops.
 - Flutter background geolocation API corrections applied (removed invalid notificationTitle/Text params, fixed onLocation callback async handling).
 - Background tracking permission gate now requires true background-capable location permission for app-closed courier operation.
 - Background tracking config now includes stronger motion/scheduling settings (`stopTimeout`, `motionTriggerDelay`, `scheduleUseAlarmManager`, and Always authorization request) for production hardening.
+- Admin dashboard now uses a single shared API base URL helper across pages, and the main dashboard reads the scheduler response shape correctly (`schedulerRunning` from `/health/jobs` plus `/health/status` for health checks).
+- Backend schema alignment migration added for `courier_score_snapshots`, and `notification_recipients.user_id` is aligned to backend string user IDs.
+- Harare demo seed script added for admin operational verification: `backend/scripts/seed_harare_demo.js`.
 
 ### Partially implemented / still maturing
+- Remaining mobile screens beyond the home/navigation surfaces still need a final visual consistency pass so the entire client/courier apps feel equally polished.
 - Full recipient/courier PIN-and-proof completion UX hardening across all edge cases.
 - Admin conflict resolution now includes dedicated UI + actions + audit trail; remaining work is policy tuning (SLA automation, refunds integration, escalation workflow routing).
 - Device/OEM-specific background execution policy tuning and long-haul field validation still recommended for app-closed courier tracking.
@@ -320,6 +330,7 @@ Key entities:
 - Route templates should be reusable indefinitely; each use creates independent corridor for operations.
 - Planned route start reminders are emitted to courier as local app notifications when planned start time is reached (`RouteStartReminderService`, one-time per route instance).
 - OpenStreetMap integration upgraded in courier route map flow: start/end search fields with Nominatim autocomplete + coordinate resolution, then OSRM route preview generation.
+- Corridor builder now exposes insertion slots so a courier can choose whether the next waypoint appends to the end or lands after a specific stop, enabling true between-stop editing.
 
 ## 11) Known Risks and Constraints
 - Some repo documents are stale relative to current implementation.

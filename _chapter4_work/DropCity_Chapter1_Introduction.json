@@ -1,0 +1,441 @@
+{
+  "paragraphs": [
+    {
+      "i": 0,
+      "style": "Normal",
+      "text": "UNIVERSITY OF ZIMBABWE"
+    },
+    {
+      "i": 1,
+      "style": "Normal",
+      "text": "Faculty of Computer Engineering, Informatics and Communications"
+    },
+    {
+      "i": 2,
+      "style": "Normal",
+      "text": "Department of Computer Science"
+    },
+    {
+      "i": 5,
+      "style": "Normal",
+      "text": "DropCity:"
+    },
+    {
+      "i": 6,
+      "style": "Normal",
+      "text": "A Resilient Peer-to-Peer Logistics Ecosystem Using Zero-Detour Corridor Matching"
+    },
+    {
+      "i": 7,
+      "style": "Normal",
+      "text": "B.Sc. Honours in Computer Science \u2014 Part 4 Capstone Dissertation"
+    },
+    {
+      "i": 10,
+      "style": "Normal",
+      "text": "Submitted by:"
+    },
+    {
+      "i": 11,
+      "style": "Normal",
+      "text": "Simon Mkaro"
+    },
+    {
+      "i": 12,
+      "style": "Normal",
+      "text": "Registration Number: R223872N"
+    },
+    {
+      "i": 14,
+      "style": "Normal",
+      "text": "Supervisor: Mr A. Muramba"
+    },
+    {
+      "i": 15,
+      "style": "Normal",
+      "text": "June 2026"
+    },
+    {
+      "i": 17,
+      "style": "Heading 1",
+      "text": "CHAPTER 1: INTRODUCTION"
+    },
+    {
+      "i": 18,
+      "style": "Normal",
+      "text": "This chapter establishes the research context, motivation, and scholarly justification for the DropCity platform. It constructs the problem domain from first principles \u2014 examining the latent transport economics of Harare's informal commuter networks, the inadequacy of existing delivery paradigms, and the infrastructure fragility that defines daily digital experience in the developing world. The chapter then articulates the project's core aims, formal research objectives, academic scope, feasibi"
+    },
+    {
+      "i": 19,
+      "style": "Heading 2",
+      "text": "1.1  Background and Context"
+    },
+    {
+      "i": 20,
+      "style": "Normal",
+      "text": "Urban logistics in the developing world operates under fundamentally different constraints from the environments that motivate most published literature on delivery optimisation. In high-income cities, the dominant challenge is the last-mile problem: how to efficiently route a dedicated vehicle between a distribution hub and a dense cluster of recipients. In Harare, Zimbabwe's capital city, the problem is structurally different. The question is not how to deploy a dedicated vehicle \u2014 it is why a"
+    },
+    {
+      "i": 21,
+      "style": "Normal",
+      "text": "Harare's urban topology is organised around high-density commuter arteries that radiate outward from the Central Business District (CBD). Routes such as Chitungwiza\u2013CBD, Westgate\u2013CBD, and CBD\u2013University of Zimbabwe (Mt Pleasant) carry enormous daily passenger volumes. Each vehicle travelling these corridors represents unused volumetric transport capacity \u2014 physical space that could, with appropriate digital coordination, carry small parcels alongside paying passengers at negligible marginal cost"
+    },
+    {
+      "i": 22,
+      "style": "Normal",
+      "text": "Despite this potential, no mature digital platform has successfully formalised and operationalised this opportunistic logistics layer. Existing peer-to-peer delivery platforms, including inDrive and Lalamove, rely on proximity-based dispatching: they route the nearest available driver to a pickup location, invariably requiring a dedicated detour. This model ignores the most economically rational actor in the Harare logistics landscape \u2014 the commuter who is already going there. DropCity is design"
+    },
+    {
+      "i": 24,
+      "style": "Normal",
+      "text": "Figure 1.1: Harare's principal commuter corridors and their 500-metre spatial buffer zones, constituting the DropCity operational theatre. Parcels are eligible for algorithmic matching only when both pickup and drop-off coordinates fall within the teal-shaded corridor buffer of a courier's declared route."
+    },
+    {
+      "i": 25,
+      "style": "Normal",
+      "text": "Figure 1.1 illustrates why a spatial buffer approach is both necessary and sufficient for matching in this domain: the dense, parallel nature of Harare's radial road network ensures that high proportions of delivery requests naturally fall within 500 metres of an active commuter route, making zero-detour matching operationally viable at scale."
+    },
+    {
+      "i": 28,
+      "style": "Heading 2",
+      "text": "1.2  Problem Statement"
+    },
+    {
+      "i": 29,
+      "style": "Normal",
+      "text": "The core problem this research addresses is the absence of a computationally principled and infrastructure-resilient mechanism for matching parcel delivery demand with pre-existing, informal commuter transport supply in sub-Saharan urban environments. This problem decomposes into four constituent deficits, each of which DropCity is designed to resolve."
+    },
+    {
+      "i": 30,
+      "style": "Heading 3",
+      "text": "1.2.1  The Passenger-Commute Asset Deficit"
+    },
+    {
+      "i": 31,
+      "style": "Normal",
+      "text": "Harare's minibus (Kombi) operators and private commuters collectively traverse hundreds of thousands of vehicle-kilometres per day along fixed routes. The volumetric capacity of these vehicles \u2014 measured in kilogrammes and cubic centimetres \u2014 is almost entirely under-utilised with respect to small parcel transport. No existing platform converts this latent physical capacity into an economic asset. The result is that clients requiring small parcel delivery must commission a dedicated trip, incurr"
+    },
+    {
+      "i": 32,
+      "style": "Heading 3",
+      "text": "1.2.2  The Digital Dead-Zone Problem"
+    },
+    {
+      "i": 33,
+      "style": "Normal",
+      "text": "Zimbabwe's cellular telecommunications infrastructure is characterised by severe spatial heterogeneity. Econet Wireless, the dominant provider, reports high aggregate coverage, but ground-truth signal quality along urban corridors varies dramatically. Field observation confirms that routes including the Avondale\u2013Belgravia dip and sections of the Sam Nujoma corridor experience frequent connectivity interruptions categorised as digital dead zones \u2014 periods during which HTTP requests fail with Sock"
+    },
+    {
+      "i": 34,
+      "style": "Heading 3",
+      "text": "1.2.3  The Privacy-vs-Transparency Tension"
+    },
+    {
+      "i": 35,
+      "style": "Normal",
+      "text": "Conventional live-tracking interfaces \u2014 displaying a moving courier icon on a map in real time \u2014 expose the precise geolocation of the courier continuously throughout a delivery. In cash-based, informal market contexts, this creates an exploitable security surface: a malicious actor can monitor courier movement patterns, infer pickup and drop-off locations, and identify high-value delivery windows. A technically sound privacy-preserving alternative \u2014 one that communicates delivery progress meani"
+    },
+    {
+      "i": 36,
+      "style": "Heading 3",
+      "text": "1.2.4  The Custodial Security Gap"
+    },
+    {
+      "i": 37,
+      "style": "Normal",
+      "text": "Informal parcel delivery in Harare relies on verbal confirmation, personal trust networks, and \u2014 in best cases \u2014 a single telephonic handover code. No standardised, cryptographically secure, multi-party chain-of-custody mechanism exists for the informal courier market. This creates irreversible ambiguity in the event of a disputed delivery: neither party possesses admissible evidence of where, when, and to whom the parcel was transferred."
+    },
+    {
+      "i": 39,
+      "style": "Normal",
+      "text": "Figure 1.2: Ishikawa decomposition of the urban last-mile logistics failure domain in Harare, illustrating the four principal problem dimensions that DropCity's technical architecture is designed to resolve."
+    },
+    {
+      "i": 40,
+      "style": "Normal",
+      "text": "The four-part decomposition in Figure 1.2 is important because it demonstrates that DropCity's contribution is not simply an application \u2014 it is a systems-level response to a cluster of interconnected socio-technical failures, each requiring a distinct algorithmic or architectural solution."
+    },
+    {
+      "i": 41,
+      "style": "Heading 2",
+      "text": "1.3  Aim"
+    },
+    {
+      "i": 42,
+      "style": "Normal",
+      "text": "This project aims to design, develop, and empirically evaluate a comprehensive multi-application logistics platform that operationalises the concept of opportunistic corridor-based delivery in Harare's informal commuter transport network. The platform prioritises zero additional detour for couriers, cryptographic chain-of-custody security, privacy-preserving progress communication, and infrastructure-agnostic resilience to intermittent network connectivity \u2014 thereby producing a technically matur"
+    },
+    {
+      "i": 43,
+      "style": "Heading 2",
+      "text": "1.4  Research Objectives"
+    },
+    {
+      "i": 44,
+      "style": "Normal",
+      "text": "The following five objectives structure the technical and empirical scope of this research:"
+    },
+    {
+      "i": 45,
+      "style": "Normal",
+      "text": "Table 1.1: The five formal research objectives of the DropCity project, each corresponding to a distinct technical module."
+    },
+    {
+      "i": 46,
+      "style": "Heading 2",
+      "text": "1.5  Scope and Delimitations"
+    },
+    {
+      "i": 47,
+      "style": "Normal",
+      "text": "The operational scope of DropCity is restricted to intra-city parcel delivery within the Harare metropolitan area. The system supports parcels categorised as Small (S), Medium (M), or Large (L), with weight limits defined by the capacity of the matched courier vehicle. Deliverables include: a Flutter-based client mobile application, a Flutter-based courier mobile application, a Next.js administrative console, and a Node.js/Express backend API layer persisting to Supabase/PostgreSQL with PostGIS "
+    },
+    {
+      "i": 48,
+      "style": "Normal",
+      "text": "The following are explicitly outside the scope of this research: inter-city logistics, temperature-controlled or hazardous goods delivery, automated payment escrow integration (EcoCash/InnBucks settlement is acknowledged as a future phase), and hardware-level telecommunications infrastructure improvement. The system assumes that couriers possess a smartphone capable of running a Flutter application and that clients have access to a mobile internet connection at the time of parcel creation."
+    },
+    {
+      "i": 49,
+      "style": "Heading 2",
+      "text": "1.6  Feasibility Study"
+    },
+    {
+      "i": 50,
+      "style": "Heading 3",
+      "text": "1.6.1  Technical Feasibility"
+    },
+    {
+      "i": 51,
+      "style": "Normal",
+      "text": "The DropCity platform is implemented using a mature, production-grade technology stack. Flutter (Dart) provides high-performance, single-codebase mobile applications for Android. PostGIS, the spatial extension to PostgreSQL, provides industry-standard geospatial query capabilities including ST_DWithin, ST_LineLocatePoint, and ST_ClosestPoint \u2014 the three PostGIS functions that are the computational core of the Zero-Detour Matching algorithm. Node.js/Express provides a non-blocking I/O API gateway"
+    },
+    {
+      "i": 52,
+      "style": "Heading 3",
+      "text": "1.6.2  Economic Feasibility"
+    },
+    {
+      "i": 53,
+      "style": "Normal",
+      "text": "The platform's deployment cost is constrained to cloud service subscriptions: backend hosting on Render, managed PostgreSQL on Supabase, and Firebase services on a free-tier baseline. The total estimated operational budget for pilot deployment is US$90, itemised in Table 1.2 below. The revenue model leverages a Platform Debt mechanic: couriers accumulate a small percentage obligation on each completed delivery, settling periodically to maintain active platform status, thereby requiring no upfron"
+    },
+    {
+      "i": 55,
+      "style": "Normal",
+      "text": "Table 1.2: Project budget allocation for pilot deployment of the DropCity platform."
+    },
+    {
+      "i": 56,
+      "style": "Heading 3",
+      "text": "1.6.3  Operational Feasibility"
+    },
+    {
+      "i": 57,
+      "style": "Normal",
+      "text": "The DropCity model is operationally aligned with existing behavioural patterns among Harare commuters. The concept of transporting small items alongside passengers is culturally embedded in the Kombi culture \u2014 informal agreements to carry parcels between regular passengers are commonplace. DropCity digitises and formalises this existing behaviour rather than introducing an unfamiliar practice. The pricing model, benchmarked against existing Kombi passenger fares, ensures that courier compensatio"
+    },
+    {
+      "i": 58,
+      "style": "Heading 3",
+      "text": "1.6.4  Legal and Ethical Feasibility"
+    },
+    {
+      "i": 59,
+      "style": "Normal",
+      "text": "The platform collects minimal personally identifiable information. Raw GPS coordinates are never exposed to clients or third parties; only scalar progress percentages are transmitted via the public Firestore channel. SHA-256 hashing of one-time PINs ensures that the custodial verification mechanism does not store plaintext sensitive codes. National ID verification during courier onboarding aligns with Zimbabwe's financial and transport regulatory norms for informal operator registration."
+    },
+    {
+      "i": 60,
+      "style": "Heading 2",
+      "text": "1.7  Significance and Motivation"
+    },
+    {
+      "i": 61,
+      "style": "Heading 3",
+      "text": "1.7.1  The Education 5.0 Imperative"
+    },
+    {
+      "i": 62,
+      "style": "Normal",
+      "text": "Zimbabwe's national Education 5.0 policy mandates that university research must transcend the production of theoretical knowledge and deliver tangible, community-relevant products. DropCity is a direct embodiment of this mandate: it converts advanced academic concepts \u2014 distributed computing, spatial database theory, cryptographic verification, and offline-first mobile architecture \u2014 into a deployable logistics service with measurable socio-economic impact on urban Harare."
+    },
+    {
+      "i": 63,
+      "style": "Heading 3",
+      "text": "1.7.2  Contribution to Distributed Computing Theory"
+    },
+    {
+      "i": 64,
+      "style": "Normal",
+      "text": "Beyond its application value, DropCity makes three specific contributions to the academic body of knowledge in Parallel and Distributed Computing (PDC). First, it demonstrates the viability of treating a fleet of consumer smartphones as a distributed telemetry network \u2014 Logistics-as-a-Sensor \u2014 capable of generating empirical telecommunications infrastructure maps. Second, it operationalises the Asynchronous Request Queue pattern in a real-world urban logistics context, providing a documented cas"
+    },
+    {
+      "i": 65,
+      "style": "Heading 3",
+      "text": "1.7.3  Carbon Footprint Reduction"
+    },
+    {
+      "i": 66,
+      "style": "Normal",
+      "text": "By routing parcels through journeys that would occur regardless of delivery demand, DropCity eliminates the marginal carbon cost of dedicated delivery vehicles. In an urban environment where fuel costs represent a significant portion of household expenditure, this efficiency gain is not merely environmental \u2014 it is a direct reduction in the operational cost of the delivery ecosystem."
+    },
+    {
+      "i": 67,
+      "style": "Normal",
+      "text": "Figure 1.3: Competitive positioning of DropCity relative to existing peer-to-peer delivery platforms along the dimensions of route optimisation depth and infrastructure resilience. DropCity occupies a unique position in the top-right quadrant, combining spatial corridor precision with offline-first architectural design."
+    },
+    {
+      "i": 68,
+      "style": "Normal",
+      "text": "Figure 1.3 makes explicit that DropCity's academic and commercial contribution is not incremental improvement within an existing product category \u2014 it is the creation of a new category: the offline-first, zero-detour, corridor-matched logistics platform. No comparable platform has been documented for sub-Saharan urban contexts."
+    },
+    {
+      "i": 69,
+      "style": "Heading 2",
+      "text": "1.8  Work Plan"
+    },
+    {
+      "i": 70,
+      "style": "Normal",
+      "text": "The project was executed across a fourteen-week timeline divided into three major phases, governed by the Agile-Scrum methodology combined with elements of the Spiral Risk Model to manage spatial algorithm uncertainty and security protocol design risks. Table 1.3 summarises the phase structure; Figure 1.4 presents the Gantt chart."
+    },
+    {
+      "i": 71,
+      "style": "Normal",
+      "text": "Table 1.3: Three-phase project work plan across a fourteen-week execution timeline."
+    },
+    {
+      "i": 73,
+      "style": "Normal",
+      "text": "Figure 1.4: Project Gantt chart depicting the fourteen-week execution timeline. Colour coding distinguishes the three project phases: Planning and Design (teal), Development and Implementation (mint), and Evaluation and Refinement (amber)."
+    },
+    {
+      "i": 74,
+      "style": "Heading 2",
+      "text": "1.9  Overview of the Technical Architecture"
+    },
+    {
+      "i": 75,
+      "style": "Normal",
+      "text": "To contextualise the chapters that follow, this section provides a concise architectural preview. DropCity is a distributed system comprising four communicating nodes: the Client Flutter Application, the Courier Flutter Application, the Next.js Administrative Console, and the Node.js/Express API Gateway. The API Gateway mediates all communication between mobile clients and the Supabase PostgreSQL/PostGIS database, with Firebase Firestore serving as the real-time channel for parcel status and pro"
+    },
+    {
+      "i": 77,
+      "style": "Normal",
+      "text": "Figure 1.5: High-level distributed system architecture of DropCity, illustrating data flow between mobile client nodes, the Express API gateway, background intelligence workers, and the dual-persistence layer (PostgreSQL/PostGIS + Firestore)."
+    },
+    {
+      "i": 78,
+      "style": "Normal",
+      "text": "The Courier Flutter Application occupies a particularly significant position in this architecture. It functions simultaneously as a delivery execution interface, a distributed telemetry node (Logistics-as-a-Sensor), and an offline-autonomous computing unit. During connectivity loss, it maintains full transactional integrity through the local SQLite Asynchronous Request Queue, flushing cached records sequentially upon network restoration. This design pattern \u2014 treating the mobile device as an inf"
+    },
+    {
+      "i": 79,
+      "style": "Heading 2",
+      "text": "1.10  Chapter Organisation"
+    },
+    {
+      "i": 80,
+      "style": "Normal",
+      "text": "The remainder of this dissertation is structured as follows. Chapter 2 provides a comprehensive literature review, contrasting traditional vehicle routing heuristics with opportunistic logistics models, reviewing the mathematical properties of PostGIS spatial joins, and contextualising the Passenger-Proxy Pricing Model within cash-based informal economies. Chapter 3 details the research methodology, including the Agile-Scrum lifecycle, the Spiral Risk Model, and the formal mathematical derivatio"
+    },
+    {
+      "i": 81,
+      "style": "Heading 2",
+      "text": "1.11  Conclusion"
+    },
+    {
+      "i": 82,
+      "style": "Normal",
+      "text": "This chapter has established the socio-technical context that motivates the DropCity platform, decomposed the problem domain into four constituent deficits, articulated five formal research objectives, and demonstrated the project's technical, economic, operational, and ethical feasibility. The chapter has positioned DropCity within Zimbabwe's Education 5.0 mandate and demonstrated that the platform's contribution is both a deployable socio-economic product and a novel academic contribution to P"
+    }
+  ],
+  "tables": [
+    {
+      "i": 0,
+      "rows": [
+        [
+          "Objective",
+          "Formal Statement"
+        ],
+        [
+          "O1 \u2014 Zero-Detour Matching",
+          "Design and implement a spatial corridor-matching algorithm that restricts parcel assignment to corridors where both the pickup point L_p and drop-off point L_d lie within a configurable buffer W of a "
+        ],
+        [
+          "O2 \u2014 Three-Way Handshake (3WH)",
+          "Implement a multi-party chain-of-custody protocol combining a 50-metre GPS proximity fence, a SHA-256 hashed one-time PIN, and photographic proof of condition \u2014 establishing an admissible, tamper-evid"
+        ],
+        [
+          "O3 \u2014 Privacy-Preserving ETA",
+          "Replace continuous live-tracking with a dynamic geofenced checkpoint system that communicates delivery progress exclusively as a scalar percentage, protecting courier geolocation whilst maintaining cl"
+        ],
+        [
+          "O4 \u2014 Offline-First Synchronisation",
+          "Implement an SQLite-backed Asynchronous Request Queue (ARQ) that captures location telemetry and transaction states locally during connectivity loss, and performs idempotent, FIFO-sequenced synchronis"
+        ],
+        [
+          "O5 \u2014 Logistics-as-a-Sensor and Watchdog Reliability",
+          "Instrument the courier fleet as a distributed telemetry network that logs device model, network provider, and geolocation of signal failures, enabling construction of an empirical connectivity heatmap"
+        ]
+      ]
+    },
+    {
+      "i": 1,
+      "rows": [
+        [
+          "Budget Item",
+          "Estimated Cost (USD)"
+        ],
+        [
+          "Cloud backend hosting (Render)",
+          "$25"
+        ],
+        [
+          "Managed database services (Supabase)",
+          "$30"
+        ],
+        [
+          "Mapping / Geolocation APIs (Google Maps Platform)",
+          "$20"
+        ],
+        [
+          "Contingency \u2014 additional cloud usage, unforeseen costs",
+          "$15"
+        ],
+        [
+          "TOTAL",
+          "$90"
+        ]
+      ]
+    },
+    {
+      "i": 2,
+      "rows": [
+        [
+          "Phase",
+          "Activities and Deliverables"
+        ],
+        [
+          "Phase 1: Planning and Design (Weeks 1\u20134)",
+          "Market research and informal transport observation; requirements elicitation via stakeholder interviews; system architecture design; PostGIS schema definition; UI/UX wireframes for all three applicati"
+        ],
+        [
+          "Phase 2: Development and Implementation (Weeks 5\u201310)",
+          "Backend API and PostGIS stored procedures; Flutter client application (5-step delivery creation, real-time notification); Flutter courier application (route declaration, ARQ tracking, 3WH handshake); "
+        ],
+        [
+          "Phase 3: Evaluation and Refinement (Weeks 11\u201314)",
+          "Harare CBD\u2013UZ pilot simulation; connectivity heatmap data collection; performance benchmarking (matching latency, geofence accuracy); user satisfaction surveys; documentation finalisation; dissertatio"
+        ]
+      ]
+    }
+  ],
+  "styles": {
+    "Normal": 47,
+    "Heading 1": 1,
+    "Heading 2": 11,
+    "Heading 3": 11
+  }
+}

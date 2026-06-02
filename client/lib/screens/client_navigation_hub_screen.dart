@@ -39,31 +39,43 @@ class _ClientNavigationHubScreenState extends State<ClientNavigationHubScreen> {
           index: _selectedIndex,
           children: _screens,
         ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.grey[900],
-          elevation: 8,
-          selectedItemColor: dropCityOrangeAccent,
-          unselectedItemColor: dropCityTextGrey,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: "Home",
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: Color(0x224B5563))),
+            color: dropCityObsidianDeep,
+          ),
+          child: SafeArea(
+            top: false,
+            child: BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) => setState(() => _selectedIndex = index),
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: dropCityObsidianDeep,
+              elevation: 0,
+              selectedItemColor: dropCityOrangeAccent,
+              unselectedItemColor: dropCityTextGrey,
+              showSelectedLabels: true,
+              showUnselectedLabels: true,
+              selectedFontSize: 12,
+              unselectedFontSize: 12,
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: "Home",
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.local_shipping),
+                  label: "Deliveries",
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person),
+                  label: "Account",
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.local_shipping),
-              label: "Deliveries",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: "Account",
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
-

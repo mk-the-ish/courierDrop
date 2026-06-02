@@ -243,6 +243,7 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
   Timer? _searchDebounce;
   Timer? _cameraDebounce;
   int _routeRequestId = 0;
+  int? _insertAfterIndex;
 
   @override
   void initState() {
@@ -299,6 +300,7 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
             onTap: () {
               if (index < 0 || index >= _points.length) return;
               _points.removeAt(index);
+              _normalizeInsertAfterIndex();
               _rebuildMarkers();
               setState(() {});
               _scheduleRouteUpdate();
@@ -332,6 +334,29 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
     }
   }
 
+  void _normalizeInsertAfterIndex() {
+    if (_points.isEmpty) {
+      _insertAfterIndex = null;
+      return;
+    }
+    if (_insertAfterIndex == null) return;
+    if (_insertAfterIndex! >= _points.length) {
+      _insertAfterIndex = _points.length - 1;
+    }
+    if (_insertAfterIndex! < 0) {
+      _insertAfterIndex = null;
+    }
+  }
+
+  void _setInsertAfterIndex(int? index) {
+    if (index == null) {
+      setState(() => _insertAfterIndex = null);
+      return;
+    }
+    if (index < 0 || index >= _points.length) return;
+    setState(() => _insertAfterIndex = index);
+  }
+
   void _addPoint(LatLng point) {
     if (!isFiniteLatLng(point)) {
       return;
@@ -342,7 +367,12 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
       );
       return;
     }
-    _points.add(point);
+    final insertAfter = _insertAfterIndex;
+    final int insertIndex = insertAfter == null
+        ? _points.length
+        : (insertAfter + 1).clamp(0, _points.length).toInt();
+    _points.insert(insertIndex, point);
+    _insertAfterIndex = insertIndex;
     _rebuildMarkers();
     _scheduleRouteUpdate();
     setState(() {});
@@ -479,6 +509,7 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
       } else {
         _points[_points.length - 1] = coordinates;
       }
+      _normalizeInsertAfterIndex();
       _rebuildMarkers();
     });
     _scheduleRouteUpdate();
@@ -522,6 +553,7 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
   void _undo() {
     if (_points.isEmpty) return;
     _points.removeLast();
+    _normalizeInsertAfterIndex();
     _rebuildMarkers();
     _polylines.clear();
     setState(() {});
@@ -533,6 +565,7 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
     _markers.clear();
     _polylines.clear();
     _routeInfo = null;
+    _insertAfterIndex = null;
     _startController.clear();
     _endController.clear();
     _startAddress = null;
@@ -552,6 +585,9 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final insertLabel = _insertAfterIndex == null
+        ? "Appending new points at the end"
+        : "Next waypoint inserts after stop ${_insertAfterIndex! + 1}";
     return Scaffold(
       appBar: AppBar(
         title: const Text("Draw Route"),
@@ -609,8 +645,8 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
                 padding: const EdgeInsets.all(12),
                 child: Text(
                   _points.length < 2
-                      ? "Long press map to add start and end points"
-                      : "Long press to add corridor points along the route",
+                      ? "Choose an insertion slot, then long press the map to add the first corridor points"
+                      : "Choose a stop to insert after, then long press the map to add a waypoint between stops",
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
@@ -644,6 +680,42 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
                         isDense: true,
                         labelText: "End location",
                         prefixIcon: Icon(Icons.location_on),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        insertLabel,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.blueGrey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 40,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ChoiceChip(
+                              label: const Text("Append end"),
+                              selected: _insertAfterIndex == null,
+                              onSelected: (_) => _setInsertAfterIndex(null),
+                            ),
+                            const SizedBox(width: 8),
+                            for (var i = 0; i < _points.length; i++) ...[
+                              ChoiceChip(
+                                label: Text("After ${i + 1}"),
+                                selected: _insertAfterIndex == i,
+                                onSelected: (_) => _setInsertAfterIndex(i),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                     if (_isSearchingPlaces)

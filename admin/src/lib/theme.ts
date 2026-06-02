@@ -1,35 +1,30 @@
 // DropCity Brand Theme Constants
-// Based on the official brand guidelines in libmat/fonts.txt
+// Shared palette for admin, courier, and client surfaces.
 
 export const brandColors = {
-  // Transit Teal - Primary color for movement, efficiency, and modern tech feel
+  orangeAccent: '#FF6B35',
+  orangeLight: '#FFA500',
+  darkGradientStart: '#1a1a2e',
+  darkGradientEnd: '#16213e',
   transitTeal: '#008080',
-  
-  // Safe Slate - Deep, dark grey/green for contrast and security
+  activeMint: '#26A69A',
   safeSlate: '#2F4F4F',
-  
-  // Alert Amber - Sparingly used for caution and readiness
-  alertAmber: '#FFBF00',
-  
-  // Cloud White - Clean backgrounds for lightweight feel
+  obsidianDeep: '#06030C',
   cloudWhite: '#F8F9FA',
+  textGrey: '#9CA3AF',
+  borderDark: '#4B5563',
 };
 
 export const heartbeatStates = {
-  // Active Heartbeat - Green pulse
   active: '#22c55e',
-  
-  // Missed Frequency - Amber ripple
-  missed: '#FFBF00',
-  
-  // Watchdog Alert - Red static
+  missed: '#FFA500',
   alert: '#ef4444',
 };
 
 export const themeConfig = {
-  primary: brandColors.transitTeal,
+  primary: brandColors.orangeAccent,
   secondary: brandColors.safeSlate,
-  accent: brandColors.alertAmber,
+  accent: brandColors.orangeLight,
   background: brandColors.cloudWhite,
   success: heartbeatStates.active,
   warning: heartbeatStates.missed,

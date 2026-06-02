@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
-const baseUrl =
-  process.env.NEXT_PUBLIC_API_URL || "https://dropcity-backend.onrender.com";
+const baseUrl = getApiBaseUrl();
 
 function adminToken() {
   if (typeof window === "undefined") return "";
@@ -30,9 +31,7 @@ export default function SettingsPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      const map = new Map<string, unknown>(
-        (data.settings || []).map((row: any) => [row.key, row.value]),
-      );
+      const map = new Map<string, unknown>((data.settings || []).map((row: any) => [row.key, row.value]));
       setMaintenanceMode(Boolean(map.get("maintenance_mode")));
       setMatchingBuffer(String(map.get("global_matching_buffer_m") ?? "500"));
       setRouteDeviation(String(map.get("route_deviation_threshold_m") ?? "500"));
@@ -66,50 +65,51 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="space-y-6">
       <PageHeader
         title="Settings"
-        description="Global toggles and matching thresholds"
+        description="Global toggles and matching thresholds for the courier platform."
       />
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Badge variant={maintenanceMode ? "warning" : "success"} className="justify-center py-3 text-sm">
+          {maintenanceMode ? "Maintenance Enabled" : "Maintenance Off"}
+        </Badge>
+        <Badge variant="secondary" className="justify-center py-3 text-sm">Matching Buffer {matchingBuffer}m</Badge>
+        <Badge variant="secondary" className="justify-center py-3 text-sm">Route Deviation {routeDeviation}m</Badge>
+        <Badge variant="secondary" className="justify-center py-3 text-sm">Inactivity {inactivityTimeout}m</Badge>
+      </div>
 
       <Card>
         <CardHeader>
+          <p className="micro-label">Platform Controls</p>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             System Configuration
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center justify-between rounded border p-3">
+          <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
             <div>
-              <p className="font-medium">Maintenance Mode</p>
-              <p className="text-sm text-muted-foreground">
-                Temporarily pause normal platform operations.
-              </p>
+              <p className="font-medium text-slate-100">Maintenance Mode</p>
+              <p className="text-sm text-slate-400">Temporarily pause normal platform operations.</p>
             </div>
             <input
               type="checkbox"
               checked={maintenanceMode}
               onChange={(e) => setMaintenanceMode(e.target.checked)}
+              className="h-4 w-4 rounded border-white/20 bg-white/5 text-orange-accent"
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="matching-buffer">Global Matching Buffer Size (m)</Label>
-            <Input
-              id="matching-buffer"
-              value={matchingBuffer}
-              onChange={(e) => setMatchingBuffer(e.target.value)}
-            />
+            <Input id="matching-buffer" value={matchingBuffer} onChange={(e) => setMatchingBuffer(e.target.value)} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="route-deviation">Route Deviation Threshold (m)</Label>
-            <Input
-              id="route-deviation"
-              value={routeDeviation}
-              onChange={(e) => setRouteDeviation(e.target.value)}
-            />
+            <Input id="route-deviation" value={routeDeviation} onChange={(e) => setRouteDeviation(e.target.value)} />
           </div>
 
           <div className="space-y-2">

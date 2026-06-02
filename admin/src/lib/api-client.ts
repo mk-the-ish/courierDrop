@@ -20,12 +20,18 @@ class ApiClient {
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    
+    // Get token from localStorage
+    const token = typeof window !== 'undefined' 
+      ? localStorage.getItem('admin_token') || localStorage.getItem('adminToken')
+      : null;
 
     try {
       const response = await fetch(url, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),  // ← ADD THIS
           ...options?.headers,
         },
       });

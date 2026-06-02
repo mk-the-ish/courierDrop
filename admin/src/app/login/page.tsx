@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Loader } from "lucide-react";
 import { useAdminAuth } from "@/lib/admin-auth";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
-const baseUrl =
-  process.env.NEXT_PUBLIC_API_URL || "https://dropcity-backend.onrender.com";
+const baseUrl = getApiBaseUrl();
 
 export default function LoginPage() {
   const router = useRouter();

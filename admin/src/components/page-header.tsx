@@ -10,12 +10,13 @@ export const PageHeader = React.forwardRef<HTMLDivElement, PageHeaderProps>(
   ({ title, description, action, className, ...props }, ref) => (
     <div
       ref={ref}
-      className={`flex items-start justify-between mb-8 ${className || ''}`}
+      className={`flex flex-col gap-4 md:flex-row md:items-start md:justify-between ${className || ''}`}
       {...props}
     >
       <div>
-        <h1 className="text-4xl font-bold text-safe-slate">{title}</h1>
-        {description && <p className="text-gray-600 mt-1">{description}</p>}
+        <p className="micro-label mb-2">DropCity Console</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-50 md:text-4xl">{title}</h1>
+        {description && <p className="mt-2 max-w-3xl text-sm text-slate-400 md:text-base">{description}</p>}
       </div>
       {action && <div className="flex gap-3">{action}</div>}
     </div>
