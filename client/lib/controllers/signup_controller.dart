@@ -15,7 +15,7 @@ class ClientSignupController extends ChangeNotifier {
   final AuthState authState;
   final ApiClient apiClient;
 
-  int _step = 1;
+  int _step = 0;
   bool _loading = false;
   String? _error;
   String? _email;
@@ -25,6 +25,16 @@ class ClientSignupController extends ChangeNotifier {
   int get step => _step;
   bool get loading => _loading;
   String? get error => _error;
+
+  void chooseClientAccount() {
+    _step = 1;
+    notifyListeners();
+  }
+
+  void chooseCourierAccount() {
+    _step = -1;
+    notifyListeners();
+  }
 
   Future<bool> submitStep1({
     required String email,
@@ -106,7 +116,12 @@ class ClientSignupController extends ChangeNotifier {
 
   void back() {
     if (_completed) return;
-    if (_step > 1) {
+    if (_step < 0) {
+      _step = 0;
+      notifyListeners();
+      return;
+    }
+    if (_step > 0) {
       _step -= 1;
       notifyListeners();
     }

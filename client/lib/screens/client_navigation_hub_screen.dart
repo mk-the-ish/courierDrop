@@ -42,7 +42,7 @@ class _ClientNavigationHubScreenState extends State<ClientNavigationHubScreen> {
         bottomNavigationBar: Container(
           decoration: const BoxDecoration(
             border: Border(top: BorderSide(color: Color(0x224B5563))),
-            color: dropCityObsidianDeep,
+            color: Colors.white,
           ),
           child: SafeArea(
             top: false,
@@ -50,9 +50,9 @@ class _ClientNavigationHubScreenState extends State<ClientNavigationHubScreen> {
               currentIndex: _selectedIndex,
               onTap: (index) => setState(() => _selectedIndex = index),
               type: BottomNavigationBarType.fixed,
-              backgroundColor: dropCityObsidianDeep,
+              backgroundColor: Colors.white,
               elevation: 0,
-              selectedItemColor: dropCityOrangeAccent,
+              selectedItemColor: dropCityTransitTeal,
               unselectedItemColor: dropCityTextGrey,
               showSelectedLabels: true,
               showUnselectedLabels: true,

@@ -12,7 +12,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, loading } = useAdminAuth();
 
   const authPages = ['/login', '/forgot-password', '/reset-password'];
+  const publicPages = ['/terms'];
   const isAuthPage = authPages.some((page) => pathname?.startsWith(page));
+  const isPublicPage = publicPages.some((page) => pathname?.startsWith(page));
   const isAdminPage = pathname?.startsWith('/admin');
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (isAuthPage) {
+  if (isAuthPage || isPublicPage) {
     return <>{children}</>;
   }
 

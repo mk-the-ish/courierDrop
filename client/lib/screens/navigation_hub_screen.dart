@@ -46,7 +46,7 @@ class _NavigationHubScreenState extends State<NavigationHubScreen> {
           currentIndex: _selectedIndex,
           onTap: _onNavTapped,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.grey[900],
+          backgroundColor: dropCitySafeSlate,
           elevation: 8,
           selectedItemColor: dropCityOrangeAccent,
           unselectedItemColor: dropCityTextGrey,

@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../controllers/onboarding_controller.dart';
 import '../auth/auth_state.dart';
+import "../theme.dart";
 
 class ClientOnboardingScreen extends StatefulWidget {
   final AuthState authState;
@@ -172,12 +173,12 @@ class _ClientOnboardingScreenState extends State<ClientOnboardingScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.shade100,
+                color: dropCityErrorRed.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 controller.error!,
-                style: TextStyle(color: Colors.red.shade900),
+                style: TextStyle(color: dropCityErrorRed),
               ),
             ),
         ],
@@ -212,10 +213,10 @@ class _ClientOnboardingScreenState extends State<ClientOnboardingScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.green.shade100,
+                color: dropCityActiveMint.withOpacity(0.14),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text('✓ ID document uploaded', style: TextStyle(color: Colors.green)),
+              child: const Text('✓ ID document uploaded', style: TextStyle(color: dropCityActiveMint)),
             )
           else
             ElevatedButton.icon(
@@ -231,12 +232,12 @@ class _ClientOnboardingScreenState extends State<ClientOnboardingScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.shade100,
+                color: dropCityErrorRed.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 controller.error!,
-                style: TextStyle(color: Colors.red.shade900),
+                style: TextStyle(color: dropCityErrorRed),
               ),
             ),
         ],

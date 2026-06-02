@@ -7,6 +7,7 @@ import "package:latlong2/latlong.dart";
 import "../services/map_service.dart";
 import "../widgets/map_view.dart";
 import "../utils/map_coordinates.dart";
+import "../theme.dart";
 
 class DeliveryPickerScreen extends StatefulWidget {
   const DeliveryPickerScreen({super.key});
@@ -217,7 +218,7 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
           point: _pickup!,
           width: 40,
           height: 40,
-          child: const Icon(Icons.place, color: Colors.green, size: 36),
+          child: const Icon(Icons.place, color: dropCityActiveMint, size: 36),
         ),
       );
     }
@@ -228,7 +229,7 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
           point: _dropoff!,
           width: 40,
           height: 40,
-          child: const Icon(Icons.place, color: Colors.red, size: 36),
+          child: const Icon(Icons.place, color: dropCityErrorRed, size: 36),
         ),
       );
     }
@@ -246,7 +247,7 @@ class _DeliveryPickerScreenState extends State<DeliveryPickerScreen> {
       Polyline(
         points: route.polylinePoints,
         strokeWidth: 5,
-        color: Colors.teal,
+        color: dropCityTransitTeal,
       ),
     };
   }
@@ -390,9 +391,9 @@ class _BottomPanel extends StatelessWidget {
           children: [
             Text(title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            _LocationTile(label: "Pickup", value: pickup, color: Colors.green),
+            _LocationTile(label: "Pickup", value: pickup, color: dropCityActiveMint),
             const SizedBox(height: 6),
-            _LocationTile(label: "Dropoff", value: dropoff, color: Colors.red),
+            _LocationTile(label: "Dropoff", value: dropoff, color: dropCityErrorRed),
             if (isResolvingAddress || (previewAddress != null && previewAddress!.isNotEmpty)) ...[
               const SizedBox(height: 10),
               Text(

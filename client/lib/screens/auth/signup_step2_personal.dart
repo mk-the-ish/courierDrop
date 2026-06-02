@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import "../../theme.dart";
 
 class ClientSignupStep2Personal extends StatefulWidget {
   final Future<void> Function(
@@ -83,12 +84,12 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3A7D)),
+          icon: const Icon(Icons.arrow_back, color: dropCitySafeSlate),
           onPressed: widget.onBack,
         ),
         title: const Text(
           'Personal Information',
-          style: TextStyle(color: Color(0xFF0F3A7D), fontWeight: FontWeight.w600),
+          style: TextStyle(color: dropCitySafeSlate, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
       ),
@@ -106,7 +107,7 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                     height: 32,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Color(0xFF0D7A7A),
+                      color: dropCityTransitTeal,
                     ),
                     child: const Center(
                       child: Text(
@@ -123,9 +124,9 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                     child: LinearProgressIndicator(
                       value: 1.0,
                       minHeight: 4,
-                      backgroundColor: Colors.grey[300],
+                      backgroundColor: dropCitySlateGrey.withOpacity(0.35),
                       valueColor:
-                          const AlwaysStoppedAnimation<Color>(Color(0xFF0D7A7A)),
+                          const AlwaysStoppedAnimation<Color>(dropCityTransitTeal),
                     ),
                   ),
                 ],
@@ -137,7 +138,7 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F3A7D),
+                  color: dropCitySafeSlate,
                 ),
               ),
               const SizedBox(height: 12),
@@ -145,7 +146,7 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                 'Step 2 of 2 - Final Step',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[600],
+                  color: dropCitySlateGrey,
                 ),
               ),
               const SizedBox(height: 32),
@@ -226,7 +227,7 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
+                  color: dropCitySafeSlate,
                 ),
               ),
               const SizedBox(height: 12),
@@ -239,11 +240,11 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                     height: 180,
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: Colors.grey[300]!,
+                        color: dropCitySlateGrey.withOpacity(0.35),
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(12),
-                      color: Colors.grey[50],
+                      color: dropCityCloudWhite,
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -251,13 +252,13 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                         Icon(
                           Icons.camera_alt_outlined,
                           size: 48,
-                          color: Colors.grey[400],
+                          color: dropCitySlateGrey,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'Tap to capture ID photo',
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: dropCitySlateGrey,
                             fontSize: 14,
                           ),
                         ),
@@ -289,7 +290,7 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                           height: 40,
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.red,
+                            color: dropCityErrorRed,
                           ),
                           child: const Icon(
                             Icons.close,
@@ -308,8 +309,8 @@ class _ClientSignupStep2PersonalState extends State<ClientSignupStep2Personal> {
                 child: ElevatedButton(
                   onPressed: (_isLoading || _idImage == null) ? null : _handleComplete,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D7A7A),
-                    disabledBackgroundColor: Colors.grey[400],
+                    backgroundColor: dropCityTransitTeal,
+                    disabledBackgroundColor: dropCitySlateGrey,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),

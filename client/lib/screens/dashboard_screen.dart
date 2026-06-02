@@ -3,6 +3,7 @@ import "dart:async";
 import "../auth/auth_state.dart";
 import "delivery_creation_flow_screen.dart";
 import "parcel_status_screen.dart";
+import "../theme.dart";
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, required this.authState});
@@ -271,10 +272,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Color _confidenceColor(String? value) {
     final normalized = (value ?? "").toUpperCase();
-    if (normalized == "HIGH") return Colors.green;
-    if (normalized == "MEDIUM") return Colors.orange;
-    if (normalized == "LOW") return Colors.red;
-    return Colors.grey;
+    if (normalized == "HIGH") return dropCityActiveMint;
+    if (normalized == "MEDIUM") return dropCityAlertAmber;
+    if (normalized == "LOW") return dropCityErrorRed;
+    return dropCitySlateGrey;
   }
 
   Widget _confidenceBadge(String? value) {
@@ -296,7 +297,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("DropCity Dashboard"),
+        title: const Text("DropCity"),
         actions: [
           IconButton(
             onPressed: _openNotifications,
@@ -312,12 +313,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.refresh),
             tooltip: "Refresh dashboard",
           ),
-          TextButton(
-            onPressed: widget.authState.signOut,
-            child: const Text(
-              "Sign out",
-            ),
-          ),
         ],
       ),
       body: SafeArea(
@@ -326,35 +321,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: ListView(
             padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Parcel Management",
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        "Live activity for your deliveries",
-                        style: TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _InfoChip(label: "Total", value: totalParcels.toString()),
-                          _InfoChip(label: "Pending", value: pendingParcels.toString()),
-                          _InfoChip(label: "Assigned", value: assignedParcels.toString()),
-                          _InfoChip(label: "In transit", value: inTransitParcels.toString()),
-                        ],
+              const Text(
+                "Good morning 👋",
+                style: TextStyle(
+                  color: dropCitySafeSlate,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          DeliveryCreationFlowScreen(authState: widget.authState),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: dropCityTransitTeal,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: dropCityTransitTeal.withOpacity(0.22),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12),
                       ),
                     ],
                   ),
+                  child: const Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.white24,
+                        foregroundColor: Colors.white,
+                        child: Icon(Icons.inventory_2_outlined),
+                      ),
+                      SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Send a Parcel",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text(
+                              "Create a new delivery request",
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward, color: Colors.white),
+                    ],
+                  ),
                 ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _InfoChip(label: "Total", value: totalParcels.toString()),
+                  _InfoChip(label: "Matching", value: pendingParcels.toString()),
+                  _InfoChip(label: "Assigned", value: assignedParcels.toString()),
+                  _InfoChip(label: "In transit", value: inTransitParcels.toString()),
+                ],
               ),
               const SizedBox(height: 16),
               if (_isLoading)
@@ -368,7 +409,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     padding: const EdgeInsets.all(12),
                     child: Text(
                       "Failed to load dashboard: $_error",
-                      style: const TextStyle(color: Colors.red),
+                      style: const TextStyle(color: dropCityErrorRed),
                     ),
                   ),
                 ),
@@ -380,7 +421,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       _StatTile(
                         icon: Icons.local_shipping,
-                        iconColor: Colors.teal,
+                        iconColor: dropCityTransitTeal,
                         value: _intStat("pending"),
                         label: "Pending",
                       ),
@@ -392,13 +433,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       _StatTile(
                         icon: Icons.location_on,
-                        iconColor: Colors.orange,
+                        iconColor: dropCityAlertAmber,
                         value: _intStat("inTransit"),
                         label: "In transit",
                       ),
                       _StatTile(
                         icon: Icons.check_circle,
-                        iconColor: Colors.green,
+                        iconColor: dropCityActiveMint,
                         value: _intStat("completed"),
                         label: "Completed",
                       ),
@@ -425,7 +466,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 12),
                 Card(
                   child: ListTile(
-                    leading: const Icon(Icons.update, color: Colors.orange),
+                    leading: const Icon(Icons.update, color: dropCityAlertAmber),
                     title: Text(_latestEtaUpdate?["title"]?.toString() ?? "ETA updated"),
                     subtitle: Text(
                       "${_latestEtaUpdate?["body"]?.toString() ?? ""}\n"
@@ -448,15 +489,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
               const SizedBox(height: 16),
               const Text(
-                "Your Parcels",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                "YOUR ACTIVE DELIVERIES",
+                style: TextStyle(
+                  color: dropCitySlateGrey,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                ),
               ),
               const SizedBox(height: 8),
               if (_parcels.isEmpty)
                 const Card(
                   child: Padding(
                     padding: EdgeInsets.all(16),
-                    child: Text("No parcels yet. Request your first parcel below."),
+                    child: Text("No active deliveries — send your first parcel."),
                   ),
                 ),
               ..._parcels.take(5).map((parcel) {
@@ -513,7 +559,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           const SizedBox(height: 6),
                           const Text(
                             "Tap to open live status",
-                            style: TextStyle(color: Colors.orange),
+                            style: TextStyle(color: dropCityAlertAmber),
                           ),
                         ],
                       ),
@@ -535,7 +581,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         },
         icon: const Icon(Icons.add),
-        label: const Text("New Parcel"),
+        label: const Text("Send a Parcel"),
       ),
     );
   }
@@ -552,14 +598,14 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.08),
+        color: dropCityTransitTeal.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.withOpacity(0.18)),
+        border: Border.all(color: dropCityTransitTeal.withOpacity(0.18)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(label, style: const TextStyle(fontSize: 12, color: dropCitySlateGrey)),
           const SizedBox(width: 8),
           Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         ],
@@ -683,7 +729,7 @@ class _StatTile extends StatelessWidget {
           "$value",
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        Text(label, style: const TextStyle(color: Colors.grey)),
+        Text(label, style: const TextStyle(color: dropCitySlateGrey)),
       ],
     );
   }
@@ -703,9 +749,9 @@ class _ConfidenceBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
+        border: Border.all(color: color.withOpacity(0.35)),
       ),
       child: Text(
         label,

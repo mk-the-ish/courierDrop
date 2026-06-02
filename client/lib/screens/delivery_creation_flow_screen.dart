@@ -10,6 +10,7 @@ import "package:provider/provider.dart";
 import "../auth/auth_state.dart";
 import "../controllers/delivery_creation_controller.dart";
 import "delivery_picker.dart";
+import "../theme.dart";
 
 class _PlaceSuggestion {
   const _PlaceSuggestion({
@@ -507,20 +508,20 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
         const SizedBox(height: 6),
         Text(
           "Order ID: ${c.parcelId ?? "-"}",
-          style: TextStyle(color: Colors.grey.shade700),
+          style: TextStyle(color: dropCitySafeSlate),
         ),
         const SizedBox(height: 10),
         if (c.recommendedPrice != null)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.teal.shade50,
+              color: dropCityTransitTeal.withOpacity(0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.teal.shade100),
+              border: Border.all(color: dropCityTransitTeal.withOpacity(0.16)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.local_offer, color: Colors.teal),
+                const Icon(Icons.local_offer, color: dropCityTransitTeal),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -566,16 +567,16 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: selected ? Colors.teal : Colors.grey.shade300,
+                    color: selected ? dropCityTransitTeal : dropCitySlateGrey.withOpacity(0.30),
                     width: selected ? 2 : 1,
                   ),
-                  color: selected ? Colors.teal.shade50 : Colors.white,
+                  color: selected ? dropCityTransitTeal.withOpacity(0.08) : Colors.white,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CircleAvatar(
-                      backgroundColor: selected ? Colors.teal : Colors.grey.shade300,
+                      backgroundColor: selected ? dropCityTransitTeal : dropCitySlateGrey.withOpacity(0.30),
                       child: Text(
                         courierName.isNotEmpty ? courierName[0].toUpperCase() : "C",
                         style: TextStyle(
@@ -609,7 +610,7 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
                               _CourierChip(
                                 icon: Icons.payments_outlined,
                                 label: recPrice == null ? "No quote" : recPrice.toStringAsFixed(2),
-                                color: Colors.teal.shade700,
+                                color: dropCityTransitTeal,
                               ),
                             ],
                           ),
@@ -669,7 +670,7 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
           const SizedBox(height: 6),
           Text(
             "After this, we return to dashboard and wait for courier confirmation.",
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 12, color: dropCitySafeSlate),
           ),
         ],
         const SizedBox(height: 8),

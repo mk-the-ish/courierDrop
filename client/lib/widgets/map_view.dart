@@ -5,6 +5,7 @@ import "package:flutter_map/flutter_map.dart";
 import "package:latlong2/latlong.dart";
 
 import "../utils/map_coordinates.dart";
+import "../theme.dart";
 
 class MapView extends StatefulWidget {
   const MapView({
@@ -84,7 +85,7 @@ class _MapViewState extends State<MapView> {
         MarkerLayer(markers: widget.markers.toList()),
         const Align(
           child: IgnorePointer(
-            child: Icon(Icons.location_pin, size: 42, color: Colors.red),
+            child: Icon(Icons.location_pin, size: 42, color: dropCityErrorRed),
           ),
         ),
       ],

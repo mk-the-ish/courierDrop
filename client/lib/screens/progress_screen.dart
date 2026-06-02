@@ -12,6 +12,7 @@ import "package:shared_preferences/shared_preferences.dart";
 
 import "../auth/auth_state.dart";
 import "../widgets/location_preview_map.dart";
+import "../theme.dart";
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key, required this.authState});
@@ -368,7 +369,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 "PIN locked. Try again in $_lockoutSeconds s.",
-                style: const TextStyle(color: Colors.red),
+                style: const TextStyle(color: dropCityErrorRed),
               ),
             ),
           const SizedBox(height: 12),

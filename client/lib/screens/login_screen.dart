@@ -1,6 +1,8 @@
 import "package:flutter/material.dart";
 
 import "../auth/auth_state.dart";
+import "../theme.dart";
+import "../widgets/dropcity_brand.dart";
 import "auth/signup_screen.dart";
 
 class LoginScreen extends StatefulWidget {
@@ -16,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
   bool _obscurePassword = true;
 
   @override
@@ -27,18 +28,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      return;
-    }
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     try {
-      await widget.authState.signIn(email, password);
+      await widget.authState.signIn(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString().replaceFirst("Exception: ", ""))),
       );
@@ -48,97 +45,119 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Client Login")),
-      body: Form(
-        key: _formKey,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: "Email"),
-                validator: (value) {
-                  final email = (value ?? "").trim();
-                  if (email.isEmpty) {
-                    return "Email is required";
-                  }
-                  if (!email.contains("@")) {
-                    return "Enter a valid email";
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) {
-                  if (!widget.authState.isBusy) {
-                    _submit();
-                  }
-                },
-                decoration: InputDecoration(
-                  labelText: "Password",
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
-                    icon: Icon(
-                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+      body: SafeArea(
+        child: AnimatedBuilder(
+          animation: widget.authState,
+          builder: (context, _) {
+            return Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+                children: [
+                  const Center(child: DropCityLogoMark(size: 48)),
+                  const SizedBox(height: 28),
+                  const Text(
+                    "Welcome back",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: dropCitySafeSlate,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                ),
-                validator: (value) {
-                  final password = value ?? "";
-                  if (password.isEmpty) {
-                    return "Password is required";
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: widget.authState.isBusy ? null : _showForgotPasswordDialog,
-                  child: const Text("Forgot password?"),
-                ),
-              ),
-              const SizedBox(height: 8),
-              AnimatedBuilder(
-                animation: widget.authState,
-                builder: (context, _) {
-                  return ElevatedButton(
-                    onPressed: widget.authState.isBusy ? null : _submit,
-                    child: Text(
-                      widget.authState.isBusy
-                          ? "Working..."
-                          : "Sign in",
+                  const SizedBox(height: 6),
+                  const Text(
+                    "Sign in to your account",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: dropCitySlateGrey, fontSize: 14),
+                  ),
+                  const SizedBox(height: 32),
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: "Email",
+                      hintText: "your@email.com",
+                      prefixIcon: Icon(Icons.mail_outline),
                     ),
-                  );
-                },
+                    validator: (value) {
+                      final email = (value ?? "").trim();
+                      if (email.isEmpty) return "Email is required";
+                      if (!email.contains("@")) return "Enter a valid email";
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (!widget.authState.isBusy) _submit();
+                    },
+                    decoration: InputDecoration(
+                      labelText: "Password",
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                      ),
+                    ),
+                    validator: (value) {
+                      if ((value ?? "").isEmpty) return "Password is required";
+                      return null;
+                    },
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: widget.authState.isBusy ? null : _showForgotPasswordDialog,
+                      child: const Text("Forgot password?"),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  DropCityPrimaryButton(
+                    label: "Sign In",
+                    icon: Icons.login,
+                    loading: widget.authState.isBusy,
+                    onPressed: _submit,
+                  ),
+                  const SizedBox(height: 28),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: dropCitySlateGrey.withOpacity(0.35))),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text("or", style: TextStyle(color: dropCitySlateGrey)),
+                      ),
+                      Expanded(child: Divider(color: dropCitySlateGrey.withOpacity(0.35))),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "Don't have an account?",
+                        style: TextStyle(color: dropCitySlateGrey),
+                      ),
+                      TextButton(
+                        onPressed: widget.authState.isBusy
+                            ? null
+                            : () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ClientSignupScreen(authState: widget.authState),
+                                  ),
+                                ),
+                        child: const Text("Get Started"),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: widget.authState.isBusy
-                    ? null
-                    : () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ClientSignupScreen(authState: widget.authState),
-                          ),
-                        );
-                      },
-                child: const Text("Create account"),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -163,9 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ElevatedButton(
             onPressed: () async {
               final email = emailController.text.trim();
-              if (email.isEmpty || !email.contains("@")) {
-                return;
-              }
+              if (email.isEmpty || !email.contains("@")) return;
               try {
                 await widget.authState.requestPasswordReset(email);
                 if (!mounted) return;
@@ -173,11 +190,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Reset email sent.")),
                 );
-              } catch (e) {
+              } catch (error) {
                 if (!mounted) return;
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+                  SnackBar(content: Text(error.toString().replaceFirst("Exception: ", ""))),
                 );
               }
             },

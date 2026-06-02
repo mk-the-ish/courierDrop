@@ -15,6 +15,7 @@ import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
 import "firebase_options.dart";
 import "theme.dart";
+import "widgets/dropcity_brand.dart";
 
 final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
@@ -236,40 +237,29 @@ class _LaunchScreen extends StatelessWidget {
     return Scaffold(
       body: Container(
         width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFE0F7F4), Colors.white],
-          ),
-        ),
+        color: dropCitySafeSlate,
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.local_shipping, size: 56, color: Colors.teal),
-                const SizedBox(height: 16),
-                Text(
-                  "DropCity",
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                const DropCityWordmark(
+                  logoSize: 96,
+                  textColor: dropCityCloudWhite,
+                  subtitle: true,
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Preparing your workspace...",
-                  textAlign: TextAlign.center,
+                const SizedBox(height: 24),
+                const LinearProgressIndicator(
+                  color: dropCityTransitTeal,
+                  backgroundColor: Colors.white24,
                 ),
-                const SizedBox(height: 16),
-                const CircularProgressIndicator(),
                 if (hint != null) ...[
                   const SizedBox(height: 14),
                   Text(
                     hint!,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.orange.shade800),
+                    style: const TextStyle(color: dropCityAlertAmber),
                   ),
                 ],
                 if (showContinueOption) ...[

@@ -7,6 +7,7 @@ import "package:latlong2/latlong.dart";
 
 import "../auth/auth_state.dart";
 import "../widgets/location_preview_map.dart";
+import "../theme.dart";
 
 class RecipientHandoffScreen extends StatefulWidget {
   const RecipientHandoffScreen({
@@ -97,7 +98,7 @@ class _RecipientHandoffScreenState extends State<RecipientHandoffScreen> {
           const SizedBox(height: 8),
           const Text(
             "Take a quick confirmation photo, then generate a PIN for the courier.",
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(color: dropCitySlateGrey),
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
@@ -131,7 +132,7 @@ class _RecipientHandoffScreenState extends State<RecipientHandoffScreen> {
           if (_otp != null) ...[
             const SizedBox(height: 20),
             Card(
-              color: Colors.green.shade50,
+              color: dropCityActiveMint.withOpacity(0.08),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(

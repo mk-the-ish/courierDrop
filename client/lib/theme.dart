@@ -1,18 +1,20 @@
 import "package:flutter/material.dart";
 
 // Shared DropCity palette
-const Color dropCityOrangeAccent = Color(0xFFFF6B35);
-const Color dropCityOrangeLight = Color(0xFFFFA500);
+const Color dropCityOrangeAccent = Color(0xFF008080);
+const Color dropCityOrangeLight = Color(0xFF26A69A);
 const Color dropCityDarkGradientStart = Color(0xFF1A1A2E);
 const Color dropCityDarkGradientEnd = Color(0xFF16213E);
 const Color dropCityTransitTeal = Color(0xFF008080);
 const Color dropCityActiveMint = Color(0xFF26A69A);
 const Color dropCitySafeSlate = Color(0xFF2F4F4F);
+const Color dropCityAlertAmber = Color(0xFFFFBF00);
+const Color dropCitySlateGrey = Color(0xFF94A3B8);
 const Color dropCityObsidianDeep = Color(0xFF06030C);
 const Color dropCityCloudWhite = Color(0xFFF8F9FA);
 const Color dropCityTextLight = Color(0xFFFFFFFF);
 const Color dropCityTextDark = Color(0xFF0F172A);
-const Color dropCityTextGrey = Color(0xFF9CA3AF);
+const Color dropCityTextGrey = dropCitySlateGrey;
 const Color dropCityBorderDark = Color(0xFF4B5563);
 const Color dropCityErrorRed = Color(0xFFEF5350);
 const Color dropCitySuccessGreen = Color(0xFF4CAF50);
@@ -38,7 +40,7 @@ InputDecorationTheme _inputDecorationTheme({required bool dark}) {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(dropCityBorderRadius),
-      borderSide: const BorderSide(color: dropCityOrangeAccent, width: 2),
+      borderSide: const BorderSide(color: dropCityTransitTeal, width: 2),
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(dropCityBorderRadius),
@@ -52,13 +54,13 @@ InputDecorationTheme _inputDecorationTheme({required bool dark}) {
     hintStyle: TextStyle(color: hintColor),
     errorStyle: const TextStyle(color: dropCityErrorRed),
     prefixIconColor: MaterialStateColor.resolveWith(
-      (states) => states.contains(MaterialState.focused) ? dropCityOrangeAccent : labelColor,
+      (states) => states.contains(MaterialState.focused) ? dropCityTransitTeal : labelColor,
     ),
     suffixIconColor: MaterialStateColor.resolveWith(
-      (states) => states.contains(MaterialState.focused) ? dropCityOrangeAccent : hintColor,
+      (states) => states.contains(MaterialState.focused) ? dropCityTransitTeal : hintColor,
     ),
     helperStyle: TextStyle(color: hintColor),
-    floatingLabelStyle: const TextStyle(color: dropCityOrangeAccent),
+    floatingLabelStyle: const TextStyle(color: dropCityTransitTeal),
   );
 }
 
@@ -88,10 +90,10 @@ TextTheme _textTheme({required bool dark}) {
 final ThemeData dropCityLightTheme = ThemeData(
   brightness: Brightness.light,
   scaffoldBackgroundColor: dropCityCloudWhite,
-  primaryColor: dropCityOrangeAccent,
+  primaryColor: dropCityTransitTeal,
   cardColor: Colors.white,
   colorScheme: const ColorScheme.light(
-    primary: dropCityOrangeAccent,
+    primary: dropCityTransitTeal,
     secondary: dropCityActiveMint,
     surface: Colors.white,
     error: dropCityErrorRed,
@@ -100,21 +102,21 @@ final ThemeData dropCityLightTheme = ThemeData(
     onSecondary: Colors.white,
   ),
   appBarTheme: const AppBarTheme(
-    backgroundColor: dropCityDarkGradientStart,
-    foregroundColor: Colors.white,
+    backgroundColor: dropCityCloudWhite,
+    foregroundColor: dropCitySafeSlate,
     elevation: 0,
   ),
   inputDecorationTheme: _inputDecorationTheme(dark: false),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
-      backgroundColor: dropCityOrangeAccent,
+      backgroundColor: dropCityTransitTeal,
       foregroundColor: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(dropCityBorderRadius),
       ),
       elevation: 4,
-      shadowColor: dropCityOrangeAccent.withOpacity(0.25),
+      shadowColor: dropCityTransitTeal.withOpacity(0.25),
     ),
   ),
   outlinedButtonTheme: OutlinedButtonThemeData(
@@ -129,7 +131,7 @@ final ThemeData dropCityLightTheme = ThemeData(
   ),
   bottomNavigationBarTheme: const BottomNavigationBarThemeData(
     backgroundColor: Colors.white,
-    selectedItemColor: dropCityOrangeAccent,
+    selectedItemColor: dropCityTransitTeal,
     unselectedItemColor: dropCityTextGrey,
   ),
   textTheme: _textTheme(dark: false),
@@ -139,11 +141,11 @@ final ThemeData dropCityLightTheme = ThemeData(
 final ThemeData dropCityDarkTheme = ThemeData(
   brightness: Brightness.dark,
   scaffoldBackgroundColor: dropCityDarkGradientStart,
-  primaryColor: dropCityOrangeAccent,
+  primaryColor: dropCityTransitTeal,
   cardColor: dropCityDarkGradientEnd,
   colorScheme: const ColorScheme.dark(
-    primary: dropCityOrangeAccent,
-    secondary: dropCityOrangeLight,
+    primary: dropCityTransitTeal,
+    secondary: dropCityActiveMint,
     surface: dropCityDarkGradientEnd,
     error: dropCityErrorRed,
     onPrimary: Colors.white,
@@ -158,20 +160,20 @@ final ThemeData dropCityDarkTheme = ThemeData(
   inputDecorationTheme: _inputDecorationTheme(dark: true),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
-      backgroundColor: dropCityOrangeAccent,
+      backgroundColor: dropCityTransitTeal,
       foregroundColor: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(dropCityBorderRadius),
       ),
       elevation: 8,
-      shadowColor: dropCityOrangeAccent.withOpacity(0.4),
+      shadowColor: dropCityTransitTeal.withOpacity(0.4),
     ),
   ),
   outlinedButtonTheme: OutlinedButtonThemeData(
     style: OutlinedButton.styleFrom(
       foregroundColor: Colors.white,
-      side: const BorderSide(color: dropCityOrangeAccent, width: 2),
+      side: const BorderSide(color: dropCityTransitTeal, width: 2),
       padding: const EdgeInsets.symmetric(vertical: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(dropCityBorderRadius),
@@ -180,7 +182,7 @@ final ThemeData dropCityDarkTheme = ThemeData(
   ),
   bottomNavigationBarTheme: const BottomNavigationBarThemeData(
     backgroundColor: dropCityObsidianDeep,
-    selectedItemColor: dropCityOrangeAccent,
+    selectedItemColor: dropCityTransitTeal,
     unselectedItemColor: dropCityTextGrey,
   ),
   textTheme: _textTheme(dark: true),

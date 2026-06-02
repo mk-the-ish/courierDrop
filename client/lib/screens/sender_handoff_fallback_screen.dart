@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../auth/auth_state.dart";
+import "../theme.dart";
 
 class SenderHandoffFallbackScreen extends StatefulWidget {
   const SenderHandoffFallbackScreen({
@@ -69,7 +70,7 @@ class _SenderHandoffFallbackScreenState extends State<SenderHandoffFallbackScree
           const SizedBox(height: 8),
           const Text(
             "Use this workflow when recipient cannot complete in-app handoff. You can log a dispute event for admin resolution.",
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(color: dropCitySlateGrey),
           ),
           const SizedBox(height: 16),
           const Text("Recommended quick checklist", style: TextStyle(fontWeight: FontWeight.bold)),

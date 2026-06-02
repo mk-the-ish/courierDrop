@@ -15,6 +15,7 @@ import "../auth/auth_state.dart";
 import "recipient_handoff_screen.dart";
 import "sender_handoff_fallback_screen.dart";
 import "../widgets/location_preview_map.dart";
+import "../theme.dart";
 
 class ParcelStatusScreen extends StatefulWidget {
   const ParcelStatusScreen({
@@ -371,13 +372,13 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
     switch (value) {
       case "ON_CORRIDOR":
       case "NOMINAL":
-        return Colors.green;
+        return dropCityActiveMint;
       case "MOVING_POSITIVELY":
-        return Colors.orange;
+        return dropCityAlertAmber;
       case "OFF_CORRIDOR_STATIONARY":
-        return Colors.red;
+        return dropCityErrorRed;
       default:
-        return Colors.grey;
+        return dropCitySlateGrey;
     }
   }
 
@@ -480,13 +481,13 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: dropCityActiveMint.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+                border: Border.all(color: dropCityActiveMint.withOpacity(0.28)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.check_circle, color: Colors.green),
+                  const Icon(Icons.check_circle, color: dropCityActiveMint),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -608,7 +609,7 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
             const SizedBox(height: 8),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.verified_user, color: Colors.teal),
+                leading: const Icon(Icons.verified_user, color: dropCityTransitTeal),
                 title: const Text("Recipient handoff"),
                 subtitle: const Text("Generate a secure PIN and share it with the courier."),
                 trailing: ElevatedButton(
@@ -731,7 +732,7 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
                   const SizedBox(height: 4),
                   Text(
                     _trackingFreshnessLabel(trackingLastUpdate),
-                    style: const TextStyle(color: Colors.grey),
+                    style: const TextStyle(color: dropCitySlateGrey),
                   ),
                 ],
               ),
@@ -778,7 +779,7 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
                 return ListTile(
                   leading: Icon(
                     reached ? Icons.check_circle : Icons.radio_button_unchecked,
-                    color: reached ? Colors.green : Colors.grey,
+                    color: reached ? dropCityActiveMint : dropCitySlateGrey,
                   ),
                   title: Text("Checkpoint $sequence"),
                   subtitle: Text(reached ? "Reached" : "Pending"),
@@ -797,7 +798,7 @@ class _ParcelStatusScreenState extends State<ParcelStatusScreen> {
               padding: EdgeInsets.only(top: 4),
               child: Text(
                 "Historical events require admin access.",
-                style: TextStyle(color: Colors.orange),
+                style: TextStyle(color: dropCityAlertAmber),
               ),
             ),
           if (_handshakeEvents.isNotEmpty)

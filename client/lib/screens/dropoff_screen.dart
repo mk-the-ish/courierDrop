@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../auth/auth_state.dart';
 import '../controllers/location_tracking_controller.dart';
 import '../utils/map_coordinates.dart';
+import "../theme.dart";
 
 /**
  * Dropoff Screen (Client/Recipient)
@@ -240,7 +241,7 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
             _buildStatusCard(
               title: 'Delivery Zone',
               status: _gpsInRange ? 'Courier At Location' : 'Waiting for Courier',
-              statusColor: _gpsInRange ? Colors.green : Colors.orange,
+              statusColor: _gpsInRange ? dropCityActiveMint : dropCityAlertAmber,
               details: [
                 'Safe Zone Radius: ${widget.gateRadiusMeters.toStringAsFixed(0)}m',
                 if (_distanceToDropoffMeters != null)
@@ -258,7 +259,7 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
                 return _buildStatusCard(
                   title: 'Your Location Accuracy',
                   status: isAccurate ? 'High Accuracy' : 'Low Accuracy',
-                  statusColor: isAccurate ? Colors.green : Colors.orange,
+                  statusColor: isAccurate ? dropCityActiveMint : dropCityAlertAmber,
                   details: [
                     if (accuracy != null) 'Accuracy: ±${accuracy.toStringAsFixed(1)}m',
                   ],
@@ -275,7 +276,7 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
             const SizedBox(height: 8),
             const Text(
               'Enter the code your courier provided',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: dropCitySlateGrey),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -299,12 +300,12 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade100,
+                  color: dropCityErrorRed.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _verificationError!,
-                  style: TextStyle(color: Colors.red.shade900, fontSize: 12),
+                  style: TextStyle(color: dropCityErrorRed, fontSize: 12),
                 ),
               ),
             const SizedBox(height: 24),
@@ -314,17 +315,17 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade100,
+                  color: dropCityActiveMint.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green),
+                    Icon(Icons.check_circle, color: dropCityActiveMint),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Delivery complete! Thank you for using DropCity.',
-                        style: TextStyle(color: Colors.green),
+                        style: TextStyle(color: dropCityActiveMint),
                       ),
                     ),
                   ],
@@ -351,7 +352,7 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
                     SizedBox(height: 8),
                     Text(
                       'Your courier is on the way. You will receive an SMS with the verification code when they arrive at your delivery zone.',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                      style: TextStyle(fontSize: 11, color: dropCitySlateGrey),
                     ),
                   ],
                 ),
@@ -377,7 +378,7 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
         child: ElevatedButton(
           onPressed: _checkCurrentLocation,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey.shade300,
+            backgroundColor: dropCitySlateGrey.withOpacity(0.30),
           ),
           child: const Text(
             'Refresh Location',
@@ -397,7 +398,7 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: dropCitySlateGrey.withOpacity(0.30)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -433,7 +434,7 @@ class _ClientDropoffScreenState extends State<ClientDropoffScreen> {
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 detail,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                style: const TextStyle(fontSize: 12, color: dropCitySlateGrey),
               ),
             ),
           ),
