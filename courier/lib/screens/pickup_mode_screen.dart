@@ -42,12 +42,14 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
   bool _isSubmitting = false;
   bool _isLocating = false;
   bool _isLoading = false;
+  bool _loadingAssigned = true;
   StreamSubscription<Position>? _positionSub;
   double? _distanceToGate;
   Timer? _lockoutTimer;
   int? _lockoutSeconds;
   String? _currentTopic;
   bool? _routeStarted;
+  List<Map<String, dynamic>> _assignedParcels = const [];
 
   static const String _prefParcelId = "pickup_parcelId";
   static const String _prefPin = "pickup_pin";
@@ -61,6 +63,7 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
     _restoreFormState();
     _handleLostData();
     _refreshRouteState();
+    _loadAssignedParcels();
     _applyInitialParcelContext();
   }
 
@@ -94,6 +97,20 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _routeStarted = false);
+    }
+  }
+
+  Future<void> _loadAssignedParcels() async {
+    try {
+      final parcels = await widget.authState.apiClient.getAssignedParcels();
+      if (!mounted) return;
+      setState(() {
+        _assignedParcels = parcels;
+        _loadingAssigned = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingAssigned = false);
     }
   }
 
@@ -535,7 +552,15 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
   Widget build(BuildContext context) {
     final isBusy = widget.authState.isBusy || _isSubmitting || _isLocating || _isLoading;
     return Scaffold(
-      appBar: AppBar(title: const Text("Pickup Mode")),
+      appBar: AppBar(
+        title: const Text("Pickup Mode"),
+        actions: [
+          IconButton(
+            onPressed: _loadingAssigned ? null : _loadAssignedParcels,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -559,6 +584,35 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 8),
+          if (_loadingAssigned)
+            const LinearProgressIndicator()
+          else if (_assignedParcels.isNotEmpty)
+            DropdownButtonFormField<String>(
+              value: _assignedParcels.any((item) => item["id"]?.toString() == _parcelIdController.text.trim())
+                  ? _parcelIdController.text.trim()
+                  : null,
+              decoration: const InputDecoration(
+                labelText: "Assigned parcel",
+                border: OutlineInputBorder(),
+              ),
+              items: _assignedParcels
+                  .map(
+                    (parcel) => DropdownMenuItem<String>(
+                      value: parcel["id"]?.toString(),
+                      child: Text(
+                        "${parcel["id"]?.toString() ?? "-"}${parcel["destination"] != null ? " - ${parcel["destination"]}" : ""}",
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _parcelIdController.text = value);
+                _loadParcel();
+              },
+            ),
           const SizedBox(height: 12),
           Row(
             children: [

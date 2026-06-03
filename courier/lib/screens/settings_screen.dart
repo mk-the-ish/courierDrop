@@ -1,8 +1,142 @@
 import "package:flutter/material.dart";
+
 import "../auth/auth_state.dart";
 import "../theme.dart";
 
-class SettingsScreen extends StatefulWidget{const SettingsScreen({super.key,required this.authState});final AuthState authState;@override State<SettingsScreen> createState()=>_State();}
-class _State extends State<SettingsScreen>{bool tracking=true;@override Widget build(BuildContext context){final email=widget.authState.user?.email??"courier@dropcity.app";return Scaffold(appBar:AppBar(title:const Text("Settings")),body:ListView(padding:const EdgeInsets.fromLTRB(16,18,16,100),children:[Column(children:[CircleAvatar(radius:32,backgroundColor:dropCitySafeSlate,foregroundColor:Colors.white,child:Text(email[0].toUpperCase(),style:const TextStyle(fontSize:24,fontWeight:FontWeight.w900))),const SizedBox(height:10),const Text("DropCity Courier",style:TextStyle(color:dropCitySafeSlate,fontSize:18,fontWeight:FontWeight.w900)),Text(email,style:const TextStyle(color:dropCitySlateGrey,fontSize:13)),const SizedBox(height:8),Chip(label:const Text("Score 78.4"),backgroundColor:dropCityTransitTeal.withOpacity(.12),labelStyle:const TextStyle(color:dropCityTransitTeal,fontWeight:FontWeight.w900))]),const SizedBox(height:22),_Section(title:"ACCOUNT",rows:[_Row(icon:Icons.edit_outlined,label:"Edit Profile"),_Row(icon:Icons.lock_outline,label:"Change Password"),_Row(icon:Icons.notifications_none,label:"Notification Preferences")]),_Section(title:"VEHICLE",rows:[_Row(icon:Icons.directions_car,label:"My Vehicle"),_Row(icon:Icons.photo_camera_outlined,label:"Update Vehicle Photos")]),_Section(title:"TRACKING",rows:[ListTile(leading:const Icon(Icons.gps_fixed,color:dropCityTransitTeal),title:const Text("Background Tracking"),subtitle:const Text("Disabling stops earning",style:TextStyle(color:dropCityAlertAmber,fontSize:11)),trailing:Switch(value:tracking,activeColor:dropCityTransitTeal,onChanged:(v)=>setState(()=>tracking=v))) ]),_Section(title:"APP",rows:[_Row(icon:Icons.info_outline,label:"App Version",trailing:"v1.0.0"),_Row(icon:Icons.privacy_tip_outlined,label:"Privacy Policy"),_Row(icon:Icons.description_outlined,label:"Terms of Service")]),Card(child:ListTile(leading:const Icon(Icons.logout,color:dropCityErrorRed),title:const Text("Sign Out",style:TextStyle(color:dropCityErrorRed,fontWeight:FontWeight.w900)),onTap:widget.authState.signOut))]));}}
-class _Section extends StatelessWidget{const _Section({required this.title,required this.rows});final String title;final List<Widget> rows;@override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.only(bottom:14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(title,style:const TextStyle(color:dropCitySlateGrey,fontSize:12,fontWeight:FontWeight.w900,letterSpacing:.8)),const SizedBox(height:6),Card(child:Column(children:rows))]));}
-class _Row extends StatelessWidget{const _Row({required this.icon,required this.label,this.trailing});final IconData icon;final String label;final String? trailing;@override Widget build(BuildContext context)=>ListTile(leading:Icon(icon,color:dropCityTransitTeal),title:Text(label),trailing:trailing==null?const Icon(Icons.chevron_right,color:dropCitySlateGrey):Text(trailing!,style:const TextStyle(color:dropCitySlateGrey)));}
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key, required this.authState});
+
+  final AuthState authState;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool tracking = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final email = widget.authState.user?.email ?? "courier@dropcity.app";
+    return Scaffold(
+      backgroundColor: dropCityCloudWhite,
+      appBar: AppBar(title: const Text("Settings")),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 100),
+        children: [
+          Column(
+            children: [
+              CircleAvatar(
+                radius: 32,
+                backgroundColor: dropCitySafeSlate,
+                foregroundColor: Colors.white,
+                child: Text(email[0].toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+              ),
+              const SizedBox(height: 10),
+              const Text("DropCity Courier", style: TextStyle(color: dropCitySafeSlate, fontSize: 18, fontWeight: FontWeight.w900)),
+              Text(email, style: const TextStyle(color: dropCitySlateGrey, fontSize: 13)),
+              const SizedBox(height: 8),
+              Chip(
+                label: const Text("Score 78.4"),
+                backgroundColor: dropCityTransitTeal.withOpacity(.12),
+                labelStyle: const TextStyle(color: dropCityTransitTeal, fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          _Section(
+            title: "ACCOUNT",
+            rows: const [
+              _Row(icon: Icons.edit_outlined, label: "Edit Profile"),
+              _Row(icon: Icons.lock_outline, label: "Change Password"),
+              _Row(icon: Icons.notifications_none, label: "Notification Preferences"),
+            ],
+          ),
+          _Section(
+            title: "VEHICLE",
+            rows: const [
+              _Row(icon: Icons.directions_car, label: "My Vehicle"),
+              _Row(icon: Icons.photo_camera_outlined, label: "Update Vehicle Photos"),
+            ],
+          ),
+          _Section(
+            title: "TRACKING",
+            rows: [
+              ListTile(
+                leading: const Icon(Icons.gps_fixed, color: dropCityTransitTeal),
+                title: const Text("Background Tracking"),
+                subtitle: const Text("Disabling stops earning", style: TextStyle(color: dropCityAlertAmber, fontSize: 11)),
+                trailing: Switch(
+                  value: tracking,
+                  activeColor: dropCityTransitTeal,
+                  onChanged: (value) async {
+                    setState(() => tracking = value);
+                    await widget.authState.apiClient.setCourierOnline(value);
+                  },
+                ),
+              ),
+            ],
+          ),
+          _Section(
+            title: "APP",
+            rows: const [
+              _Row(icon: Icons.info_outline, label: "App Version", trailing: "v1.0.0"),
+              _Row(icon: Icons.privacy_tip_outlined, label: "Privacy Policy"),
+              _Row(icon: Icons.description_outlined, label: "Terms of Service"),
+            ],
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.logout, color: dropCityErrorRed),
+              title: const Text("Sign Out", style: TextStyle(color: dropCityErrorRed, fontWeight: FontWeight.w900)),
+              onTap: () async {
+                await widget.authState.signOut();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.rows});
+
+  final String title;
+  final List<Widget> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(color: dropCitySlateGrey, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: .8)),
+          const SizedBox(height: 6),
+          Card(child: Column(children: rows)),
+        ],
+      ),
+    );
+  }
+}
+
+class _Row extends StatelessWidget {
+  const _Row({required this.icon, required this.label, this.trailing});
+
+  final IconData icon;
+  final String label;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: dropCityTransitTeal),
+      title: Text(label),
+      trailing: trailing == null
+          ? const Icon(Icons.chevron_right, color: dropCitySlateGrey)
+          : Text(trailing!, style: const TextStyle(color: dropCitySlateGrey)),
+    );
+  }
+}

@@ -17,8 +17,11 @@ class DropCityLogoMark extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _DropCityLogoPainter(light: light),
+      child: Image.asset(
+        "assets/images/logo.png",
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
       ),
     );
   }
@@ -129,60 +132,6 @@ class StepDots extends StatelessWidget {
         );
       }),
     );
-  }
-}
-
-class _DropCityLogoPainter extends CustomPainter {
-  const _DropCityLogoPainter({required this.light});
-
-  final bool light;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final spinePaint = Paint()
-      ..color = light ? dropCityCloudWhite : dropCitySafeSlate
-      ..strokeWidth = size.width * 0.07
-      ..strokeCap = StrokeCap.round;
-    final ribbonPaint = Paint()
-      ..color = dropCityTransitTeal
-      ..strokeWidth = size.width * 0.18
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    final pinPaint = Paint()..color = dropCityAlertAmber;
-    final centerX = size.width / 2;
-
-    canvas.drawLine(
-      Offset(centerX, size.height * 0.18),
-      Offset(centerX, size.height * 0.82),
-      spinePaint,
-    );
-
-    final path = Path()
-      ..moveTo(size.width * 0.28, size.height * 0.20)
-      ..cubicTo(
-        size.width * 0.84,
-        size.height * 0.20,
-        size.width * 0.18,
-        size.height * 0.80,
-        size.width * 0.72,
-        size.height * 0.80,
-      );
-    canvas.drawPath(path, ribbonPaint);
-
-    final pinCenter = Offset(centerX, size.height * 0.50);
-    canvas.drawCircle(pinCenter, size.width * 0.13, pinPaint);
-    canvas.drawCircle(pinCenter, size.width * 0.045, Paint()..color = Colors.white);
-    final tipPath = Path()
-      ..moveTo(centerX, size.height * 0.72)
-      ..lineTo(size.width * 0.42, size.height * 0.58)
-      ..lineTo(size.width * 0.58, size.height * 0.58)
-      ..close();
-    canvas.drawPath(tipPath, pinPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _DropCityLogoPainter oldDelegate) {
-    return oldDelegate.light != light;
   }
 }
 

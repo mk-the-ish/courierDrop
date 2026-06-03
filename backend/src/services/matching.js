@@ -106,7 +106,7 @@ async function getEligibleCourierMatches({
   const corridorIds = rawMatches.map((m) => m.corridor_id).filter(Boolean);
   const { data: corridors, error: corridorError } = await supabase
     .from("corridors")
-    .select("id,created_by")
+    .select("id,created_by,status,planned_start_at")
     .in("id", corridorIds);
   if (corridorError) {
     throw new Error(corridorError.message);
@@ -157,6 +157,7 @@ async function getEligibleCourierMatches({
   for (const raw of rawMatches) {
     const corridor = corridorById.get(raw.corridor_id);
     if (!corridor?.created_by) continue;
+    if (!["PENDING", "ACTIVE"].includes((corridor.status || "").toUpperCase())) continue;
     const courierId = corridor.created_by;
     const route = routeByCorridor.get(raw.corridor_id);
     const lifecycle = routeLifecycleState(route, now);
@@ -297,4 +298,3 @@ module.exports = {
   getEligibleCourierMatches,
   matchPendingParcels
 };
-

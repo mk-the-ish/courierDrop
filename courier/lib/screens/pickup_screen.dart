@@ -124,7 +124,7 @@ class _PickupScreenState extends State<PickupScreen> {
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) Navigator.of(context).pop(true);
         });
-    } catch (e) {
+    }} catch (e) {
       setState(() => _verificationError = 'Error: $e');
     } finally {
       setState(() => _isVerifying = false);

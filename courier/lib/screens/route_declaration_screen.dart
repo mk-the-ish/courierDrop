@@ -287,172 +287,97 @@ class _ActiveRouteCard extends StatelessWidget {
   final bool isStopping;
 
   @override
-  Widget build(BuildContext context) => Card(
-        child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  dropCityTransitTeal.withOpacity(0.9),
-                  dropCityTransitTeal.withOpacity(0.7)
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) {
+    final startName = route["start_place_name"]?.toString().isNotEmpty == true
+        ? route["start_place_name"].toString()
+        : route["start_location"]?.toString() ?? "Start";
+    final endName = route["end_place_name"]?.toString().isNotEmpty == true
+        ? route["end_place_name"].toString()
+        : route["end_location"]?.toString() ?? "End";
+    final statusText = state == "TRAVELLING" ? "ACTIVE ROUTE" : "SCHEDULED ROUTE";
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: dropCityTransitTeal.withOpacity(.16)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      state == "TRAVELLING" ? "Active Route" : "Ready to Start",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: state == "TRAVELLING"
-                            ? dropCityActiveMint
-                            : Colors.white24,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        state,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(statusText, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: dropCitySafeSlate)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: state == "TRAVELLING" ? dropCityActiveMint : dropCitySlateGrey.withOpacity(.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(state, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
                 ),
-                const SizedBox(height: 12),
-                // Location display: use place name if available, else coordinates
-                Text(
-                  route["start_place_name"]?.toString().isNotEmpty == true
-                      ? route["start_place_name"].toString()
-                      : route["start_location"]?.toString() ?? "Start",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(startName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: dropCitySafeSlate)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.arrow_forward, size: 18, color: dropCitySlateGrey),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(endName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: dropCitySafeSlate), overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Chip(label: Text("ETA ${route["declared_eta_minutes"]?.toString() ?? "--"}m")),
+                if (route["notes"]?.toString().isNotEmpty == true)
+                  Chip(
+                    label: Text(route["notes"].toString()),
+                    backgroundColor: dropCityActiveMint.withOpacity(.12),
+                    labelStyle: const TextStyle(color: dropCityActiveMint, fontWeight: FontWeight.w800),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: state == "TRAVELLING" || isStarting ? null : onStart,
+                    icon: isStarting
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.play_arrow),
+                    label: Text(isStarting ? "Starting..." : "Start Route"),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.arrow_forward,
-                        size: 20, color: Colors.white70),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        route["end_place_name"]?.toString().isNotEmpty == true
-                            ? route["end_place_name"].toString()
-                            : route["end_location"]?.toString() ?? "End",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Route info chips
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    Chip(
-                      label: Text(
-                        "ETA ${route["declared_eta_minutes"]?.toString() ?? "--"}m",
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                      backgroundColor: Colors.white24,
-                    ),
-                    if (route["notes"]?.toString().isNotEmpty == true)
-                      Chip(
-                        label: Text(
-                          route["notes"].toString(),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white,
-                          ),
-                        ),
-                        backgroundColor: Colors.white24,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Action buttons
-                SizedBox(
-                  width: double.infinity,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (state == "TRAVELLING")
-                        ElevatedButton.icon(
-                          onPressed: isStopping ? null : onStop,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: dropCityTransitTeal,
-                          ),
-                          icon: isStopping
-                              ? SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation(
-                                      dropCityTransitTeal,
-                                    ),
-                                  ),
-                                )
-                              : const Icon(Icons.stop),
-                          label:
-                              Text(isStopping ? "Stopping..." : "Stop Route"),
-                        )
-                      else
-                        ElevatedButton.icon(
-                          onPressed: isStarting ? null : onStart,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: dropCityTransitTeal,
-                          ),
-                          icon: isStarting
-                              ? SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation(
-                                      dropCityTransitTeal,
-                                    ),
-                                  ),
-                                )
-                              : const Icon(Icons.play_arrow),
-                          label:
-                              Text(isStarting ? "Starting..." : "Start Route"),
-                        ),
-                    ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: state == "TRAVELLING" && !isStopping ? onStop : null,
+                    icon: isStopping
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.stop),
+                    label: Text(isStopping ? "Stopping..." : "End Route"),
                   ),
                 ),
               ],
-            )),
-      );
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _RouteCard extends StatelessWidget {

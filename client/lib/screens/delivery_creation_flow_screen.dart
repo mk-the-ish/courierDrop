@@ -1124,7 +1124,9 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
                       if (c.selectedCorridorId == null && c.matchedCorridors.isNotEmpty) {
                         c.selectedCorridorId = (c.matchedCorridors.first["corridorId"] ?? c.matchedCorridors.first["corridor_id"])?.toString();
                       }
-                      await c.requestSelectedCourier();
+                      if (c.selectedCorridorId != null) {
+                        await c.requestSelectedCourier();
+                      }
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Delivery request posted.")),

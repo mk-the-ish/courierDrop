@@ -42,6 +42,8 @@ create table if not exists corridors (
   allow_multiple_parcels boolean not null default true,
   notes text,
   request_id text,
+  status text not null default 'PENDING',
+  planned_start_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -141,6 +143,9 @@ create index if not exists corridors_created_by_idx
 
 create index if not exists corridors_created_at_idx
   on corridors (created_at desc);
+
+create index if not exists corridors_status_idx
+  on corridors (status, created_at desc);
 
 create index if not exists corridors_start_point_gix
   on corridors using gist (start_point);

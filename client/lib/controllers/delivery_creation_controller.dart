@@ -170,7 +170,7 @@ class DeliveryCreationController extends ChangeNotifier {
               ?.toString();
     }
     if (selectedCorridorId == null) {
-      throw Exception("No courier matches are available to request.");
+      return;
     }
     _busy = true;
     _error = null;

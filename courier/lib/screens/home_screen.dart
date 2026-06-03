@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../auth/auth_state.dart";
+import "../theme.dart";
 import "courier_info_screen.dart";
 import "navigation_hub_screen.dart";
 
@@ -46,9 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // Still checking vehicle info
     if (!_checkedVehicleInfo) {
       return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
+        backgroundColor: dropCityCloudWhite,
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 

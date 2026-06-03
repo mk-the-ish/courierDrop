@@ -168,6 +168,14 @@ router.post(
       throw new ApiError(updateErr.message, 500, "COURIER_START_TRAVEL_FAILED");
     }
 
+    await supabase
+      .from("corridors")
+      .update({
+        status: "ACTIVE",
+        planned_start_at: new Date().toISOString()
+      })
+      .eq("id", corridorId);
+
     return res.json({
       state: deriveState(updated),
       current_route_id: updated?.current_route_id
@@ -181,6 +189,15 @@ router.post(
   asyncHandler(async (req, res) => {
     const courierId = req.user?.uid;
     const supabase = getSupabase();
+    const { data: currentRow, error: currentErr } = await supabase
+      .from("users")
+      .select("current_route_id")
+      .eq("id", courierId)
+      .maybeSingle();
+    if (currentErr) {
+      throw new ApiError(currentErr.message, 500, "COURIER_END_TRAVEL_FETCH_FAILED");
+    }
+    const currentRouteId = currentRow?.current_route_id || null;
     const { data: updated, error } = await supabase
       .from("users")
       .update({
@@ -193,6 +210,12 @@ router.post(
       .maybeSingle();
     if (error) {
       throw new ApiError(error.message, 500, "COURIER_END_TRAVEL_FAILED");
+    }
+    if (currentRouteId) {
+      await supabase
+        .from("corridors")
+        .update({ status: "COMPLETED" })
+        .eq("id", currentRouteId);
     }
     return res.json({
       state: deriveState(updated),
@@ -327,6 +350,8 @@ router.post(
         window_end: end.toISOString(),
         allow_multiple_parcels: Boolean(template.allow_multiple_parcels),
         notes: template.notes || null,
+        status: "PENDING",
+        planned_start_at: planned.toISOString(),
         request_id: req.requestId || null,
         created_at: nowIso
       })
