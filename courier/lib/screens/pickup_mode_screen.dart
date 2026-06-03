@@ -13,6 +13,7 @@ import "package:latlong2/latlong.dart";
 
 import "../auth/auth_state.dart";
 import "../widgets/location_preview_map.dart";
+import "../theme.dart";
 
 class PickupModeScreen extends StatefulWidget {
   const PickupModeScreen({
@@ -543,7 +544,7 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
               content: const Text(
                 "Start Route from the dashboard before pickup. The server requires an active route.",
               ),
-              leading: const Icon(Icons.route, color: Colors.orange),
+              leading: const Icon(Icons.route, color: dropCityAlertAmber),
               actions: [
                 TextButton(
                   onPressed: _refreshRouteState,
@@ -581,7 +582,7 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 _pickupPointHint!,
-                style: const TextStyle(color: Colors.green),
+                style: const TextStyle(color: dropCityActiveMint),
               ),
             ),
           if (_distanceToGate != null)
@@ -605,7 +606,7 @@ class _PickupModeScreenState extends State<PickupModeScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 "PIN locked. Try again in $_lockoutSeconds s.",
-                style: const TextStyle(color: Colors.red),
+                style: const TextStyle(color: dropCityErrorRed),
               ),
             ),
           const SizedBox(height: 12),

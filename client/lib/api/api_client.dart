@@ -289,6 +289,7 @@ class ApiClient {
     bool dualTracking = false,
     double? weightKg,
     int? clientEtaMinutes,
+    double? userPrice,
   }) async {
     final uri = Uri.parse("$baseUrl/parcels");
     final payload = <String, dynamic>{
@@ -303,6 +304,7 @@ class ApiClient {
       "dualTracking": dualTracking,
       if (weightKg != null) "weightKg": weightKg,
       if (clientEtaMinutes != null) "clientEtaMinutes": clientEtaMinutes,
+      if (userPrice != null) "userPrice": userPrice,
     };
 
     // Note: Do NOT include base64 image data in JSON payload

@@ -1,18 +1,9 @@
-import "dart:async";
-import "dart:convert";
-
 import "package:flutter/material.dart";
-import "package:geolocator/geolocator.dart";
-import "dart:io";
-
-import "package:image_picker/image_picker.dart";
-import "package:latlong2/latlong.dart";
-import "package:mobile_scanner/mobile_scanner.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
 import "../auth/auth_state.dart";
-import "../widgets/location_preview_map.dart";
 import "../theme.dart";
+import "../widgets/dropcity_brand.dart";
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key, required this.authState});
@@ -23,427 +14,246 @@ class ProgressScreen extends StatefulWidget {
   State<ProgressScreen> createState() => _ProgressScreenState();
 }
 
-class _ProgressScreenState extends State<ProgressScreen> {
-  final _parcelIdController = TextEditingController();
-  final _pinController = TextEditingController();
-  final _latController = TextEditingController();
-  final _lngController = TextEditingController();
-  String? _photoPath;
+class _ProgressScreenState extends State<ProgressScreen> with SingleTickerProviderStateMixin {
+  static const _prefsKey = "progress_selected_parcel_id";
 
-  bool _isSubmitting = false;
-  bool _isLocating = false;
-  String? _pickupPin;
-  String? _dropoffPin;
-  bool _pickupUsed = false;
-  bool _dropoffUsed = false;
-  Timer? _lockoutTimer;
-  int? _lockoutSeconds;
+  final List<Map<String, dynamic>> _demoParcels = const [
+    {
+      "id": "DC12345678",
+      "label": "Books (2 kg)",
+      "progress": 45,
+      "statusIndex": 1,
+      "eta": "~18 min",
+    },
+    {
+      "id": "DC99887766",
+      "label": "Documents (0.4 kg)",
+      "progress": 23,
+      "statusIndex": 0,
+      "eta": "~32 min",
+    },
+    {
+      "id": "DC44556677",
+      "label": "Phone charger (0.2 kg)",
+      "progress": 78,
+      "statusIndex": 2,
+      "eta": "~8 min",
+    },
+  ];
 
-  static const String _prefParcelId = "progress_parcelId";
-  static const String _prefPin = "progress_pin";
-  static const String _prefLat = "progress_lat";
-  static const String _prefLng = "progress_lng";
-  static const String _prefPhotoPath = "progress_photoPath";
-  static const String _prefPickupPin = "progress_pickupPin";
-  static const String _prefDropoffPin = "progress_dropoffPin";
+  Map<String, dynamic>? _selected;
+  bool _loading = true;
+  late final AnimationController _pulse;
 
   @override
   void initState() {
     super.initState();
-    _restoreFormState();
-    _handleLostData();
-  }
-
-  Future<void> _handleLostData() async {
-    final ImagePicker picker = ImagePicker();
-    final LostDataResponse response = await picker.retrieveLostData();
-    
-    if (response.isEmpty) return;
-    
-    if (response.file != null) {
-      setState(() {
-        _photoPath = response.file!.path;
-      });
-      await _saveFormState();
-    }
-  }
-
-  Future<void> _restoreFormState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (!mounted) return;
-      String? savedPhotoPath = prefs.getString(_prefPhotoPath);
-      
-      // Verify photo file actually exists
-      if (savedPhotoPath != null && !File(savedPhotoPath).existsSync()) {
-        savedPhotoPath = null;
-        await prefs.remove(_prefPhotoPath);
-      }
-      
-      setState(() {
-        _parcelIdController.text = prefs.getString(_prefParcelId) ?? "";
-        _pinController.text = prefs.getString(_prefPin) ?? "";
-        _latController.text = prefs.getString(_prefLat) ?? "";
-        _lngController.text = prefs.getString(_prefLng) ?? "";
-        _photoPath = savedPhotoPath;
-        _pickupPin = prefs.getString(_prefPickupPin);
-        _dropoffPin = prefs.getString(_prefDropoffPin);
-      });
-    } catch (e) {
-      // Ignore errors during restoration
-    }
-  }
-
-  Future<void> _saveFormState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await Future.wait([
-        prefs.setString(_prefParcelId, _parcelIdController.text),
-        prefs.setString(_prefPin, _pinController.text),
-        prefs.setString(_prefLat, _latController.text),
-        prefs.setString(_prefLng, _lngController.text),
-        if (_photoPath != null) prefs.setString(_prefPhotoPath, _photoPath!) else prefs.remove(_prefPhotoPath),
-        if (_pickupPin != null) prefs.setString(_prefPickupPin, _pickupPin!) else prefs.remove(_prefPickupPin),
-        if (_dropoffPin != null) prefs.setString(_prefDropoffPin, _dropoffPin!) else prefs.remove(_prefDropoffPin),
-      ]);
-    } catch (e) {
-      // Ignore errors during save
-    }
-  }
-
-  Future<void> _clearFormState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await Future.wait([
-        prefs.remove(_prefParcelId),
-        prefs.remove(_prefPin),
-        prefs.remove(_prefLat),
-        prefs.remove(_prefLng),
-        prefs.remove(_prefPhotoPath),
-        prefs.remove(_prefPickupPin),
-        prefs.remove(_prefDropoffPin),
-      ]);
-    } catch (e) {
-      // Ignore errors during clear
-    }
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
+    _loadSelection();
   }
 
   @override
   void dispose() {
-    _lockoutTimer?.cancel();
-    _parcelIdController.dispose();
-    _pinController.dispose();
-    _latController.dispose();
-    _lngController.dispose();
+    _pulse.dispose();
     super.dispose();
   }
 
-  Future<void> _useCurrentLocation() async {
-    setState(() => _isLocating = true);
-    try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Location permission denied.")),
-        );
-        return;
-      }
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      _latController.text = position.latitude.toStringAsFixed(6);
-      _lngController.text = position.longitude.toStringAsFixed(6);
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Location error: $error")),
-      );
-    } finally {
-      if (mounted) setState(() => _isLocating = false);
-    }
-  }
-
-  Future<void> _initHandshake() async {
-    final parcelId = _parcelIdController.text.trim();
-    if (parcelId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Parcel ID required.")),
-      );
-      return;
-    }
-    setState(() => _isSubmitting = true);
-    try {
-      final response =
-          await widget.authState.apiClient.initHandshake(parcelId);
-      if (!mounted) return;
-      setState(() {
-        _pickupPin = response["pickupPin"]?.toString();
-        _dropoffPin = response["dropoffPin"]?.toString();
-        _pickupUsed = false;
-        _dropoffUsed = false;
-      });
-      await _saveFormState();
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Init error: $error")),
-      );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  Future<void> _dropoff() async {
-    final parcelId = _parcelIdController.text.trim();
-    final pin = _pinController.text.trim();
-    final lat = double.tryParse(_latController.text.trim());
-    final lng = double.tryParse(_lngController.text.trim());
-
-    if (parcelId.isEmpty || pin.isEmpty || _photoPath == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Parcel ID, PIN, and photo required.")),
-      );
-      return;
-    }
-    if (lat == null || lng == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Valid lat/lng required.")),
-      );
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-    try {
-      final photoUrl = await widget.authState.apiClient.uploadHandshakePhoto(
-        _photoPath!,
-        parcelId: parcelId,
-      );
-      await widget.authState.apiClient.dropoffHandshake(
-        parcelId: parcelId,
-        pin: pin,
-        lat: lat,
-        lng: lng,
-        accuracy: await _getAccuracy(),
-        photoUrl: photoUrl,
-      );
-      if (!mounted) return;
-      setState(() {
-        _pickupPin = null;
-        _pickupUsed = true;
-        _dropoffPin = null;
-        _dropoffUsed = true;
-      });
-      await _clearFormState();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Dropoff verified.")),
-      );
-    } catch (error) {
-      _handleLockout(error.toString());
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Dropoff error: $error")),
-      );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  Future<void> _capturePhoto() async {
-    await _saveFormState();
-    final picker = ImagePicker();
-    final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-    if (photo == null) {
-      return;
-    }
+  Future<void> _loadSelection() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedId = prefs.getString(_prefsKey);
     if (!mounted) return;
-    setState(() => _photoPath = photo.path);
-    await _saveFormState();
-  }
-
-  Future<double?> _getAccuracy() async {
-    try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      return position.accuracy;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  void _handleLockout(String raw) {
-    try {
-      final start = raw.indexOf("{");
-      if (start != -1) {
-        final jsonText = raw.substring(start);
-        final decoded = jsonDecode(jsonText) as Map<String, dynamic>;
-        if (decoded["code"] == "HANDSHAKE_PIN_LOCKED" &&
-            decoded["retryAfterSeconds"] != null) {
-          final seconds = (decoded["retryAfterSeconds"] as num).toInt();
-          _startLockout(seconds);
+    setState(() {
+      _selected = null;
+      if (savedId != null) {
+        for (final parcel in _demoParcels) {
+          if (parcel["id"] == savedId) {
+            _selected = parcel;
+            break;
+          }
         }
       }
-    } catch (_) {
-      // ignore
-    }
-  }
-
-  void _startLockout(int seconds) {
-    _lockoutTimer?.cancel();
-    setState(() => _lockoutSeconds = seconds);
-    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      if (_lockoutSeconds == null || _lockoutSeconds! <= 1) {
-        timer.cancel();
-        setState(() => _lockoutSeconds = null);
-      } else {
-        setState(() => _lockoutSeconds = _lockoutSeconds! - 1);
-      }
+      _loading = false;
     });
   }
 
-  Future<void> _scanQr() async {
-    final result = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const _QrScanScreen()),
-    );
-    if (result != null && result.isNotEmpty) {
-      setState(() => _parcelIdController.text = result);
-    }
+  Future<void> _persistSelection(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, id);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isBusy = widget.authState.isBusy || _isSubmitting || _isLocating;
+    final selected = _selected;
     return Scaffold(
-      appBar: AppBar(title: const Text("Progress / Dropoff")),
+      backgroundColor: dropCityCloudWhite,
+      appBar: AppBar(
+        backgroundColor: dropCityCloudWhite,
+        foregroundColor: dropCitySafeSlate,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        centerTitle: true,
+        title: const Column(
+          children: [
+            Text("Live Progress", style: TextStyle(fontWeight: FontWeight.w900)),
+            SizedBox(height: 2),
+            Text("Parcel ID: DC12345678", style: TextStyle(color: dropCitySlateGrey, fontSize: 12)),
+          ],
+        ),
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         children: [
-          TextField(
-            controller: _parcelIdController,
-            decoration: const InputDecoration(
-              labelText: "Parcel ID",
-              border: OutlineInputBorder(),
+          DropdownButtonFormField<String>(
+            hint: const Text("Select parcel"),
+            value: selected?["id"]?.toString(),
+            decoration: InputDecoration(
+              labelText: "Live parcel",
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              prefixIcon: const Icon(Icons.inventory_2_outlined),
             ),
+            items: _demoParcels
+                .map(
+                  (parcel) => DropdownMenuItem<String>(
+                    value: parcel["id"]?.toString(),
+                    child: Text(parcel["label"]?.toString() ?? parcel["id"].toString()),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) async {
+              if (value == null) return;
+              final parcel = _demoParcels.firstWhere((item) => item["id"] == value);
+              setState(() => _selected = parcel);
+              await _persistSelection(value);
+            },
           ),
           const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: isBusy ? null : _scanQr,
-            child: const Text("Scan Parcel QR"),
+          if (_loading || selected == null) ...[
+            _EmptyProgressState(pulse: _pulse),
+          ] else ...[
+            _StatusBanner(pulse: _pulse, label: "Your parcel is on the way"),
+            const SizedBox(height: 14),
+            _ProgressCard(
+              progress: selected["progress"] as int,
+              statusIndex: selected["statusIndex"] as int,
+              eta: selected["eta"]?.toString() ?? "~18 min",
+              pulse: _pulse,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyProgressState extends StatelessWidget {
+  const _EmptyProgressState({required this.pulse});
+
+  final AnimationController pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: dropCitySafeSlate,
+            borderRadius: BorderRadius.circular(22),
           ),
-          const SizedBox(height: 12),
-          Row(
+          child: const Row(
             children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: dropCityTransitTeal,
+                child: Icon(Icons.inventory_2_outlined, color: Colors.white, size: 20),
+              ),
+              SizedBox(width: 14),
               Expanded(
-                child: OutlinedButton(
-                  onPressed: isBusy ? null : _initHandshake,
-                  child: const Text("Generate PINs"),
+                child: Text(
+                  "Your parcel is on the way",
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
                 ),
               ),
             ],
           ),
-          if (_pickupPin != null || _dropoffPin != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                "Pickup PIN: ${_pickupUsed ? "***" : (_pickupPin ?? "-")} | "
-                "Dropoff PIN: ${_dropoffUsed ? "***" : (_dropoffPin ?? "-")}",
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _pinController,
-            decoration: const InputDecoration(
-              labelText: "Dropoff PIN",
-              border: OutlineInputBorder(),
-            ),
+        ),
+        const SizedBox(height: 18),
+        Container(
+          height: 320,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: dropCitySlateGrey.withOpacity(0.18)),
           ),
-          if (_lockoutSeconds != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                "PIN locked. Try again in $_lockoutSeconds s.",
-                style: const TextStyle(color: dropCityErrorRed),
-              ),
-            ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: isBusy ? null : _capturePhoto,
-            icon: const Icon(Icons.camera_alt),
-            label: Text(_photoPath == null ? "Capture photo" : "Retake photo"),
-          ),
-          if (_photoPath != null) ...[
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(
-                File(_photoPath!),
-                height: 140,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _latController,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: "Lat",
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.local_shipping_outlined, size: 72, color: dropCityTransitTeal),
+                const SizedBox(height: 10),
+                const Text("No parcel selected yet", style: TextStyle(color: dropCitySafeSlate, fontSize: 18, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                const Text("Use the dropdown above to load a live parcel.", style: TextStyle(color: dropCitySlateGrey)),
+                const SizedBox(height: 18),
+                AnimatedBuilder(
+                  animation: pulse,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: 0.45 + (pulse.value * 0.45),
+                      child: child,
+                    );
+                  },
+                  child: const Icon(Icons.circle, color: dropCityActiveMint, size: 14),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _lngController,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: "Lng",
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: isBusy ? null : _useCurrentLocation,
-            icon: const Icon(Icons.my_location),
-            label: Text(_isLocating ? "Locating..." : "Use current location"),
-          ),
-          if (_latController.text.isNotEmpty &&
-              _lngController.text.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Builder(
-              builder: (context) {
-                final lat = double.tryParse(_latController.text.trim());
-                final lng = double.tryParse(_lngController.text.trim());
-                final point = (lat != null && lng != null) ? LatLng(lat, lng) : null;
-                return LocationPreviewMap(
-                  point: point,
-                  label: "Dropoff location preview",
-                );
-              },
+              ],
             ),
-          ],
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: isBusy ? null : _dropoff,
-            child: Text(isBusy ? "Submitting..." : "Verify dropoff"),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({required this.pulse, required this.label});
+  final AnimationController pulse;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: dropCitySafeSlate,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: [
+          AnimatedBuilder(
+            animation: pulse,
+            builder: (context, _) {
+              final scale = 0.92 + pulse.value * 0.16;
+              return Transform.scale(
+                scale: scale,
+                child: const CircleAvatar(
+                  radius: 18,
+                  backgroundColor: dropCityActiveMint,
+                  child: Icon(Icons.radio_button_checked, color: Colors.white, size: 18),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),
@@ -451,44 +261,158 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 }
 
-class _QrScanScreen extends StatefulWidget {
-  const _QrScanScreen();
+class _ProgressCard extends StatelessWidget {
+  const _ProgressCard({
+    required this.progress,
+    required this.statusIndex,
+    required this.eta,
+    required this.pulse,
+  });
 
-  @override
-  State<_QrScanScreen> createState() => _QrScanScreenState();
-}
-
-class _QrScanScreenState extends State<_QrScanScreen> {
-  late MobileScannerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = MobileScannerController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  final int progress;
+  final int statusIndex;
+  final String eta;
+  final AnimationController pulse;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Scan Parcel QR")),
-      body: MobileScanner(
-        controller: _controller,
-        onDetect: (capture) {
-          final List<Barcode> barcodes = capture.barcodes;
-          if (barcodes.isNotEmpty) {
-            final code = barcodes.first.rawValue;
-            if (code != null && code.isNotEmpty) {
-              _controller.stop();
-              Navigator.of(context).pop(code);
-            }
-          }
-        },
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: dropCitySlateGrey.withOpacity(0.14)),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            width: 220,
+            height: 220,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: progress / 100,
+                  strokeWidth: 10,
+                  backgroundColor: dropCitySlateGrey.withOpacity(0.18),
+                  valueColor: const AlwaysStoppedAnimation(dropCityTransitTeal),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text("$progress%", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: dropCitySafeSlate)),
+                    const SizedBox(height: 8),
+                    const Text("Progress", style: TextStyle(color: dropCitySlateGrey)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          _MilestoneRow(index: 0, activeIndex: statusIndex, title: "Picked up from sender", activeLabel: "Completed", pulse: pulse),
+          _MilestoneRow(index: 1, activeIndex: statusIndex, title: "En route - Avondale checkpoint", activeLabel: "In progress", pulse: pulse),
+          _MilestoneRow(index: 2, activeIndex: statusIndex, title: "Arriving at your location", activeLabel: "Pending", pulse: pulse),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: dropCityCloudWhite,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: dropCitySlateGrey.withOpacity(0.16)),
+            ),
+            child: Column(
+              children: [
+                Text(eta, style: const TextStyle(color: dropCityTransitTeal, fontSize: 28, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                const Text("Estimated arrival", style: TextStyle(color: dropCitySlateGrey)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_outline, size: 14, color: dropCitySlateGrey),
+              SizedBox(width: 6),
+              Text(
+                "Your courier's location is private",
+                style: TextStyle(color: dropCitySlateGrey, fontSize: 11, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MilestoneRow extends StatelessWidget {
+  const _MilestoneRow({
+    required this.index,
+    required this.activeIndex,
+    required this.title,
+    required this.activeLabel,
+    required this.pulse,
+  });
+
+  final int index;
+  final int activeIndex;
+  final String title;
+  final String activeLabel;
+  final AnimationController pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = index < activeIndex;
+    final active = index == activeIndex;
+    final pending = index > activeIndex;
+    final color = completed
+        ? dropCityActiveMint
+        : active
+            ? dropCityTransitTeal
+            : dropCitySlateGrey;
+    final icon = completed
+        ? Icons.check_circle
+        : active
+            ? Icons.radio_button_checked
+            : Icons.radio_button_unchecked;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          if (active)
+            AnimatedBuilder(
+              animation: pulse,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: 0.45 + (pulse.value * 0.55),
+                  child: child,
+                );
+              },
+              child: Icon(icon, color: color, size: 28),
+            )
+          else
+            Icon(icon, color: color, size: 28),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w800)),
+                Text(
+                  completed
+                      ? "Completed"
+                      : active
+                          ? activeLabel
+                          : "Pending",
+                  style: const TextStyle(color: dropCitySlateGrey),
+                ),
+              ],
+            ),
+          ),
+          if (pending) const SizedBox(width: 8),
+        ],
       ),
     );
   }

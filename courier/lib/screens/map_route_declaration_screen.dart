@@ -12,6 +12,7 @@ import "package:shared_preferences/shared_preferences.dart";
 
 import "../auth/auth_state.dart";
 import "../utils/map_coordinates.dart";
+import "../theme.dart";
 
 class RouteInfo {
   RouteInfo({
@@ -287,10 +288,10 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
       final isStart = i == 0;
       final isEnd = i == _points.length - 1;
       final color = isStart
-          ? Colors.green
+          ? dropCityActiveMint
           : isEnd
-              ? Colors.red
-              : Colors.orange;
+              ? dropCityErrorRed
+              : dropCityAlertAmber;
       _markers.add(
         Marker(
           point: _points[index],
@@ -629,7 +630,7 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
               MarkerLayer(markers: _markers.toList()),
               const Align(
                 child: IgnorePointer(
-                  child: Icon(Icons.location_pin, size: 42, color: Colors.red),
+                  child: Icon(Icons.location_pin, size: 42, color: dropCityErrorRed),
                 ),
               ),
             ],

@@ -9,11 +9,13 @@ class AuthUser {
     required this.uid,
     required this.email,
     required this.idToken,
+    this.displayName,
   });
 
   final String uid;
   final String email;
   final String idToken;
+  final String? displayName;
 }
 
 class AuthService {
@@ -42,6 +44,7 @@ class AuthService {
       uid: result.userId,
       email: email,
       idToken: result.idToken,
+      displayName: _decodeDisplayName(result.idToken),
     );
     return _currentUser!;
   }
@@ -66,6 +69,7 @@ class AuthService {
       uid: result.userId,
       email: email,
       idToken: result.idToken,
+      displayName: _decodeDisplayName(result.idToken),
     );
 
     return _currentUser!;
@@ -93,6 +97,7 @@ class AuthService {
       uid: result.userId,
       email: currentEmail,
       idToken: result.idToken,
+      displayName: _decodeDisplayName(result.idToken) ?? _currentUser?.displayName,
     );
     await _tokenStore.saveTokens(
       idToken: result.idToken,
@@ -115,6 +120,11 @@ class AuthService {
     }
   }
 
+  String? _decodeDisplayName(String token) {
+    final payload = _decodeJwtPayload(token);
+    return _extractDisplayNameFromPayload(payload);
+  }
+
   bool _restoreFromCachedIdToken(String token) {
     final payload = _decodeJwtPayload(token);
     final uid = payload?["user_id"]?.toString() ??
@@ -128,8 +138,16 @@ class AuthService {
       uid: uid,
       email: payload?["email"]?.toString() ?? "",
       idToken: token,
+      displayName: _extractDisplayNameFromPayload(payload),
     );
     return true;
+  }
+
+  String? _extractDisplayNameFromPayload(Map<String, dynamic>? payload) {
+    if (payload == null) {
+      return null;
+    }
+    return payload["displayName"]?.toString() ?? payload["name"]?.toString();
   }
 
   Future<bool> restoreSession() async {

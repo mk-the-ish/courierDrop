@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../auth/auth_state.dart';
 import '../controllers/location_tracking_controller.dart';
 import '../utils/map_coordinates.dart';
+import "../theme.dart";
 
 /**
  * Pickup Screen
@@ -220,7 +221,7 @@ class _PickupScreenState extends State<PickupScreen> {
             _buildStatusCard(
               title: 'GPS Verification',
               status: _gpsInRange ? 'In Range' : 'Out of Range',
-              statusColor: _gpsInRange ? Colors.green : Colors.orange,
+              statusColor: _gpsInRange ? dropCityActiveMint : dropCityAlertAmber,
               details: [
                 'Gate Radius: ${widget.gateRadiusMeters.toStringAsFixed(0)}m',
                 if (_distanceToGateMeters != null)
@@ -238,7 +239,7 @@ class _PickupScreenState extends State<PickupScreen> {
                 return _buildStatusCard(
                   title: 'Location Accuracy',
                   status: isAccurate ? 'High' : 'Low',
-                  statusColor: isAccurate ? Colors.green : Colors.orange,
+                  statusColor: isAccurate ? dropCityActiveMint : dropCityAlertAmber,
                   details: [
                     if (accuracy != null) 'Accuracy: ±${accuracy.toStringAsFixed(1)}m',
                   ],
@@ -277,12 +278,12 @@ class _PickupScreenState extends State<PickupScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade100,
+                  color: dropCityErrorRed.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _verificationError!,
-                  style: TextStyle(color: Colors.red.shade900, fontSize: 12),
+                  style: TextStyle(color: dropCityErrorRed, fontSize: 12),
                 ),
               ),
             const SizedBox(height: 24),
@@ -292,17 +293,17 @@ class _PickupScreenState extends State<PickupScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade100,
+                  color: dropCityActiveMint.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green),
+                    Icon(Icons.check_circle, color: dropCityActiveMint),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Pickup verified! Proceeding to next step...',
-                        style: TextStyle(color: Colors.green),
+                        style: TextStyle(color: dropCityActiveMint),
                       ),
                     ),
                   ],
@@ -329,7 +330,7 @@ class _PickupScreenState extends State<PickupScreen> {
         child: ElevatedButton(
           onPressed: _checkCurrentLocation,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey.shade300,
+            backgroundColor: dropCitySlateGrey.withOpacity(0.30),
           ),
           child: const Text(
             'Refresh Location',
@@ -349,7 +350,7 @@ class _PickupScreenState extends State<PickupScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: dropCitySlateGrey.withOpacity(0.30)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

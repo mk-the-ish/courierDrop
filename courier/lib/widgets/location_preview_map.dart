@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../utils/map_coordinates.dart';
+import "../theme.dart";
 
 class LocationPreviewMap extends StatelessWidget {
   const LocationPreviewMap({
@@ -62,7 +63,7 @@ class LocationPreviewMap extends StatelessWidget {
                         height: 40,
                         child: const Icon(
                           Icons.location_pin,
-                          color: Colors.red,
+                          color: dropCityErrorRed,
                           size: 36,
                         ),
                       ),

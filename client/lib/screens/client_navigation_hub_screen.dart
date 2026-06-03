@@ -64,7 +64,7 @@ class _ClientNavigationHubScreenState extends State<ClientNavigationHubScreen> {
                   label: "Home",
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.local_shipping),
+                  icon: Icon(Icons.inventory_2_outlined),
                   label: "Deliveries",
                 ),
                 BottomNavigationBarItem(

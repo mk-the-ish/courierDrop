@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../auth/auth_state.dart';
 import '../controllers/location_tracking_controller.dart';
 import '../utils/map_coordinates.dart';
+import "../theme.dart";
 
 /**
  * Courier Dropoff Screen
@@ -273,8 +274,8 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                         point: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
                         radius: widget.gateRadiusMeters,
                         useRadiusInMeter: true,
-                        color: Colors.green.withOpacity(0.2),
-                        borderColor: Colors.green,
+                        color: dropCityActiveMint.withOpacity(0.2),
+                        borderColor: dropCityActiveMint,
                         borderStrokeWidth: 2,
                       ),
                     ],
@@ -285,7 +286,7 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                         point: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
                         width: 40,
                         height: 40,
-                        child: const Icon(Icons.location_on, color: Colors.green, size: 36),
+                        child: const Icon(Icons.location_on, color: dropCityActiveMint, size: 36),
                       ),
                     ],
                   ),
@@ -298,7 +299,7 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
             _buildStatusCard(
               title: 'Delivery Location',
               status: _isAtLocation ? 'At Location' : 'Approaching',
-              statusColor: _isAtLocation ? Colors.green : Colors.orange,
+              statusColor: _isAtLocation ? dropCityActiveMint : dropCityAlertAmber,
               details: [
                 'Safe Zone: ${widget.gateRadiusMeters.toStringAsFixed(0)}m radius',
                 if (_distanceToDropoffMeters != null)
@@ -314,7 +315,7 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                 return _buildStatusCard(
                   title: 'GPS Accuracy',
                   status: (accuracy ?? 100) <= 30 ? 'High' : 'Low',
-                  statusColor: (accuracy ?? 100) <= 30 ? Colors.green : Colors.orange,
+                  statusColor: (accuracy ?? 100) <= 30 ? dropCityActiveMint : dropCityAlertAmber,
                   details: [
                     if (accuracy != null) 'Accuracy: ±${accuracy.toStringAsFixed(1)}m',
                   ],
@@ -346,7 +347,7 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade100,
+                        color: dropCityActiveMint.withOpacity(0.14),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -392,10 +393,10 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade100,
+                        color: dropCityActiveMint.withOpacity(0.14),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text('✓ Photo uploaded', style: TextStyle(color: Colors.green)),
+                      child: const Text('✓ Photo uploaded', style: TextStyle(color: dropCityActiveMint)),
                     ),
                 ],
               ),
@@ -407,12 +408,12 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade100,
+                  color: dropCityErrorRed.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _verificationError!,
-                  style: TextStyle(color: Colors.red.shade900, fontSize: 12),
+                  style: TextStyle(color: dropCityErrorRed, fontSize: 12),
                 ),
               ),
           ],
@@ -437,7 +438,7 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: dropCitySlateGrey.withOpacity(0.30)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -479,9 +480,9 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: completed ? Colors.green : Colors.grey.shade300),
+        border: Border.all(color: completed ? dropCityActiveMint : dropCitySlateGrey.withOpacity(0.30)),
         borderRadius: BorderRadius.circular(12),
-        color: completed ? Colors.green.shade50 : Colors.transparent,
+        color: completed ? dropCityActiveMint.withOpacity(0.08) : Colors.transparent,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,7 +493,7 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: completed ? Colors.green : Colors.grey,
+                  color: completed ? dropCityActiveMint : Colors.grey,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Center(

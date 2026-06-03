@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme.dart';
 import 'dart:async';
 
 class SplashScreen extends StatefulWidget {
@@ -43,9 +44,9 @@ class _SplashScreenState extends State<SplashScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF0F3A7D), // Deep blue
+              dropCitySafeSlate, // Deep blue
               Color(0xFF1E5A7D), // Medium blue
-              Color(0xFF0D7A7A), // Teal
+              dropCityTransitTeal, // Teal
             ],
           ),
         ),

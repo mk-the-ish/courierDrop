@@ -1,6 +1,9 @@
 import "package:flutter/material.dart";
 import "dart:async";
+import 'dart:ui' as ui;
+import "package:latlong2/latlong.dart";
 import "../auth/auth_state.dart";
+import "../services/map_service.dart";
 import "delivery_creation_flow_screen.dart";
 import "parcel_status_screen.dart";
 import "../theme.dart";
@@ -20,6 +23,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic> _stats = const {};
   List<Map<String, dynamic>> _parcels = const [];
   Timer? _activeParcelsTimer;
+  final MapService _mapService = MapService();
+  final Map<String, String> _placeNameCache = {};
   bool _ratingSheetOpen = false;
   final Set<String> _ratingInProgress = {};
   List<Map<String, dynamic>> _notifications = const [];
@@ -71,6 +76,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _latestEtaUpdate = null;
         }
       });
+      _resolveParcelPlaceNames(data.parcels);
       _checkForPendingRating();
     } catch (error) {
       if (!mounted) {
@@ -171,6 +177,132 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
     _showRatingSheet(parcelId);
+  }
+
+  LatLng? _parseLatLng(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    if (trimmed.startsWith("POINT(") && trimmed.endsWith(")")) {
+      final inner = trimmed.substring(6, trimmed.length - 1).trim();
+      final parts = inner.split(RegExp(r"[ ,]+"));
+      if (parts.length >= 2) {
+        final lat = double.tryParse(parts[0]);
+        final lng = double.tryParse(parts[1]);
+        if (lat != null && lng != null) {
+          return LatLng(lat, lng);
+        }
+      }
+      return null;
+    }
+    final parts = trimmed.split(RegExp(r"[ ,]+"));
+    if (parts.length >= 2) {
+      final lat = double.tryParse(parts[0]);
+      final lng = double.tryParse(parts[1]);
+      if (lat != null && lng != null) {
+        return LatLng(lat, lng);
+      }
+    }
+    return null;
+  }
+
+  Future<String> _resolvePlaceName(String rawValue, String fallback) async {
+    final location = _parseLatLng(rawValue);
+    if (location == null) {
+      return fallback;
+    }
+    try {
+      final label = await _mapService.reverseGeocode(location);
+      return label.isNotEmpty ? label : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  Future<void> _resolveParcelPlaceNames(List<Map<String, dynamic>> parcels) async {
+    final candidates = parcels.take(5).toList();
+    for (final parcel in candidates) {
+      final parcelId = parcel["id"]?.toString();
+      if (parcelId == null || parcelId.isEmpty) {
+        continue;
+      }
+      final originKey = "$parcelId-origin";
+      final destinationKey = "$parcelId-destination";
+      if (_placeNameCache.containsKey(originKey) && _placeNameCache.containsKey(destinationKey)) {
+        continue;
+      }
+      final originRaw = parcel["origin"]?.toString() ?? "";
+      final destinationRaw = parcel["destination"]?.toString() ?? "";
+      final originLabel = await _resolvePlaceName(originRaw, originRaw);
+      final destinationLabel = await _resolvePlaceName(destinationRaw, destinationRaw);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _placeNameCache[originKey] = originLabel;
+        _placeNameCache[destinationKey] = destinationLabel;
+      });
+    }
+  }
+
+  String _routeTitle(Map<String, dynamic> parcel) {
+    final parcelId = parcel["id"]?.toString() ?? "";
+    final origin = _placeNameCache["$parcelId-origin"] ?? parcel["origin"]?.toString() ?? "Unknown";
+    final destination = _placeNameCache["$parcelId-destination"] ?? parcel["destination"]?.toString() ?? "Unknown";
+    final originLabel = origin.split(",").first.trim();
+    final destinationLabel = destination.split(",").first.trim();
+    if (originLabel.isEmpty || destinationLabel.isEmpty) {
+      return "Delivery summary";
+    }
+    return "$originLabel → $destinationLabel";
+  }
+
+  double _parcelProgress(Map<String, dynamic> parcel) {
+    final rawStatus = parcel["status"]?.toString() ?? "";
+    final status = rawStatus.toUpperCase();
+    if (status == "COMPLETED") {
+      return 100.0;
+    }
+    final createdAt = DateTime.tryParse(parcel["created_at"]?.toString() ?? "");
+    final etaAt = DateTime.tryParse(parcel["etaAt"]?.toString() ?? "");
+    if (createdAt != null && etaAt != null && etaAt.isAfter(createdAt)) {
+      final total = etaAt.difference(createdAt).inSeconds;
+      final elapsed = DateTime.now().difference(createdAt).inSeconds;
+      final progress = (elapsed / total) * 100.0;
+      if (status == "IN_TRANSIT") {
+        return progress.clamp(50.0, 99.0);
+      }
+      return progress.clamp(10.0, 90.0);
+    }
+    if (status == "IN_TRANSIT") {
+      return 75.0;
+    }
+    return 25.0;
+  }
+
+  String _statusChipLabel(String rawStatus) {
+    final status = rawStatus.toUpperCase();
+    if (status == "IN_TRANSIT") {
+      return "IN TRANSIT";
+    }
+    return "MATCHING";
+  }
+
+  Color _statusChipColor(String rawStatus) {
+    final status = rawStatus.toUpperCase();
+    if (status == "IN_TRANSIT") {
+      return dropCityActiveMint;
+    }
+    return dropCityAlertAmber;
+  }
+
+  String _friendlyDateLabel(String rawValue) {
+    final date = DateTime.tryParse(rawValue);
+    if (date == null) {
+      return rawValue;
+    }
+    return "${date.day}/${date.month}/${date.year}";
   }
 
   Future<void> _showRatingSheet(String parcelId) async {
@@ -295,9 +427,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final assignedParcels = _intStat("assigned");
     final inTransitParcels = _intStat("inTransit");
 
+    final displayName = widget.authState.user?.displayName?.split(" ").first ?? widget.authState.user?.email.split("@").first ?? "there";
     return Scaffold(
+      backgroundColor: dropCityCloudWhite,
       appBar: AppBar(
-        title: const Text("DropCity"),
+        backgroundColor: dropCityCloudWhite,
+        elevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12.0),
+          child: Image.asset(
+            "assets/images/logo.png",
+            width: 36,
+            height: 36,
+            fit: BoxFit.contain,
+          ),
+        ),
+        title: const Text(
+          "DropCity",
+          style: TextStyle(
+            color: dropCitySafeSlate,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
         actions: [
           IconButton(
             onPressed: _openNotifications,
@@ -308,11 +460,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             tooltip: "Notifications",
           ),
-          IconButton(
-            onPressed: _isLoading ? null : _loadDashboard,
-            icon: const Icon(Icons.refresh),
-            tooltip: "Refresh dashboard",
-          ),
         ],
       ),
       body: SafeArea(
@@ -321,50 +468,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: ListView(
             padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
             children: [
-              const Text(
-                "Good morning 👋",
-                style: TextStyle(
+              Text(
+                "Good morning, $displayName 👋",
+                style: const TextStyle(
                   color: dropCitySafeSlate,
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               InkWell(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(20),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) =>
-                          DeliveryCreationFlowScreen(authState: widget.authState),
+                      builder: (_) => DeliveryCreationFlowScreen(authState: widget.authState),
                     ),
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: dropCityTransitTeal,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: dropCityTransitTeal.withOpacity(0.22),
+                        color: dropCityTransitTeal.withOpacity(0.18),
                         blurRadius: 24,
                         offset: const Offset(0, 12),
                       ),
                     ],
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      CircleAvatar(
-                        backgroundColor: Colors.white24,
-                        foregroundColor: Colors.white,
-                        child: Icon(Icons.inventory_2_outlined),
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white24,
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
                       ),
-                      SizedBox(width: 14),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                          children: const [
                             Text(
                               "Send a Parcel",
                               style: TextStyle(
@@ -373,31 +529,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            SizedBox(height: 3),
+                            SizedBox(height: 6),
                             Text(
                               "Create a new delivery request",
-                              style: TextStyle(color: Colors.white70),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      Icon(Icons.arrow_forward, color: Colors.white),
+                      const Icon(Icons.arrow_forward, color: Colors.white),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _InfoChip(label: "Total", value: totalParcels.toString()),
-                  _InfoChip(label: "Matching", value: pendingParcels.toString()),
-                  _InfoChip(label: "Assigned", value: assignedParcels.toString()),
-                  _InfoChip(label: "In transit", value: inTransitParcels.toString()),
-                ],
+              const SizedBox(height: 24),
+              const Text(
+                "YOUR ACTIVE DELIVERIES",
+                style: TextStyle(
+                  color: dropCitySlateGrey,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               if (_isLoading)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 32),
@@ -413,155 +571,174 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _StatTile(
-                        icon: Icons.local_shipping,
-                        iconColor: dropCityTransitTeal,
-                        value: _intStat("pending"),
-                        label: "Pending",
-                      ),
-                      _StatTile(
-                        icon: Icons.assignment_turned_in,
-                        iconColor: Colors.indigo,
-                        value: _intStat("assigned"),
-                        label: "Assigned",
-                      ),
-                      _StatTile(
-                        icon: Icons.location_on,
-                        iconColor: dropCityAlertAmber,
-                        value: _intStat("inTransit"),
-                        label: "In transit",
-                      ),
-                      _StatTile(
-                        icon: Icons.check_circle,
-                        iconColor: dropCityActiveMint,
-                        value: _intStat("completed"),
-                        label: "Completed",
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.schedule),
-                  title: Text("Next ETA: ${_formatEta(nextEtaMinutes)}"),
-                  subtitle: nextEtaParcelId == null
-                      ? const Text("No active parcels right now")
-                      : Row(
-                          children: [
-                            Expanded(child: Text("Parcel: $nextEtaParcelId")),
-                            _confidenceBadge(nextEtaConfidence),
-                          ],
-                        ),
-                ),
-              ),
-              if (_latestEtaUpdate != null) ...[
-                const SizedBox(height: 12),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.update, color: dropCityAlertAmber),
-                    title: Text(_latestEtaUpdate?["title"]?.toString() ?? "ETA updated"),
-                    subtitle: Text(
-                      "${_latestEtaUpdate?["body"]?.toString() ?? ""}\n"
-                      "Received ${_formatWhen(_latestEtaUpdate?["created_at"]?.toString() ?? "")}",
+              if (!_isLoading && _error == null && _parcels.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    isThreeLine: true,
-                    trailing: ((_latestEtaUpdate?["status"]?.toString() ?? "") == "unread")
-                        ? TextButton(
-                            onPressed: () async {
-                              final id = _latestEtaUpdate?["id"]?.toString();
-                              if (id == null || id.isEmpty) return;
-                              await widget.authState.apiClient.markNotificationRead(id);
-                              await _loadDashboard();
-                            },
-                            child: const Text("Mark read"),
-                          )
-                        : const Icon(Icons.done, size: 18),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              const Text(
-                "YOUR ACTIVE DELIVERIES",
-                style: TextStyle(
-                  color: dropCitySlateGrey,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (_parcels.isEmpty)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text("No active deliveries — send your first parcel."),
+                    elevation: 0,
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _EmptyBoxIllustration(size: 92, color: dropCitySlateGrey),
+                          const SizedBox(height: 16),
+                          const Text(
+                            "No active deliveries — send your first parcel.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: dropCitySlateGrey,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ..._parcels.take(5).map((parcel) {
-                final etaMinutes = (parcel["etaMinutes"] as num?)?.toInt();
                 final id = parcel["id"]?.toString() ?? "-";
-                final origin = parcel["origin"]?.toString() ?? "-";
-                final destination = parcel["destination"]?.toString() ?? "-";
-                final status =
-                    _friendlyStatus(parcel["status"]?.toString() ?? "-");
-                final canOpenStatus = id != "-";
-                return Card(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: !canOpenStatus
-                        ? null
-                        : () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ParcelStatusScreen(
-                                  authState: widget.authState,
-                                  initialParcelId: id,
+                final status = parcel["status"]?.toString() ?? "";
+                final routeTitle = _routeTitle(parcel);
+                final progress = _parcelProgress(parcel) / 100.0;
+                final originLabel = _placeNameCache["$id-origin"] ?? parcel["origin"]?.toString() ?? "-";
+                final destinationLabel = _placeNameCache["$id-destination"] ?? parcel["destination"]?.toString() ?? "-";
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 2,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ParcelStatusScreen(
+                              authState: widget.authState,
+                              initialParcelId: id,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: dropCityTransitTeal.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.inventory_2_outlined,
+                                    color: dropCityTransitTeal,
+                                  ),
                                 ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        routeTitle,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: _statusChipColor(status).withOpacity(0.14),
+                                          borderRadius: BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          _statusChipLabel(status),
+                                          style: TextStyle(
+                                            color: _statusChipColor(status),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              "From: $originLabel",
+                              style: const TextStyle(
+                                color: dropCitySafeSlate,
+                                fontWeight: FontWeight.w600,
                               ),
-                            );
-                          },
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              originLabel,
+                              style: const TextStyle(color: dropCitySlateGrey, fontSize: 13),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              "To: $destinationLabel",
+                              style: const TextStyle(
+                                color: dropCitySafeSlate,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              destinationLabel,
+                              style: const TextStyle(color: dropCitySlateGrey, fontSize: 13),
+                            ),
+                            const SizedBox(height: 16),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: LinearProgressIndicator(
+                                value: progress.clamp(0.0, 1.0),
+                                minHeight: 8,
+                                backgroundColor: dropCitySlateGrey.withOpacity(0.16),
+                                color: dropCityTransitTeal,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
                                   "Parcel $id",
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                    color: dropCitySlateGrey,
+                                    fontSize: 12,
+                                  ),
                                 ),
-                              ),
-                              _confidenceBadge(parcel["etaConfidence"]?.toString()),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text("Status: $status"),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text("ETA: ${_formatEta(etaMinutes)}"),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text("From: $origin"),
-                          Text("To: $destination"),
-                          const SizedBox(height: 6),
-                          const Text(
-                            "Tap to open live status",
-                            style: TextStyle(color: dropCityAlertAmber),
-                          ),
-                        ],
+                                Text(
+                                  "${(progress * 100).round()}% complete",
+                                  style: const TextStyle(
+                                    color: dropCitySafeSlate,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -570,18 +747,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  DeliveryCreationFlowScreen(authState: widget.authState),
-            ),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text("Send a Parcel"),
       ),
     );
   }
@@ -612,6 +777,57 @@ class _InfoChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _EmptyBoxIllustration extends StatelessWidget {
+  const _EmptyBoxIllustration({this.size = 72, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _EmptyBoxPainter(color),
+      ),
+    );
+  }
+}
+
+class _EmptyBoxPainter extends CustomPainter {
+  _EmptyBoxPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeJoin = StrokeJoin.round;
+
+    final w = size.width;
+    final h = size.height;
+
+    final rect = Rect.fromLTWH(w * 0.12, h * 0.34, w * 0.76, h * 0.5);
+    canvas.drawRect(rect, paint);
+
+    final path = ui.Path();
+    path.moveTo(w * 0.12, h * 0.34);
+    path.lineTo(w * 0.5, h * 0.08);
+    path.lineTo(w * 0.88, h * 0.34);
+    canvas.drawPath(path, paint);
+
+    // center fold line
+    canvas.drawLine(Offset(w * 0.5, h * 0.08), Offset(w * 0.5, h * 0.34), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _RatingPayload {

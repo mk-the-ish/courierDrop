@@ -20,7 +20,8 @@ class DeliveryCreationController extends ChangeNotifier {
   String description = "";
   String parcelSize = "M";
   double weightKg = 1;
-  DateTime? desiredArrivalTime;
+  String priority = "standard";
+  bool fragile = false;
   String? parcelImageDataUrl;
 
   String originAddress = "";
@@ -38,15 +39,14 @@ class DeliveryCreationController extends ChangeNotifier {
   List<Map<String, dynamic>> matchedCorridors = const [];
   String? selectedCorridorId;
   String customPrice = "";
+  double? userPrice;
 
   int get step => _step;
   bool get busy => _busy;
   String? get error => _error;
 
   bool canAdvanceStep1() {
-    return description.trim().isNotEmpty &&
-        weightKg > 0 &&
-        desiredArrivalTime != null;
+    return description.trim().isNotEmpty && weightKg > 0;
   }
 
   bool canAdvanceStep2() => parcelImageDataUrl != null;
@@ -106,18 +106,22 @@ class DeliveryCreationController extends ChangeNotifier {
         recipientNote
       ].where((x) => x.isNotEmpty).join(" | ");
 
+      userPrice = customPrice.trim().isNotEmpty
+          ? double.tryParse(customPrice.trim())
+          : null;
       parcelId = await authState.apiClient.postParcelRequest(
         origin: "${originLatLng!.latitude.toStringAsFixed(6)}, ${originLatLng!.longitude.toStringAsFixed(6)}",
         destination:
             "${destinationLatLng!.latitude.toStringAsFixed(6)}, ${destinationLatLng!.longitude.toStringAsFixed(6)}",
         size: parcelSize,
-        priority: "Standard",
-        fragile: false,
+        priority: priority,
+        fragile: fragile,
         notes: notes,
         recipientId: recipientMode == RecipientMode.inApp ? recipientId : null,
         dualTracking: recipientMode == RecipientMode.inApp,
         weightKg: weightKg,
         clientEtaMinutes: etaMins,
+        userPrice: userPrice,
       );
 
       // TODO: Upload parcel image separately after parcel is created
@@ -141,6 +145,9 @@ class DeliveryCreationController extends ChangeNotifier {
           recommendedPrice = rec.toDouble();
         }
       }
+      if (recommendedPrice != null && customPrice.trim().isEmpty) {
+        customPrice = recommendedPrice!.toStringAsFixed(2);
+      }
     } catch (e) {
       _error = e.toString();
       rethrow;
@@ -151,7 +158,17 @@ class DeliveryCreationController extends ChangeNotifier {
   }
 
   Future<void> requestSelectedCourier() async {
-    if (parcelId == null || selectedCorridorId == null) return;
+    if (parcelId == null) {
+      throw Exception("Parcel has not been created yet.");
+    }
+    if (selectedCorridorId == null && matchedCorridors.isNotEmpty) {
+      selectedCorridorId =
+          (matchedCorridors.first["corridorId"] ?? matchedCorridors.first["corridor_id"])
+              ?.toString();
+    }
+    if (selectedCorridorId == null) {
+      throw Exception("No courier matches are available to request.");
+    }
     _busy = true;
     _error = null;
     notifyListeners();

@@ -1,204 +1,81 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import "package:flutter/material.dart";
+import "package:provider/provider.dart";
 
-import '../../controllers/signup_controller.dart';
-import '../../theme.dart';
-import './signup_steps/step1_email.dart';
-import './signup_steps/step2_personal.dart';
-import './signup_steps/step3_license.dart';
-import './signup_steps/step4_vehicle.dart';
+import "../../controllers/signup_controller.dart";
+import "../../theme.dart";
+import "../../widgets/dropcity_brand.dart";
+import "signup_steps/step1_email.dart";
+import "signup_steps/step2_personal.dart";
+import "signup_steps/step3_license.dart";
+import "signup_steps/step4_vehicle.dart";
 
-class SignupScreen extends StatefulWidget {
-  const SignupScreen({Key? key}) : super(key: key);
+class SignupScreen extends StatelessWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  Widget build(BuildContext context) {
+    return Consumer<CourierSignupController>(
+      builder: (context, controller, _) {
+        if (controller.currentStep == 5) return const _SignupCompleteScreen();
+        return Scaffold(
+          backgroundColor: dropCityCloudWhite,
+          appBar: AppBar(
+            leading: IconButton(
+              onPressed: controller.currentStep > 1 ? controller.goBack : () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back),
+            ),
+            title: const Text("Courier Signup"),
+          ),
+          body: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                CourierStepBar(step: controller.currentStep, total: 4),
+                const SizedBox(height: 22),
+                _stepContent(controller.currentStep),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _stepContent(int step) {
+    switch (step) {
+      case 1: return const CourierSignupStep1Email();
+      case 2: return const CourierSignupStep2Personal();
+      case 3: return const CourierSignupStep3License();
+      case 4: return const CourierSignupStep4Vehicle();
+      default: return const SizedBox.shrink();
+    }
+  }
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _SignupCompleteScreen extends StatelessWidget {
+  const _SignupCompleteScreen();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              dropCityDarkGradientStart,
-              dropCityDarkGradientEnd,
+      backgroundColor: dropCityCloudWhite,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircleAvatar(radius: 44, backgroundColor: dropCityActiveMint, child: Icon(Icons.check, color: Colors.white, size: 52)),
+              const SizedBox(height: 24),
+              const Text("Submitted for Approval", textAlign: TextAlign.center, style: TextStyle(color: dropCitySafeSlate, fontSize: 24, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 10),
+              const Text("Your vehicle will be reviewed by DropCity admin before your first delivery.", textAlign: TextAlign.center, style: TextStyle(color: dropCitySlateGrey, height: 1.5)),
+              const SizedBox(height: 30),
+              CourierPrimaryButton(label: "Return to Home", onPressed: () => Navigator.of(context).pushReplacementNamed("/dashboard")),
             ],
           ),
         ),
-        child: Consumer<CourierSignupController>(
-          builder: (context, controller, _) {
-            return Stack(
-              children: [
-                // Content based on step
-                SingleChildScrollView(
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 24),
-                          // Progress indicator
-                          _buildProgressIndicator(controller),
-                          const SizedBox(height: 32),
-                          // Step content
-                          _buildStepContent(controller),
-                          const SizedBox(height: 24),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Back button in top-left
-                if (controller.currentStep > 1)
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 12,
-                    left: 12,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: dropCityTextLight),
-                      onPressed: () {
-                        controller.goBack();
-                      },
-                    ),
-                  ),
-
-                // Close button (X) in top-right to close signup
-                Positioned(
-                  top: MediaQuery.of(context).padding.top + 12,
-                  right: 12,
-                  child: IconButton(
-                    icon: const Icon(Icons.close, color: dropCityTextLight),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
       ),
-    );
-  }
-
-  Widget _buildProgressIndicator(CourierSignupController controller) {
-    const steps = 4;
-    const stepNames = ['Email', 'Personal', 'License', 'Vehicle'];
-
-    return Column(
-      children: [
-        // Step number and title
-        Text(
-          'Step ${controller.currentStep} of $steps',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: dropCityTextGrey,
-              ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          stepNames[controller.currentStep - 1],
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: dropCityTextLight,
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 20),
-
-        // Progress bar
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: LinearProgressIndicator(
-            value: controller.currentStep / steps,
-            minHeight: 8,
-            backgroundColor: Colors.grey[700],
-            valueColor: const AlwaysStoppedAnimation<Color>(
-              dropCityOrangeAccent,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStepContent(CourierSignupController controller) {
-    switch (controller.currentStep) {
-      case 1:
-        return const CourierSignupStep1Email();
-      case 2:
-        return const CourierSignupStep2Personal();
-      case 3:
-        return const CourierSignupStep3License();
-      case 4:
-        return const CourierSignupStep4Vehicle();
-      case 5:
-        return _buildCompletionScreen();
-      default:
-        return const SizedBox();
-    }
-  }
-
-  Widget _buildCompletionScreen() {
-    return Column(
-      children: [
-        const SizedBox(height: 60),
-        Container(
-          width: 120,
-          height: 120,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                dropCitySuccessGreen,
-                Color(0xFF66BB6A),
-              ],
-            ),
-          ),
-          child: const Icon(
-            Icons.check,
-            size: 60,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 32),
-        Text(
-          'Welcome to DropCity!',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: dropCityTextLight,
-                fontWeight: FontWeight.bold,
-              ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Your profile has been created successfully.\nYou\'re ready to start delivering!',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: dropCityTextGrey,
-                height: 1.5,
-              ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 60),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => Navigator.of(context).pushReplacementNamed('/dashboard'),
-            child: Text(
-              'Go to Dashboard',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 60),
-      ],
     );
   }
 }

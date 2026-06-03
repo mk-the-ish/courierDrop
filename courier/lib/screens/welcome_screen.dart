@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme.dart';
 
 class WelcomeScreen extends StatelessWidget {
   final VoidCallback onSignupPressed;
@@ -23,9 +24,9 @@ class WelcomeScreen extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF0F3A7D),
+              dropCitySafeSlate,
               Color(0xFF1E5A7D),
-              Color(0xFF0D7A7A),
+              dropCityTransitTeal,
             ],
           ),
         ),
@@ -109,7 +110,7 @@ class WelcomeScreen extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF0F3A7D),
+                            color: dropCitySafeSlate,
                             letterSpacing: 0.5,
                           ),
                         ),
