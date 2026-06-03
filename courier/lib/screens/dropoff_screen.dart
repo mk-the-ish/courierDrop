@@ -59,10 +59,10 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
    */
   Future<void> _checkCurrentLocation() async {
     final locationController = context.read<LocationTrackingController>();
-    
+
     try {
       final snapshot = await locationController.getCurrentLocationSnapshot();
-      
+
       final distance = _calculateDistance(
         snapshot.lat,
         snapshot.lng,
@@ -88,19 +88,27 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
    */
   Future<void> _generateOtp() async {
     if (!_isAtLocation) {
-      setState(() => _verificationError = 'You must be at the delivery location');
+      setState(
+          () => _verificationError = 'You must be at the delivery location');
       return;
     }
 
     setState(() => _isUploading = true);
 
     try {
-      final response = await widget.authState.apiClient.post(
-        '/handshake/courier/request-manual-dropoff-otp',
-        body: {
-          'parcelId': widget.parcelId,
-          'phoneE164': '+1234567890', // Would be fetched from backend
-        },
+      // Fetch courier's profile to get phone number
+      final profile = await widget.authState.apiClient.getMyProfile();
+      final phoneE164 = profile['phone_number'] as String? ?? '';
+
+      if (phoneE164.isEmpty) {
+        setState(
+            () => _verificationError = 'Courier phone number not configured');
+        return;
+      }
+
+      final response = await widget.authState.apiClient.requestManualDropoffOtp(
+        parcelId: widget.parcelId,
+        phoneE164: phoneE164,
       );
 
       setState(() {
@@ -130,9 +138,9 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
         setState(() => _isUploading = true);
 
         try {
-          final url = await widget.authState.apiClient.uploadOnboardingDocument(
+          final url = await widget.authState.apiClient.uploadHandshakePhoto(
             image.path,
-            kind: 'delivery_photo',
+            parcelId: widget.parcelId,
           );
 
           setState(() {
@@ -182,30 +190,22 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
           .read<LocationTrackingController>()
           .getCurrentLocationSnapshot();
 
-      final response = await widget.authState.apiClient.post(
-        '/handshake/courier/complete-dropoff',
-        body: {
-          'parcelId': widget.parcelId,
-          'otp': _generatedOtp,
-          'photoUrl': _photoUrl,
-          'lat': locationSnapshot.lat,
-          'lng': locationSnapshot.lng,
-          'accuracy': locationSnapshot.accuracy,
-        },
+      await widget.authState.apiClient.completeCourierDropoff(
+        parcelId: widget.parcelId,
+        otp: _generatedOtp!,
+        photoUrl: _photoUrl!,
+        lat: locationSnapshot.lat,
+        lng: locationSnapshot.lng,
+        accuracy: locationSnapshot.accuracy,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Delivery completed successfully!')),
       );
 
-      if (response['status'] == 'ok') {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Delivery completed successfully!')),
-        );
-
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) Navigator.of(context).pop(true);
-        });
-      } else {
-        setState(() => _verificationError = 'Completion failed: ${response['message']}');
-      }
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) Navigator.of(context).pop(true);
+      });
     } catch (e) {
       setState(() => _verificationError = 'Error: $e');
     } finally {
@@ -216,20 +216,21 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
   /**
    * Calculate distance using Haversine formula
    */
-  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+  double _calculateDistance(
+      double lat1, double lng1, double lat2, double lng2) {
     const earthRadiusM = 6371000.0;
-    
+
     final dLat = _toRadians(lat2 - lat1);
     final dLng = _toRadians(lng2 - lng1);
-    
+
     final a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(_toRadians(lat1)) *
             Math.cos(_toRadians(lat2)) *
             Math.sin(dLng / 2) *
             Math.sin(dLng / 2);
-    
+
     final c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    
+
     return earthRadiusM * c;
   }
 
@@ -250,19 +251,23 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
             // Map
             Container(
               height: 250,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+              decoration:
+                  BoxDecoration(borderRadius: BorderRadius.circular(12)),
               child: FlutterMap(
                 options: MapOptions(
-                  initialCenter: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
+                  initialCenter: normalizeLatLng(
+                      LatLng(widget.dropoffLat, widget.dropoffLng)),
                   initialZoom: 18,
                 ),
                 children: [
                   TileLayer(
-                    urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    urlTemplate:
+                        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                     userAgentPackageName: "com.example.dropcity_courier",
                     tileProvider: NetworkTileProvider(
                       silenceExceptions: true,
-                      cachingProvider: BuiltInMapCachingProvider.getOrCreateInstance(
+                      cachingProvider:
+                          BuiltInMapCachingProvider.getOrCreateInstance(
                         maxCacheSize: 250000000,
                         overrideFreshAge: const Duration(days: 7),
                       ),
@@ -271,7 +276,8 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                   CircleLayer(
                     circles: [
                       CircleMarker(
-                        point: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
+                        point: normalizeLatLng(
+                            LatLng(widget.dropoffLat, widget.dropoffLng)),
                         radius: widget.gateRadiusMeters,
                         useRadiusInMeter: true,
                         color: dropCityActiveMint.withOpacity(0.2),
@@ -283,10 +289,12 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                   MarkerLayer(
                     markers: [
                       Marker(
-                        point: normalizeLatLng(LatLng(widget.dropoffLat, widget.dropoffLng)),
+                        point: normalizeLatLng(
+                            LatLng(widget.dropoffLat, widget.dropoffLng)),
                         width: 40,
                         height: 40,
-                        child: const Icon(Icons.location_on, color: dropCityActiveMint, size: 36),
+                        child: const Icon(Icons.location_on,
+                            color: dropCityActiveMint, size: 36),
                       ),
                     ],
                   ),
@@ -299,7 +307,8 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
             _buildStatusCard(
               title: 'Delivery Location',
               status: _isAtLocation ? 'At Location' : 'Approaching',
-              statusColor: _isAtLocation ? dropCityActiveMint : dropCityAlertAmber,
+              statusColor:
+                  _isAtLocation ? dropCityActiveMint : dropCityAlertAmber,
               details: [
                 'Safe Zone: ${widget.gateRadiusMeters.toStringAsFixed(0)}m radius',
                 if (_distanceToDropoffMeters != null)
@@ -315,9 +324,12 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                 return _buildStatusCard(
                   title: 'GPS Accuracy',
                   status: (accuracy ?? 100) <= 30 ? 'High' : 'Low',
-                  statusColor: (accuracy ?? 100) <= 30 ? dropCityActiveMint : dropCityAlertAmber,
+                  statusColor: (accuracy ?? 100) <= 30
+                      ? dropCityActiveMint
+                      : dropCityAlertAmber,
                   details: [
-                    if (accuracy != null) 'Accuracy: ±${accuracy.toStringAsFixed(1)}m',
+                    if (accuracy != null)
+                      'Accuracy: ±${accuracy.toStringAsFixed(1)}m',
                   ],
                 );
               },
@@ -333,7 +345,8 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                 children: [
                   if (!_otpGenerated)
                     ElevatedButton.icon(
-                      onPressed: _isAtLocation && !_isUploading ? _generateOtp : null,
+                      onPressed:
+                          _isAtLocation && !_isUploading ? _generateOtp : null,
                       icon: const Icon(Icons.vpn_key),
                       label: _isUploading
                           ? const SizedBox(
@@ -352,7 +365,8 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                       ),
                       child: Column(
                         children: [
-                          const Text('Code sent to recipient:', style: TextStyle(fontSize: 12)),
+                          const Text('Code sent to recipient:',
+                              style: TextStyle(fontSize: 12)),
                           const SizedBox(height: 8),
                           Text(
                             _generatedOtp ?? '000000',
@@ -396,7 +410,8 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                         color: dropCityActiveMint.withOpacity(0.14),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text('✓ Photo uploaded', style: TextStyle(color: dropCityActiveMint)),
+                      child: const Text('✓ Photo uploaded',
+                          style: TextStyle(color: dropCityActiveMint)),
                     ),
                 ],
               ),
@@ -419,13 +434,14 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
           ],
         ),
       ),
-      floatingActionButton: (_otpGenerated && _photoUrl != null && !_isCompleting)
-          ? FloatingActionButton.extended(
-              onPressed: _isAtLocation ? _completeDelivery : null,
-              label: const Text('Complete Delivery'),
-              icon: const Icon(Icons.check),
-            )
-          : null,
+      floatingActionButton:
+          (_otpGenerated && _photoUrl != null && !_isCompleting)
+              ? FloatingActionButton.extended(
+                  onPressed: _isAtLocation ? _completeDelivery : null,
+                  label: const Text('Complete Delivery'),
+                  icon: const Icon(Icons.check),
+                )
+              : null,
     );
   }
 
@@ -447,25 +463,32 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   status,
-                  style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           ...details.map((d) => Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(d, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          )),
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(d,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              )),
         ],
       ),
     );
@@ -480,9 +503,14 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: completed ? dropCityActiveMint : dropCitySlateGrey.withOpacity(0.30)),
+        border: Border.all(
+            color: completed
+                ? dropCityActiveMint
+                : dropCitySlateGrey.withOpacity(0.30)),
         borderRadius: BorderRadius.circular(12),
-        color: completed ? dropCityActiveMint.withOpacity(0.08) : Colors.transparent,
+        color: completed
+            ? dropCityActiveMint.withOpacity(0.08)
+            : Colors.transparent,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -508,7 +536,9 @@ class _CourierDropoffScreenState extends State<CourierDropoffScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 12),

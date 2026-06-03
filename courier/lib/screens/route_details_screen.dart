@@ -4,17 +4,56 @@ import "../auth/auth_state.dart";
 import "../theme.dart";
 
 class RouteDetailsScreen extends StatelessWidget {
-  const RouteDetailsScreen({super.key, required this.route, required this.authState});
+  const RouteDetailsScreen(
+      {super.key, required this.route, required this.authState});
 
   final Map<String, dynamic> route;
   final AuthState authState;
 
+  Future<void> _useRouteTemplate(BuildContext context) async {
+    final id = route["id"]?.toString();
+    if (id == null || id.isEmpty) {
+      return;
+    }
+
+    try {
+      // Check if there is already an active route
+      final state = await authState.apiClient.getCourierServiceState();
+      if (state["current_route_id"] != null) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("An active route already exists.")),
+        );
+        return;
+      }
+      final corridorId = await authState.apiClient.createCorridorFromTemplate(
+        routeTemplateId: id,
+        plannedStartAtIso: DateTime.now().toUtc().toIso8601String(),
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                "Route template activated. Corridor created: $corridorId")),
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to use route template: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final title = route["notes"]?.toString().isNotEmpty == true
+        ? route["notes"].toString()
+        : "${route["start_location"] ?? "Start"} → ${route["end_location"] ?? "End"}";
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(route["name"]?.toString() ?? "Route Details"),
-        actions: [IconButton(onPressed: () {}, icon: const Icon(Icons.edit_outlined))],
+        title: Text(title),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -26,15 +65,21 @@ class RouteDetailsScreen extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  Chip(label: Text(route["start_location"]?.toString() ?? "Start")),
+                  Chip(
+                      label:
+                          Text(route["start_location"]?.toString() ?? "Start")),
                   const Icon(Icons.arrow_forward, color: dropCityTransitTeal),
                   Chip(label: Text(route["end_location"]?.toString() ?? "End")),
-                  const Chip(label: Text("12.4km")),
-                  const Chip(label: Text("ETA 35m")),
                   Chip(
-                    label: const Text("REUSABLE"),
+                      label: Text(
+                          "ETA ${route["declared_eta_minutes"]?.toString() ?? "--"}m")),
+                  Chip(
+                    label: Text(route["allow_multiple_parcels"] == true
+                        ? "MULTI-PARCEL"
+                        : "SINGLE PARCEL"),
                     backgroundColor: dropCityActiveMint.withOpacity(.12),
-                    labelStyle: const TextStyle(color: dropCityActiveMint, fontWeight: FontWeight.w900),
+                    labelStyle: const TextStyle(
+                        color: dropCityActiveMint, fontWeight: FontWeight.w900),
                   ),
                 ],
               ),
@@ -43,17 +88,57 @@ class RouteDetailsScreen extends StatelessWidget {
           Container(
             height: 200,
             margin: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(color: dropCityTransitTeal.withOpacity(.08), borderRadius: BorderRadius.circular(18)),
-            child: const Center(child: Icon(Icons.route, size: 72, color: dropCityTransitTeal)),
+            decoration: BoxDecoration(
+                color: dropCityTransitTeal.withOpacity(.08),
+                borderRadius: BorderRadius.circular(18)),
+            child: const Center(
+                child: Icon(Icons.route, size: 72, color: dropCityTransitTeal)),
           ),
-          const Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [Text("Buffer: 500m"), Text("Waypoints: 23"), Text("Last used: Today")]),
           const SizedBox(height: 18),
-          ElevatedButton(onPressed: () {}, child: const Text("Use This Route Today")),
-          OutlinedButton(onPressed: () {}, child: const Text("Edit Template")),
+          ElevatedButton(
+            onPressed: () => _useRouteTemplate(context),
+            child: const Text("Use This Route Today"),
+          ),
+          OutlinedButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Template editing coming soon.")),
+              );
+            },
+            child: const Text("Edit Template"),
+          ),
           const SizedBox(height: 18),
-          const Text("Delivery History", style: TextStyle(color: dropCitySafeSlate, fontSize: 18, fontWeight: FontWeight.w900)),
-          const ListTile(title: Text("Today"), subtitle: Text("2 parcels - Score 78.4")),
-          TextButton(onPressed: () {}, child: const Text("Delete Template", style: TextStyle(color: dropCityErrorRed))),
+          const Text("Route Template Details",
+              style: TextStyle(
+                  color: dropCitySafeSlate,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900)),
+          const SizedBox(height: 12),
+          Text(
+              "Declared ETA: ${route["declared_eta_minutes"]?.toString() ?? "--"} minutes"),
+          const SizedBox(height: 8),
+          Text(
+              "Multiple parcels allowed: ${route["allow_multiple_parcels"] == true ? "Yes" : "No"}"),
+          const SizedBox(height: 8),
+          Text("Notes: ${route["notes"]?.toString() ?? "No notes"}"),
+          const SizedBox(height: 18),
+          const Text("Delivery History",
+              style: TextStyle(
+                  color: dropCitySafeSlate,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900)),
+          const ListTile(
+              title: Text("Today"),
+              subtitle: Text("No history available for templates.")),
+          TextButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Template deletion coming soon.")),
+              );
+            },
+            child: const Text("Delete Template",
+                style: TextStyle(color: dropCityErrorRed)),
+          ),
         ],
       ),
     );

@@ -82,34 +82,36 @@ class OSMMapService {
         "countrycodes": "zw",
       },
     );
-    final response = await _client
-        .get(
-          uri,
-          headers: {"User-Agent": "DropCity/1.0"},
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _client.get(
+      uri,
+      headers: {"User-Agent": "DropCity/1.0"},
+    ).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) return const [];
 
     final body = jsonDecode(response.body) as List<dynamic>;
-    return body.map((item) {
-      final row = item as Map<String, dynamic>;
-      final lat = double.tryParse(row["lat"]?.toString() ?? "");
-      final lon = double.tryParse(row["lon"]?.toString() ?? "");
-      if (lat == null || lon == null) {
-        return null;
-      }
-      final display = row["display_name"]?.toString() ?? "";
-      final parts = display.split(",");
-      final primary = parts.isNotEmpty ? parts.first.trim() : display;
-      final secondary = parts.length > 1 ? parts.sublist(1).join(",").trim() : "";
-      return PlaceSuggestion(
-        placeId: "$lat,$lon",
-        primaryText: primary,
-        secondaryText: secondary,
-        fullText: display,
-        coordinates: LatLng(lat, lon),
-      );
-    }).whereType<PlaceSuggestion>().toList();
+    return body
+        .map((item) {
+          final row = item as Map<String, dynamic>;
+          final lat = double.tryParse(row["lat"]?.toString() ?? "");
+          final lon = double.tryParse(row["lon"]?.toString() ?? "");
+          if (lat == null || lon == null) {
+            return null;
+          }
+          final display = row["display_name"]?.toString() ?? "";
+          final parts = display.split(",");
+          final primary = parts.isNotEmpty ? parts.first.trim() : display;
+          final secondary =
+              parts.length > 1 ? parts.sublist(1).join(",").trim() : "";
+          return PlaceSuggestion(
+            placeId: "$lat,$lon",
+            primaryText: primary,
+            secondaryText: secondary,
+            fullText: display,
+            coordinates: LatLng(lat, lon),
+          );
+        })
+        .whereType<PlaceSuggestion>()
+        .toList();
   }
 
   Future<LatLng?> getPlaceCoordinates(String placeId) async {
@@ -124,19 +126,18 @@ class OSMMapService {
   Future<String> reverseGeocode(LatLng coordinates) async {
     final fallback =
         "${coordinates.latitude.toStringAsFixed(5)}, ${coordinates.longitude.toStringAsFixed(5)}";
-    final uri = Uri.parse("https://nominatim.openstreetmap.org/reverse").replace(
+    final uri =
+        Uri.parse("https://nominatim.openstreetmap.org/reverse").replace(
       queryParameters: {
         "lat": coordinates.latitude.toString(),
         "lon": coordinates.longitude.toString(),
         "format": "jsonv2",
       },
     );
-    final response = await _client
-        .get(
-          uri,
-          headers: {"User-Agent": "DropCity/1.0"},
-        )
-        .timeout(const Duration(seconds: 10));
+    final response = await _client.get(
+      uri,
+      headers: {"User-Agent": "DropCity/1.0"},
+    ).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) return fallback;
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     return body["display_name"]?.toString() ?? fallback;
@@ -146,15 +147,15 @@ class OSMMapService {
     required List<LatLng> points,
   }) async {
     if (points.length < 2) return null;
-    final coordinates = points
-        .map((point) => "${point.longitude},${point.latitude}")
-        .join(";");
+    final coordinates =
+        points.map((point) => "${point.longitude},${point.latitude}").join(";");
     final uri = Uri.parse(
       "https://router.project-osrm.org/route/v1/driving/"
       "$coordinates"
       "?overview=full&geometries=polyline&alternatives=false&steps=false&continue_straight=true",
     );
-    final response = await _client.get(uri).timeout(const Duration(seconds: 12));
+    final response =
+        await _client.get(uri).timeout(const Duration(seconds: 12));
     if (response.statusCode != 200) return null;
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -165,8 +166,10 @@ class OSMMapService {
     final route = routes.first as Map<String, dynamic>;
     return RouteInfo(
       points: _decodePolyline(route["geometry"]?.toString() ?? ""),
-      distance: "${(((route["distance"] as num?)?.toDouble() ?? 0) / 1000).toStringAsFixed(1)} km",
-      duration: "${(((route["duration"] as num?)?.toDouble() ?? 0) / 60).ceil()} min",
+      distance:
+          "${(((route["distance"] as num?)?.toDouble() ?? 0) / 1000).toStringAsFixed(1)} km",
+      duration:
+          "${(((route["duration"] as num?)?.toDouble() ?? 0) / 60).ceil()} min",
     );
   }
 
@@ -486,7 +489,8 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
   }
 
   Future<void> _pickSuggestion(PlaceSuggestion suggestion) async {
-    final coordinates = suggestion.coordinates ?? await _mapService.getPlaceCoordinates(suggestion.placeId);
+    final coordinates = suggestion.coordinates ??
+        await _mapService.getPlaceCoordinates(suggestion.placeId);
     if (!mounted || coordinates == null) return;
     if (!isFiniteLatLng(coordinates)) return;
     _mapController.move(coordinates, 16);
@@ -574,14 +578,49 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
     setState(() {});
   }
 
-  void _confirm() {
+  Future<void> _confirm() async {
     if (_points.length < 2) return;
-    widget.onPolylineSelected?.call(_points);
-    Navigator.pop(context, {
-      "startPoint": _points.first,
-      "endPoint": _points.last,
-      "polyline": _points,
-    });
+    // Location names are optional - user can pick waypoints on map without typing
+    final startLocation = _startAddress?.trim().isNotEmpty == true
+        ? _startAddress!.trim()
+        : "${_points.first.latitude.toStringAsFixed(6)},${_points.first.longitude.toStringAsFixed(6)}";
+    final endLocation = _endAddress?.trim().isNotEmpty == true
+        ? _endAddress!.trim()
+        : "${_points.last.latitude.toStringAsFixed(6)},${_points.last.longitude.toStringAsFixed(6)}";
+
+    try {
+      final templateId = await widget.authState.apiClient.createRouteTemplate(
+        startLocation: startLocation,
+        endLocation: endLocation,
+        startPlaceName:
+            _startAddress?.trim().isNotEmpty == true ? _startAddress : null,
+        endPlaceName:
+            _endAddress?.trim().isNotEmpty == true ? _endAddress : null,
+        polylinePoints: _points
+            .map((point) => {"lat": point.latitude, "lng": point.longitude})
+            .toList(),
+        allowMultipleParcels: false,
+        declaredEtaMinutes: _routeInfo == null
+            ? 0
+            : int.tryParse(
+                    _routeInfo!.duration.replaceAll(RegExp(r"[^0-9]"), "")) ??
+                0,
+        notes: _activeAddress ?? "",
+      );
+      widget.onPolylineSelected?.call(_points);
+      if (!mounted) return;
+      Navigator.pop(context, {
+        "routeTemplateId": templateId,
+        "startPoint": _points.first,
+        "endPoint": _points.last,
+        "polyline": _points,
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to save route template: $error")),
+      );
+    }
   }
 
   @override
@@ -620,7 +659,8 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
                 userAgentPackageName: "com.example.dropcity_courier",
                 tileProvider: NetworkTileProvider(
                   silenceExceptions: true,
-                  cachingProvider: BuiltInMapCachingProvider.getOrCreateInstance(
+                  cachingProvider:
+                      BuiltInMapCachingProvider.getOrCreateInstance(
                     maxCacheSize: 250000000,
                     overrideFreshAge: const Duration(days: 7),
                   ),
@@ -630,7 +670,8 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
               MarkerLayer(markers: _markers.toList()),
               const Align(
                 child: IgnorePointer(
-                  child: Icon(Icons.location_pin, size: 42, color: dropCityErrorRed),
+                  child: Icon(Icons.location_pin,
+                      size: 42, color: dropCityErrorRed),
                 ),
               ),
             ],
@@ -666,7 +707,8 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
                   children: [
                     TextField(
                       controller: _startController,
-                      onChanged: (value) => _onSearchChanged(value, forStart: true),
+                      onChanged: (value) =>
+                          _onSearchChanged(value, forStart: true),
                       decoration: const InputDecoration(
                         isDense: true,
                         labelText: "Start location",
@@ -676,7 +718,8 @@ class _MapRouteDeclarationScreenState extends State<MapRouteDeclarationScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _endController,
-                      onChanged: (value) => _onSearchChanged(value, forStart: false),
+                      onChanged: (value) =>
+                          _onSearchChanged(value, forStart: false),
                       decoration: const InputDecoration(
                         isDense: true,
                         labelText: "End location",
@@ -785,7 +828,7 @@ class _Controls extends StatelessWidget {
   final VoidCallback onAddCurrent;
   final VoidCallback onUndo;
   final VoidCallback onClear;
-  final VoidCallback onConfirm;
+  final Future<void> Function() onConfirm;
 
   @override
   Widget build(BuildContext context) {
@@ -841,7 +884,7 @@ class _Controls extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: count >= 2 ? onConfirm : null,
+                    onPressed: count >= 2 ? () => onConfirm() : null,
                     child: const Text("Confirm Route"),
                   ),
                 ),

@@ -499,7 +499,8 @@ class ApiClient {
     }
   }
 
-  Future<String> uploadHandshakePhoto(String filePath, {String? parcelId}) async {
+  Future<String> uploadHandshakePhoto(String filePath,
+      {String? parcelId}) async {
     final uri = Uri.parse("$baseUrl/handshake/upload");
     final request = http.MultipartRequest("POST", uri);
     request.headers.addAll(_headers());
@@ -543,7 +544,8 @@ class ApiClient {
     }
   }
 
-  Future<String> uploadOnboardingDocument(String filePath, {required String kind}) async {
+  Future<String> uploadOnboardingDocument(String filePath,
+      {required String kind}) async {
     final uri = Uri.parse("$baseUrl/users/onboarding/document");
     final request = http.MultipartRequest("POST", uri);
     request.headers.addAll(_headers());
@@ -578,7 +580,8 @@ class ApiClient {
     required String parcelId,
     required String phoneE164,
   }) async {
-    final uri = Uri.parse("$baseUrl/handshake/courier/request-manual-dropoff-otp");
+    final uri =
+        Uri.parse("$baseUrl/handshake/courier/request-manual-dropoff-otp");
     final response = await _client.post(
       uri,
       headers: _headers(),
@@ -688,7 +691,8 @@ class ApiClient {
       body: jsonEncode({
         "corridorId": corridorId,
         if (plannedStartAtIso != null) "plannedStartAt": plannedStartAtIso,
-        if (declaredEtaMinutes != null) "declaredEtaMinutes": declaredEtaMinutes,
+        if (declaredEtaMinutes != null)
+          "declaredEtaMinutes": declaredEtaMinutes,
       }),
     );
     if (response.statusCode >= 400) {
@@ -734,7 +738,8 @@ class ApiClient {
       "offset": offset.toString(),
       if (status != null && status.isNotEmpty) "status": status,
     };
-    final uri = Uri.parse("$baseUrl/notifications/me").replace(queryParameters: query);
+    final uri =
+        Uri.parse("$baseUrl/notifications/me").replace(queryParameters: query);
     final response = await _client.get(uri, headers: _headers());
     if (response.statusCode >= 400) {
       throw Exception("Notification fetch failed: ${response.body}");
@@ -811,12 +816,16 @@ class ApiClient {
     required List<dynamic> polylinePoints,
     required bool allowMultipleParcels,
     required int declaredEtaMinutes,
+    String? startPlaceName,
+    String? endPlaceName,
     String? notes,
   }) async {
     final uri = Uri.parse("$baseUrl/couriers/route-templates");
     final payload = {
       "startLocation": startLocation,
       "endLocation": endLocation,
+      "startPlaceName": startPlaceName,
+      "endPlaceName": endPlaceName,
       "polylinePoints": polylinePoints,
       "allowMultipleParcels": allowMultipleParcels,
       "declaredEtaMinutes": declaredEtaMinutes,
@@ -859,7 +868,8 @@ class ApiClient {
     );
 
     if (response.statusCode >= 400) {
-      throw Exception("Failed to create corridor from template: ${response.body}");
+      throw Exception(
+          "Failed to create corridor from template: ${response.body}");
     }
     final decoded = jsonDecode(response.body) as Map<String, dynamic>?;
     final corridorId = decoded?["corridorId"] as String?;

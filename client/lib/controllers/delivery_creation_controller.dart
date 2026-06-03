@@ -20,6 +20,7 @@ class DeliveryCreationController extends ChangeNotifier {
   String description = "";
   String parcelSize = "M";
   double weightKg = 1;
+  DateTime? desiredArrivalTime;
   String priority = "standard";
   bool fragile = false;
   String? parcelImageDataUrl;
@@ -49,16 +50,18 @@ class DeliveryCreationController extends ChangeNotifier {
     return description.trim().isNotEmpty && weightKg > 0;
   }
 
-  bool canAdvanceStep2() => parcelImageDataUrl != null;
+  bool canAdvanceStep2() => desiredArrivalTime != null;
 
-  bool canAdvanceStep3() {
+  bool canAdvanceStep3() => parcelImageDataUrl != null;
+
+  bool canAdvanceStep4() {
     return originAddress.trim().isNotEmpty &&
         destinationAddress.trim().isNotEmpty &&
         originLatLng != null &&
         destinationLatLng != null;
   }
 
-  bool canAdvanceStep4() {
+  bool canAdvanceStep5() {
     if (recipientMode == RecipientMode.inApp) {
       return recipientId != null && recipientId!.isNotEmpty;
     }
@@ -66,7 +69,7 @@ class DeliveryCreationController extends ChangeNotifier {
   }
 
   void nextStep() {
-    if (_step < 5) {
+    if (_step < 6) {
       _step += 1;
       notifyListeners();
     }
@@ -91,9 +94,9 @@ class DeliveryCreationController extends ChangeNotifier {
     notifyListeners();
     try {
       final now = DateTime.now();
-      final etaMins = desiredArrivalTime == null
+      final int? etaMins = desiredArrivalTime == null
           ? null
-          : desiredArrivalTime!.difference(now).inMinutes.clamp(1, 24 * 60);
+          : (desiredArrivalTime!.difference(now).inMinutes.clamp(1, 24 * 60) as int);
 
       final recipientNote = recipientMode == RecipientMode.external
           ? "recipient_name:$recipientName;recipient_phone:$recipientPhone"

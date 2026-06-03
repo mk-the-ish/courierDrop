@@ -16,33 +16,10 @@ class ProgressScreen extends StatefulWidget {
 
 class _ProgressScreenState extends State<ProgressScreen> with SingleTickerProviderStateMixin {
   static const _prefsKey = "progress_selected_parcel_id";
-
-  final List<Map<String, dynamic>> _demoParcels = const [
-    {
-      "id": "DC12345678",
-      "label": "Books (2 kg)",
-      "progress": 45,
-      "statusIndex": 1,
-      "eta": "~18 min",
-    },
-    {
-      "id": "DC99887766",
-      "label": "Documents (0.4 kg)",
-      "progress": 23,
-      "statusIndex": 0,
-      "eta": "~32 min",
-    },
-    {
-      "id": "DC44556677",
-      "label": "Phone charger (0.2 kg)",
-      "progress": 78,
-      "statusIndex": 2,
-      "eta": "~8 min",
-    },
-  ];
-
+  List<Map<String, dynamic>> _parcels = const [];
   Map<String, dynamic>? _selected;
   bool _loading = true;
+  String? _error;
   late final AnimationController _pulse;
 
   @override
@@ -59,21 +36,36 @@ class _ProgressScreenState extends State<ProgressScreen> with SingleTickerProvid
   }
 
   Future<void> _loadSelection() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedId = prefs.getString(_prefsKey);
-    if (!mounted) return;
     setState(() {
-      _selected = null;
-      if (savedId != null) {
-        for (final parcel in _demoParcels) {
-          if (parcel["id"] == savedId) {
-            _selected = parcel;
-            break;
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final savedId = (await SharedPreferences.getInstance()).getString(_prefsKey);
+      final dashboard = await widget.authState.apiClient.getClientDashboard();
+      final parcels = dashboard.parcels;
+      if (!mounted) return;
+      setState(() {
+        _parcels = parcels;
+        _selected = null;
+        if (savedId != null) {
+          for (final parcel in parcels) {
+            if (parcel["id"]?.toString() == savedId) {
+              _selected = parcel;
+              break;
+            }
           }
         }
-      }
-      _loading = false;
-    });
+        _selected ??= parcels.isNotEmpty ? parcels.first : null;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _persistSelection(String id) async {
@@ -106,45 +98,101 @@ class _ProgressScreenState extends State<ProgressScreen> with SingleTickerProvid
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         children: [
-          DropdownButtonFormField<String>(
-            hint: const Text("Select parcel"),
-            value: selected?["id"]?.toString(),
-            decoration: InputDecoration(
-              labelText: "Live parcel",
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-              prefixIcon: const Icon(Icons.inventory_2_outlined),
-            ),
-            items: _demoParcels
-                .map(
-                  (parcel) => DropdownMenuItem<String>(
-                    value: parcel["id"]?.toString(),
-                    child: Text(parcel["label"]?.toString() ?? parcel["id"].toString()),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) async {
-              if (value == null) return;
-              final parcel = _demoParcels.firstWhere((item) => item["id"] == value);
-              setState(() => _selected = parcel);
-              await _persistSelection(value);
-            },
-          ),
+          if (_parcels.isNotEmpty)
+            DropdownButtonFormField<String>(
+              hint: const Text("Select parcel"),
+              value: selected?["id"]?.toString(),
+              decoration: InputDecoration(
+                labelText: "Live parcel",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                prefixIcon: const Icon(Icons.inventory_2_outlined),
+              ),
+              items: _parcels
+                  .map(
+                    (parcel) => DropdownMenuItem<String>(
+                      value: parcel["id"]?.toString(),
+                      child: Text(_parcelLabel(parcel)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) async {
+                if (value == null) return;
+                final parcel = _parcels.firstWhere((item) => item["id"]?.toString() == value);
+                setState(() => _selected = parcel);
+                await _persistSelection(value);
+              },
+            )
+          else if (!_loading)
+            const _ProgressEmptyState(),
           const SizedBox(height: 12),
-          if (_loading || selected == null) ...[
+          if (_error != null) ...[
+            _ErrorCard(message: _error!, onRetry: _loadSelection),
+          ] else if (_loading || selected == null) ...[
             _EmptyProgressState(pulse: _pulse),
           ] else ...[
-            _StatusBanner(pulse: _pulse, label: "Your parcel is on the way"),
+            _StatusBanner(pulse: _pulse, label: _statusHeadline(selected)),
             const SizedBox(height: 14),
             _ProgressCard(
-              progress: selected["progress"] as int,
-              statusIndex: selected["statusIndex"] as int,
-              eta: selected["eta"]?.toString() ?? "~18 min",
+              progress: _progressFor(selected),
+              statusIndex: _statusIndexFor(selected),
+              eta: _etaLabel(selected),
               pulse: _pulse,
+              parcel: selected,
             ),
           ],
         ],
       ),
     );
+  }
+
+  String _parcelLabel(Map<String, dynamic> parcel) {
+    final description = parcel["description"]?.toString().trim();
+    final size = parcel["size"]?.toString().trim();
+    final id = parcel["id"]?.toString() ?? "-";
+    if (description != null && description.isNotEmpty) {
+      return size != null && size.isNotEmpty ? "$description ($size)" : description;
+    }
+    if (size != null && size.isNotEmpty) {
+      return "$size parcel";
+    }
+    return id;
+  }
+
+  String _statusHeadline(Map<String, dynamic> parcel) {
+    final status = parcel["status"]?.toString().trim();
+    if (status == null || status.isEmpty) {
+      return "Your parcel is on the way";
+    }
+    return status.replaceAll("_", " ");
+  }
+
+  int _progressFor(Map<String, dynamic> parcel) {
+    final raw = parcel["progress"] ?? parcel["progress_percent"] ?? parcel["progressPercent"];
+    if (raw is num) return raw.round().clamp(0, 100);
+    final status = parcel["status"]?.toString().toUpperCase() ?? "";
+    if (status.contains("DELIVERED") || status.contains("COMPLETED")) return 100;
+    if (status.contains("PICKUP")) return 20;
+    if (status.contains("TRANSIT") || status.contains("IN_TRANSIT") || status.contains("ON_THE_WAY")) return 45;
+    return 25;
+  }
+
+  int _statusIndexFor(Map<String, dynamic> parcel) {
+    final raw = parcel["statusIndex"] ?? parcel["status_index"];
+    if (raw is num) return raw.round().clamp(0, 2);
+    final progress = _progressFor(parcel);
+    if (progress >= 70) return 2;
+    if (progress >= 25) return 1;
+    return 0;
+  }
+
+  String _etaLabel(Map<String, dynamic> parcel) {
+    final eta = parcel["eta"]?.toString().trim() ?? parcel["etaLabel"]?.toString().trim();
+    if (eta != null && eta.isNotEmpty) return eta;
+    final etaMinutes = parcel["etaMinutes"] ?? parcel["eta_minutes"];
+    if (etaMinutes is num) {
+      return "~${etaMinutes.round()} min";
+    }
+    return "~18 min";
   }
 }
 
@@ -218,6 +266,42 @@ class _EmptyProgressState extends StatelessWidget {
   }
 }
 
+class _ProgressEmptyState extends StatelessWidget {
+  const _ProgressEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox.shrink();
+  }
+}
+
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.message, required this.onRetry});
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: dropCityAlertAmber.withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(message, style: const TextStyle(color: dropCitySafeSlate)),
+          const SizedBox(height: 12),
+          TextButton(onPressed: onRetry, child: const Text("Retry")),
+        ],
+      ),
+    );
+  }
+}
+
 class _StatusBanner extends StatelessWidget {
   const _StatusBanner({required this.pulse, required this.label});
   final AnimationController pulse;
@@ -267,12 +351,14 @@ class _ProgressCard extends StatelessWidget {
     required this.statusIndex,
     required this.eta,
     required this.pulse,
+    required this.parcel,
   });
 
   final int progress;
   final int statusIndex;
   final String eta;
   final AnimationController pulse;
+  final Map<String, dynamic> parcel;
 
   @override
   Widget build(BuildContext context) {

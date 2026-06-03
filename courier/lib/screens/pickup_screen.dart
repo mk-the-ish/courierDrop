@@ -102,17 +102,17 @@ class _PickupScreenState extends State<PickupScreen> {
     setState(() => _isVerifying = true);
 
     try {
-      final response = await widget.authState.apiClient.post(
-        '/parcels/${widget.parcelId}/checkpoints/verify',
-        body: {
-          'pin': _manualPin,
-          'lat': (await context.read<LocationTrackingController>().getCurrentLocationSnapshot()).lat,
-          'lng': (await context.read<LocationTrackingController>().getCurrentLocationSnapshot()).lng,
-          'checkpoint_type': 'PICKUP',
-        },
+      final snapshot = await context.read<LocationTrackingController>().getCurrentLocationSnapshot();
+      await widget.authState.apiClient.pickupHandshake(
+        parcelId: widget.parcelId,
+        pin: _manualPin,
+        lat: snapshot.lat,
+        lng: snapshot.lng,
+        accuracy: snapshot.accuracy,
+        photoUrl: "local-photo-pending",
       );
 
-      if (response['verified'] == true) {
+      {
         setState(() => _pinConfirmed = true);
         
         if (!mounted) return;
@@ -124,9 +124,6 @@ class _PickupScreenState extends State<PickupScreen> {
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) Navigator.of(context).pop(true);
         });
-      } else {
-        setState(() => _verificationError = 'Verification failed: ${response['message']}');
-      }
     } catch (e) {
       setState(() => _verificationError = 'Error: $e');
     } finally {

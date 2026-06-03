@@ -2,6 +2,8 @@ import "dart:async";
 import "dart:convert";
 
 import "package:flutter/material.dart";
+import "package:flutter_map/flutter_map.dart";
+import "package:geolocator/geolocator.dart";
 import "package:latlong2/latlong.dart";
 import "package:http/http.dart" as http;
 import "package:image_picker/image_picker.dart";
@@ -9,6 +11,7 @@ import "package:provider/provider.dart";
 
 import "../auth/auth_state.dart";
 import "../controllers/delivery_creation_controller.dart";
+import "../services/map_service.dart";
 import "delivery_picker.dart";
 import "../theme.dart";
 import "../widgets/dropcity_brand.dart";
@@ -56,7 +59,11 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
   final _externalRecipientNameController = TextEditingController();
   final _externalRecipientPhoneController = TextEditingController();
   final _imagePicker = ImagePicker();
+  final MapController _mapController = MapController();
+  final MapService _mapService = MapService();
+  LatLng _mapCenter = const LatLng(-17.825284, 31.044512);
   bool _fragile = false;
+  bool _selectingPickup = true;
 
   Timer? _originDebounce;
   Timer? _destinationDebounce;
@@ -106,6 +113,117 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
         .toList();
   }
 
+  Future<void> _selectMapLocation(LatLng point, DeliveryCreationController c) async {
+    try {
+      final address = await _mapService.reverseGeocode(point);
+      if (_selectingPickup) {
+        c.originLatLng = point;
+        c.originAddress = address;
+        _originController.text = address;
+      } else {
+        c.destinationLatLng = point;
+        c.destinationAddress = address;
+        _destinationController.text = address;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _mapController.move(point, 14);
+        }
+      });
+      setState(() {
+        if (_selectingPickup) {
+          _originSuggestions = const [];
+        } else {
+          _destinationSuggestions = const [];
+        }
+      });
+      c.notifyListeners();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Unable to select location: $error")),
+        );
+      }
+    }
+  }
+
+  void _updateLocationFromSuggestion(_PlaceSuggestion suggestion, DeliveryCreationController c) {
+    final point = LatLng(suggestion.latitude, suggestion.longitude);
+    if (_selectingPickup) {
+      c.originLatLng = point;
+      c.originAddress = suggestion.displayName;
+      _originController.text = suggestion.displayName;
+      _originSuggestions = const [];
+    } else {
+      c.destinationLatLng = point;
+      c.destinationAddress = suggestion.displayName;
+      _destinationController.text = suggestion.displayName;
+      _destinationSuggestions = const [];
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _mapController.move(point, 14);
+      }
+    });
+    setState(() {});
+    c.notifyListeners();
+  }
+
+  Future<void> _useCurrentLocation(DeliveryCreationController c) async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        final requested = await Geolocator.requestPermission();
+        if (requested == LocationPermission.denied || requested == LocationPermission.deniedForever) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Location permission is required to use current location.")),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Location permission permanently denied. Please enable it in settings.")),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final latLng = LatLng(position.latitude, position.longitude);
+      final address = await _mapService.reverseGeocode(latLng);
+
+      if (_selectingPickup) {
+        c.originLatLng = latLng;
+        c.originAddress = address;
+        _originController.text = address;
+      } else {
+        c.destinationLatLng = latLng;
+        c.destinationAddress = address;
+        _destinationController.text = address;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _mapController.move(latLng, 14);
+        }
+      });
+      setState(() {
+        _mapCenter = latLng;
+      });
+      c.notifyListeners();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Unable to get current location: $error")),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.watch<DeliveryCreationController>();
@@ -121,9 +239,9 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Step ${c.step} of 5", style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text("Step ${c.step} of 6", style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
-                  LinearProgressIndicator(value: c.step / 5),
+                  LinearProgressIndicator(value: c.step / 6),
                 ],
               ),
             ),
@@ -149,6 +267,8 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
         return _buildStep4(c);
       case 5:
         return _buildStep5(c);
+      case 6:
+        return _buildStep6(c);
       default:
         return const SizedBox.shrink();
     }
@@ -163,7 +283,9 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
                 ? c.canAdvanceStep3()
                 : c.step == 4
                     ? c.canAdvanceStep4()
-                    : false;
+                    : c.step == 5
+                        ? c.canAdvanceStep5()
+                        : false;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
@@ -181,10 +303,10 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
             child: ElevatedButton(
               onPressed: c.busy
                   ? null
-                  : c.step < 5
+                  : c.step < 6
                       ? (canNext ? () => _onNext(context, c) : null)
                       : null,
-              child: Text(c.step < 5 ? "Next" : "Done"),
+              child: Text(c.step < 6 ? "Next" : "Done"),
             ),
           ),
         ],
@@ -199,13 +321,13 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
       c.nextStep();
       return;
     }
-    if (c.step == 3) {
+    if (c.step == 4) {
       c.originAddress = _originController.text.trim();
       c.destinationAddress = _destinationController.text.trim();
       c.nextStep();
       return;
     }
-    if (c.step == 4) {
+    if (c.step == 5) {
       c.recipientName = _externalRecipientNameController.text.trim();
       c.recipientPhone = _externalRecipientPhoneController.text.trim();
       c.nextStep();
@@ -218,7 +340,7 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        const StepDots(activeIndex: 0, count: 5),
+        const StepDots(activeIndex: 0, count: 6),
         const SizedBox(height: 28),
         const Row(
           children: [
@@ -317,24 +439,116 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
           ],
         ),
         const SizedBox(height: 28),
-        DropCityPrimaryButton(
-          label: "Next Step",
-          icon: Icons.arrow_forward,
-          onPressed: c.canAdvanceStep1() ? () => _onNext(context, c) : null,
-        ),
         const SizedBox(height: 12),
         const Align(
           alignment: Alignment.centerRight,
-          child: Text("1 of 5", style: TextStyle(color: dropCitySlateGrey, fontSize: 16, fontWeight: FontWeight.w700)),
+          child: Text("1 of 6", style: TextStyle(color: dropCitySlateGrey, fontSize: 16, fontWeight: FontWeight.w700)),
         ),
       ],
     );
   }
 
+  String _formatArrivalDateTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final date = "${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}";
+    final time = "${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}";
+    return "$date $time";
+  }
+
   Widget _buildStep2(DeliveryCreationController c) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        const StepDots(activeIndex: 1, count: 6),
+        const SizedBox(height: 24),
+        const Row(
+          children: [
+            Icon(Icons.schedule_outlined, color: dropCityTransitTeal, size: 30),
+            SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                "When should it arrive?",
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: dropCitySafeSlate),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          "Desired arrival",
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: dropCitySafeSlate),
+        ),
+        const SizedBox(height: 10),
+        InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () async {
+            final now = DateTime.now();
+            final selectedDate = await showDatePicker(
+              context: context,
+              initialDate: c.desiredArrivalTime ?? now.add(const Duration(hours: 1)),
+              firstDate: now,
+              lastDate: now.add(const Duration(days: 14)),
+            );
+            if (selectedDate == null) return;
+            final selectedTime = await showTimePicker(
+              context: context,
+              initialTime: TimeOfDay.fromDateTime(c.desiredArrivalTime ?? now.add(const Duration(hours: 1))),
+            );
+            if (selectedTime == null) return;
+            final selectedDateTime = DateTime(
+              selectedDate.year,
+              selectedDate.month,
+              selectedDate.day,
+              selectedTime.hour,
+              selectedTime.minute,
+            );
+            setState(() {
+              c.desiredArrivalTime = selectedDateTime;
+              c.notifyListeners();
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: dropCitySlateGrey.withOpacity(0.18)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    c.desiredArrivalTime == null
+                        ? "Tap to choose arrival date and time"
+                        : _formatArrivalDateTime(c.desiredArrivalTime!),
+                    style: TextStyle(
+                      color: c.desiredArrivalTime == null ? dropCitySlateGrey : dropCitySafeSlate,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.calendar_today, color: dropCityTransitTeal),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          "This helps couriers plan pickup and delivery in the right time window.",
+          style: TextStyle(color: dropCitySlateGrey, height: 1.4),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep3(DeliveryCreationController c) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const StepDots(activeIndex: 2, count: 6),
+        const SizedBox(height: 12),
         const Text("Parcel Image", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         if (c.parcelImageDataUrl == null)
@@ -376,11 +590,11 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
     );
   }
 
-  Widget _buildStep3(DeliveryCreationController c) {
+  Widget _buildStep4(DeliveryCreationController c) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        const StepDots(activeIndex: 2, count: 5),
+        const StepDots(activeIndex: 3, count: 6),
         const SizedBox(height: 24),
         const Row(
           children: [
@@ -396,55 +610,123 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
         ),
         const SizedBox(height: 14),
         Container(
-          height: 280,
+          height: 380,
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: dropCitySlateGrey.withOpacity(0.18)),
           ),
-          child: Stack(
+          clipBehavior: Clip.hardEdge,
+          child: FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: c.originLatLng ?? c.destinationLatLng ?? _mapCenter,
+              initialZoom: 14,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              ),
+              onTap: (tapPosition, point) => _selectMapLocation(point, c),
+            ),
             children: [
-              Positioned.fill(
-                child: CustomPaint(painter: _GridMapPainter()),
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.dropcity_client',
               ),
-              const Center(
-                child: Icon(Icons.location_pin, color: dropCityAlertAmber, size: 80),
-              ),
-              const Positioned(
-                left: 20,
-                top: 16,
-                child: Text(
-                  "Harare CBD",
-                  style: TextStyle(color: dropCitySafeSlate, fontSize: 22, fontWeight: FontWeight.w900),
+              if (c.originLatLng != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: c.originLatLng!,
+                      width: 40,
+                      height: 40,
+                      child: const Icon(Icons.location_pin, color: dropCityErrorRed, size: 40),
+                    ),
+                  ],
                 ),
-              ),
+              if (c.destinationLatLng != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: c.destinationLatLng!,
+                      width: 40,
+                      height: 40,
+                      child: const Icon(Icons.flag, color: dropCityTransitTeal, size: 40),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
         const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: ChoiceChip(
+                label: const Text("Pickup"),
+                selected: _selectingPickup,
+                onSelected: (selected) {
+                  setState(() {
+                    _selectingPickup = true;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ChoiceChip(
+                label: const Text("Dropoff"),
+                selected: !_selectingPickup,
+                onSelected: (selected) {
+                  setState(() {
+                    _selectingPickup = false;
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            _selectingPickup
+                ? "Tap the map to choose a pickup point, or search above."
+                : "Tap the map to choose a dropoff point, or search above.",
+            style: const TextStyle(color: dropCitySlateGrey, fontSize: 14, height: 1.4),
+          ),
+        ),
+        const SizedBox(height: 10),
         TextField(
-          controller: _originController,
+          controller: _selectingPickup ? _originController : _destinationController,
           decoration: InputDecoration(
-            hintText: "Search pickup location...",
+            hintText: _selectingPickup ? "Search pickup location..." : "Search dropoff location...",
             prefixIcon: const Icon(Icons.search),
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
           ),
           onChanged: (value) {
-            _originDebounce?.cancel();
-            _originDebounce = Timer(const Duration(milliseconds: 350), () async {
-              setState(() => _searchingOrigin = true);
-              _originSuggestions = await _fetchPlaces(value);
-              if (mounted) setState(() => _searchingOrigin = false);
-            });
+            if (_selectingPickup) {
+              _originDebounce?.cancel();
+              _originDebounce = Timer(const Duration(milliseconds: 350), () async {
+                setState(() => _searchingOrigin = true);
+                _originSuggestions = await _fetchPlaces(value);
+                if (mounted) setState(() => _searchingOrigin = false);
+              });
+            } else {
+              _destinationDebounce?.cancel();
+              _destinationDebounce = Timer(const Duration(milliseconds: 350), () async {
+                setState(() => _searchingDestination = true);
+                _destinationSuggestions = await _fetchPlaces(value);
+                if (mounted) setState(() => _searchingDestination = false);
+              });
+            }
           },
         ),
-        if (_searchingOrigin) ...[
+        if (_selectingPickup ? _searchingOrigin : _searchingDestination) ...[
           const SizedBox(height: 8),
           const LinearProgressIndicator(minHeight: 2),
         ],
-        if (_originSuggestions.isNotEmpty)
+        if (_selectingPickup ? _originSuggestions.isNotEmpty : _destinationSuggestions.isNotEmpty)
           Container(
             margin: const EdgeInsets.only(top: 10),
             decoration: BoxDecoration(
@@ -453,17 +735,11 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
               border: Border.all(color: dropCitySlateGrey.withOpacity(0.16)),
             ),
             child: Column(
-              children: _originSuggestions.take(3).map((s) {
+              children: (_selectingPickup ? _originSuggestions : _destinationSuggestions).take(3).map((s) {
                 return ListTile(
                   leading: const Icon(Icons.location_on_outlined, color: dropCitySafeSlate),
                   title: Text(s.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  onTap: () {
-                    c.originLatLng = LatLng(s.latitude, s.longitude);
-                    c.originAddress = s.displayName;
-                    _originController.text = s.displayName;
-                    setState(() => _originSuggestions = const []);
-                    c.notifyListeners();
-                  },
+                  onTap: () => _updateLocationFromSuggestion(s, c),
                 );
               }).toList(),
             ),
@@ -471,11 +747,7 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
         const SizedBox(height: 12),
         InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Current location lookup coming from device GPS.")),
-            );
-          },
+          onTap: () => _useCurrentLocation(c),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
@@ -541,18 +813,20 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
         ),
         const SizedBox(height: 18),
         DropCityPrimaryButton(
-          label: "Confirm Pickup Location",
+          label: "Confirm Locations",
           icon: Icons.arrow_forward,
-          onPressed: c.canAdvanceStep3() ? () => _onNext(context, c) : null,
+          onPressed: c.canAdvanceStep4() ? () => _onNext(context, c) : null,
         ),
       ],
     );
   }
 
-  Widget _buildStep4(DeliveryCreationController c) {
+  Widget _buildStep5(DeliveryCreationController c) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const StepDots(activeIndex: 4, count: 6),
+        const SizedBox(height: 24),
         const Text("Recipient", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         SegmentedButton<RecipientMode>(
@@ -564,6 +838,11 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
           onSelectionChanged: (set) {
             c.recipientMode = set.first;
             c.recipientId = null;
+            if (c.recipientMode == RecipientMode.external) {
+              _recipientSearchController.clear();
+            } else {
+              _recipientSearchController.text = c.recipientName;
+            }
             c.notifyListeners();
             setState(() => _recipientSuggestions = const []);
           },
@@ -577,6 +856,9 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
               border: OutlineInputBorder(),
             ),
             onChanged: (value) async {
+              c.recipientId = null;
+              c.recipientName = value.trim();
+              c.notifyListeners();
               if (value.trim().length < 3) {
                 setState(() => _recipientSuggestions = const []);
                 return;
@@ -600,7 +882,13 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
                   : (u["email"]?.toString() ?? "Unknown")),
               subtitle: Text(u["email"]?.toString() ?? ""),
               onChanged: (value) {
+                if (value == null) return;
                 c.recipientId = value;
+                c.recipientName = u["display_name"]?.toString().isNotEmpty == true
+                    ? u["display_name"].toString()
+                    : (u["email"]?.toString() ?? "Selected recipient");
+                _recipientSearchController.text = c.recipientName;
+                setState(() => _recipientSuggestions = const []);
                 c.notifyListeners();
               },
             ),
@@ -629,7 +917,7 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
     );
   }
 
-  Widget _buildStep5(DeliveryCreationController c) {
+  Widget _buildStep6(DeliveryCreationController c) {
     if (c.recommendedPrice != null && _customPriceController.text.isEmpty) {
       _customPriceController.text = c.recommendedPrice!.toStringAsFixed(2);
     }
@@ -638,7 +926,7 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        const StepDots(activeIndex: 4, count: 5),
+        const StepDots(activeIndex: 5, count: 6),
         const SizedBox(height: 24),
         const Text(
           "Review your delivery",
@@ -653,6 +941,9 @@ class _DeliveryFlowBodyState extends State<_DeliveryFlowBody> {
         _SummaryReviewCard(
           pickup: c.originAddress.isEmpty ? "Pickup address" : c.originAddress,
           dropoff: c.destinationAddress.isEmpty ? "Dropoff address" : c.destinationAddress,
+          recipient: c.recipientMode == RecipientMode.inApp
+              ? (c.recipientName.isNotEmpty ? c.recipientName : "DropCity recipient")
+              : c.recipientName,
           parcelSize: c.parcelSize,
         ),
         const SizedBox(height: 16),
@@ -964,11 +1255,13 @@ class _SummaryReviewCard extends StatelessWidget {
   const _SummaryReviewCard({
     required this.pickup,
     required this.dropoff,
+    required this.recipient,
     required this.parcelSize,
   });
 
   final String pickup;
   final String dropoff;
+  final String recipient;
   final String parcelSize;
 
   @override
@@ -1000,6 +1293,9 @@ class _SummaryReviewCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 const Text("Dropoff", style: TextStyle(color: dropCitySlateGrey)),
                 Text(dropoff, style: const TextStyle(color: dropCitySafeSlate, fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 10),
+                const Text("Recipient", style: TextStyle(color: dropCitySlateGrey)),
+                Text(recipient, style: const TextStyle(color: dropCitySafeSlate, fontSize: 18, fontWeight: FontWeight.w900)),
               ],
             ),
           ),
