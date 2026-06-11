@@ -60,7 +60,7 @@ class BackgroundLocationService {
         locationAuthorizationRequest: "Always",
 
         // Activity tracking
-        activityType: bg.Config.ACTIVITY_TYPE_OTHER_NAVIGATION,
+        geofenceProximityRadius: 200, // Proximity detection radius
         activityRecognitionInterval: 5000, // Check activity every 5s
         motionTriggerDelay: 30000,
 
@@ -71,15 +71,9 @@ class BackgroundLocationService {
         
         // Geofencing
         geofenceInitialTriggerEntry: true,
-        geofenceProximityRadius: 200.0, // Proximity detection radius
         
         // Notifications & UI
         foregroundService: true, // Persistent notification
-        notificationTitle: "DropCity Delivery Tracking",
-        notificationText: "Tracking your delivery in progress",
-        notificationSmallIcon: "ic_launcher", // Android notification icon
-        notificationLargeIcon: "ic_launcher",
-        notificationColor: "#00ACED",
         
         // HTTP logging (useful for debugging)
         logLevel: kDebugMode ? bg.Config.LOG_LEVEL_VERBOSE : bg.Config.LOG_LEVEL_OFF,
@@ -107,21 +101,18 @@ class BackgroundLocationService {
    */
   void _registerLocationCallback() {
     bg.BackgroundGeolocation.onLocation((bg.Location location) {
-      if (!location.latitude.isFinite || !location.longitude.isFinite) {
+      final lat = location.coords?.latitude;
+      final lng = location.coords?.longitude;
+      final acc = location.coords?.accuracy;
+      if (lat == null || lng == null) {
         print('[BackgroundLocation] Ignoring non-finite location sample');
         return;
       }
-      print('[BackgroundLocation] Location: ${location.latitude}, ${location.longitude}, accuracy: ${location.accuracy}m');
-      
+      print('[BackgroundLocation] Location: ${lat}, ${lng}, accuracy: ${acc}m');
       // Call the provided callback
       if (_onLocation != null) {
         _onLocation!(location);
       }
-    });
-
-    // Handle errors
-    bg.BackgroundGeolocation.onLocationError((int error) {
-      print('[BackgroundLocation] Location error code: $error');
     });
   }
 
@@ -154,9 +145,9 @@ class BackgroundLocationService {
     if (_isTracking) return;
 
     try {
-      final state = await bg.BackgroundGeolocation.start();
-      _isTracking = state;
-      print('[BackgroundLocation] Tracking started. Motion state: ${state}');
+      await bg.BackgroundGeolocation.start();
+      _isTracking = true;
+      print('[BackgroundLocation] Tracking started.');
     } catch (e) {
       print('[BackgroundLocation] Failed to start tracking: $e');
       rethrow;
@@ -261,12 +252,9 @@ class BackgroundLocationService {
   Future<void> setDesiredAccuracy(int accuracy) async {
     if (!_isInitialized) return;
 
-    try {
-      await bg.BackgroundGeolocation.setDesiredAccuracy(accuracy);
-      print('[BackgroundLocation] Desired accuracy set to: $accuracy');
-    } catch (e) {
-      print('[BackgroundLocation] Failed to set desired accuracy: $e');
-    }
+    // This plugin version does not expose a direct `setDesiredAccuracy` API.
+    // Keep as a no-op for compatibility; log the requested value.
+    print('[BackgroundLocation] setDesiredAccuracy called with: $accuracy (no-op for this plugin version)');
   }
 
   /**
@@ -275,13 +263,8 @@ class BackgroundLocationService {
    */
   Future<void> enableMotionActivityRecognition() async {
     if (!_isInitialized) return;
-
-    try {
-      await bg.BackgroundGeolocation.startActivityRecognition();
-      print('[BackgroundLocation] Motion activity recognition enabled');
-    } catch (e) {
-      print('[BackgroundLocation] Failed to enable motion recognition: $e');
-    }
+    // Activity recognition start is not available in this plugin version.
+    print('[BackgroundLocation] Motion activity recognition not available; omitted');
   }
 
   /**

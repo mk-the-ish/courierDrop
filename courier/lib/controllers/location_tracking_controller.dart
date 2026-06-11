@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
+import 'dart:math' as math;
 import '../services/background_location_service.dart';
 import '../api/api_client.dart';
 
@@ -136,7 +137,10 @@ class LocationTrackingController extends ChangeNotifier {
    * Uploads location to backend
    */
   Future<void> _handleLocationUpdate(bg.Location location) async {
-    if (!location.latitude.isFinite || !location.longitude.isFinite) {
+    final lat = location.coords?.latitude;
+    final lng = location.coords?.longitude;
+    final acc = location.coords?.accuracy;
+    if (lat == null || lng == null || !(lat is double) || !(lng is double)) {
       print('[LocationTracking] Ignored non-finite location update');
       return;
     }
@@ -145,15 +149,15 @@ class LocationTrackingController extends ChangeNotifier {
     final prevLat = _currentLatitude;
     final prevLng = _currentLongitude;
 
-    _currentLatitude = location.latitude;
-    _currentLongitude = location.longitude;
-    _currentAccuracy = location.accuracy;
+    _currentLatitude = lat as double?;
+    _currentLongitude = lng as double?;
+    _currentAccuracy = acc as double?;
     _lastLocationUpdate = DateTime.now();
     _totalLocationsRecorded++;
 
     // Calculate distance traveled if we have a previous location
     if (prevLat != null && prevLng != null) {
-      final distance = _calculateDistance(prevLat, prevLng, location.latitude, location.longitude);
+      final distance = _calculateDistance(prevLat, prevLng, lat as double, lng as double);
       _totalDistanceTraveledKm += distance;
     }
 
@@ -168,24 +172,24 @@ class LocationTrackingController extends ChangeNotifier {
    */
   Future<void> _uploadLocationToBackend(bg.Location location) async {
     if (_isUploading) return; // Avoid concurrent uploads
-    if (!location.latitude.isFinite || !location.longitude.isFinite) return;
+    final lat = location.coords?.latitude;
+    final lng = location.coords?.longitude;
+    final acc = location.coords?.accuracy;
+    if (lat == null || lng == null) return;
 
     _isUploading = true;
     notifyListeners();
 
     try {
-      await apiClient.post(
-        '/courier/location',
-        body: {
-          'latitude': location.latitude,
-          'longitude': location.longitude,
-          'accuracy': location.accuracy,
-          'timestamp': location.timestamp.toIso8601String(),
-          'speed': location.speed,
-          'heading': location.bearing,
-          'altitude': location.altitude,
-        },
-      );
+      await apiClient.postLocation({
+        'latitude': lat,
+        'longitude': lng,
+        'accuracy': acc,
+        'timestamp': location.timestamp?.toIso8601String(),
+        'speed': location.coords?.speed,
+        'heading': location.coords?.heading,
+        'altitude': location.coords?.altitude,
+      });
 
       _failedUploadCount = 0;
       _lastUploadError = null;
@@ -207,13 +211,16 @@ class LocationTrackingController extends ChangeNotifier {
   Future<({double lat, double lng, double accuracy})> getCurrentLocationSnapshot() async {
     try {
       final location = await locationService.getCurrentLocation();
-      if (!location.latitude.isFinite || !location.longitude.isFinite) {
+      final lat = location.coords?.latitude;
+      final lng = location.coords?.longitude;
+      final acc = location.coords?.accuracy;
+      if (lat == null || lng == null) {
         throw Exception('Invalid location sample');
       }
       return (
-        lat: location.latitude,
-        lng: location.longitude,
-        accuracy: location.accuracy,
+        lat: lat as double,
+        lng: lng as double,
+        accuracy: acc as double? ?? 0.0,
       );
     } catch (e) {
       print('[LocationTracking] Failed to get current location: $e');
@@ -363,9 +370,9 @@ class Math {
   }
 
   static double _mathAtan2(double y, double x) {
-    if (x > 0) return (y / x).atan();
-    if (x < 0 && y >= 0) return (y / x).atan() + 3.141592653589793;
-    if (x < 0 && y < 0) return (y / x).atan() - 3.141592653589793;
+    if (x > 0) return math.atan(y / x);
+    if (x < 0 && y >= 0) return math.atan(y / x) + 3.141592653589793;
+    if (x < 0 && y < 0) return math.atan(y / x) - 3.141592653589793;
     if (x == 0 && y > 0) return 3.141592653589793 / 2;
     if (x == 0 && y < 0) return -3.141592653589793 / 2;
     return 0;

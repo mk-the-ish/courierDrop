@@ -679,6 +679,15 @@ class ApiClient {
     return (jsonDecode(response.body) as Map).cast<String, dynamic>();
   }
 
+  /// Post location telemetry to backend
+  Future<void> postLocation(Map<String, dynamic> body) async {
+    final uri = Uri.parse("$baseUrl/courier/location");
+    final response = await _client.post(uri, headers: _headers(), body: jsonEncode(body));
+    if (response.statusCode >= 400) {
+      throw Exception("Location post failed: ${response.body}");
+    }
+  }
+
   Future<Map<String, dynamic>> createCourierRoute({
     required String corridorId,
     String? plannedStartAtIso,

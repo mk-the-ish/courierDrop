@@ -1,4 +1,5 @@
 import "package:flutter/material.dart";
+import 'dart:io';
 
 import "../theme.dart";
 
@@ -13,7 +14,14 @@ class DropCityLogoMark extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(painter: _LogoPainter(light: light)),
+      child: Image.asset(
+        'assets/images/logo.png',
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        color: light ? Colors.white : null,
+        colorBlendMode: light ? BlendMode.srcIn : null,
+      ),
     );
   }
 }
@@ -89,6 +97,7 @@ class DashedUploadBox extends StatelessWidget {
     this.icon = Icons.camera_alt_outlined,
     this.onTap,
     this.hasImage = false,
+    this.imagePath,
   });
 
   final String label;
@@ -96,6 +105,7 @@ class DashedUploadBox extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final bool hasImage;
+  final String? imagePath;
 
   @override
   Widget build(BuildContext context) {
@@ -115,27 +125,56 @@ class DashedUploadBox extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    hasImage ? Icons.check_circle : icon,
-                    color: hasImage ? dropCityActiveMint : dropCityTransitTeal,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    hasImage ? "$label uploaded" : label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: dropCitySafeSlate,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+            if (hasImage && imagePath != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.file(
+                  File(imagePath!),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: Colors.red.shade400,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "Failed to load image",
+                            style: TextStyle(color: Colors.red.shade400, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              )
+            else
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      hasImage ? Icons.check_circle : icon,
+                      color: hasImage ? dropCityActiveMint : dropCityTransitTeal,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      hasImage ? "$label uploaded" : label,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: dropCitySafeSlate,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
             if (hasImage)
               const Positioned(
                 top: 8,
@@ -153,57 +192,4 @@ class DashedUploadBox extends StatelessWidget {
   }
 }
 
-class _LogoPainter extends CustomPainter {
-  const _LogoPainter({required this.light});
-
-  final bool light;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final centerX = size.width / 2;
-    final spinePaint = Paint()
-      ..color = light ? dropCityCloudWhite : dropCitySafeSlate
-      ..strokeWidth = size.width * 0.07
-      ..strokeCap = StrokeCap.round;
-    final ribbonPaint = Paint()
-      ..color = dropCityTransitTeal
-      ..strokeWidth = size.width * 0.18
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    canvas.drawLine(
-      Offset(centerX, size.height * 0.18),
-      Offset(centerX, size.height * 0.82),
-      spinePaint,
-    );
-    canvas.drawPath(
-      Path()
-        ..moveTo(size.width * 0.28, size.height * 0.20)
-        ..cubicTo(
-          size.width * 0.84,
-          size.height * 0.20,
-          size.width * 0.18,
-          size.height * 0.80,
-          size.width * 0.72,
-          size.height * 0.80,
-        ),
-      ribbonPaint,
-    );
-
-    final pinPaint = Paint()..color = dropCityAlertAmber;
-    final pinCenter = Offset(centerX, size.height * 0.50);
-    canvas.drawCircle(pinCenter, size.width * 0.13, pinPaint);
-    canvas.drawCircle(pinCenter, size.width * 0.045, Paint()..color = Colors.white);
-    canvas.drawPath(
-      Path()
-        ..moveTo(centerX, size.height * 0.72)
-        ..lineTo(size.width * 0.42, size.height * 0.58)
-        ..lineTo(size.width * 0.58, size.height * 0.58)
-        ..close(),
-      pinPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _LogoPainter oldDelegate) => oldDelegate.light != light;
-}
+// Old custom painter removed — using asset image `assets/images/logo.png` instead.

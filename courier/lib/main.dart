@@ -20,6 +20,8 @@ import "screens/home_screen.dart";
 import "screens/navigation_hub_screen.dart";
 import "services/courier_tracking_service.dart";
 import "services/route_start_reminder_service.dart";
+import "controllers/location_tracking_controller.dart";
+import "services/background_location_service.dart";
 import "theme.dart";
 import "utils/error_reporter.dart";
 import "utils/offline_queue.dart";
@@ -70,6 +72,12 @@ Future<void> main() async {
             ChangeNotifierProvider<AuthState>.value(
               value: authState,
             ),
+                ChangeNotifierProvider<LocationTrackingController>(
+                  create: (_) => LocationTrackingController(
+                    apiClient: apiClient,
+                    locationService: BackgroundLocationService(),
+                  ),
+                ),
           ],
           child: DropCityCourierApp(
             authState: authState,

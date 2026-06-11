@@ -1,8 +1,6 @@
 import "package:flutter/material.dart";
 import "package:provider/provider.dart";
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 
 import "../../../controllers/signup_controller.dart";
 import "../../../theme.dart";
@@ -47,7 +45,9 @@ class _State extends State<CourierSignupStep3License> {
           _backPath = (b != null && File(b).existsSync()) ? b : null;
         },
       );
-    } catch (_) {}
+    } catch (_) {
+      // Ignore errors in restoration
+    }
   }
 
   Future<void> _pickImageFor(String side, {bool fromGallery = false}) async {
@@ -60,24 +60,21 @@ class _State extends State<CourierSignupStep3License> {
       );
       if (file == null) return;
 
-      // Copy temp file to persistent app storage to prevent deletion by OS
-      final appDir = await getApplicationDocumentsDirectory();
-      final fileName = 'license_${side}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final persistentPath = p.join(appDir.path, fileName);
-      await File(file.path).copy(persistentPath);
-
+      final p = file.path;
       final prefs = await SharedPreferences.getInstance();
+
       if (side == 'front') {
-        setState(() => _frontPath = persistentPath);
-        await prefs.setString('signup_step3_front', persistentPath);
+        setState(() => _frontPath = p);
+        await prefs.setString('signup_step3_front', p);
       } else {
-        setState(() => _backPath = persistentPath);
-        await prefs.setString('signup_step3_back', persistentPath);
+        setState(() => _backPath = p);
+        await prefs.setString('signup_step3_back', p);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Image pick failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Image pick failed: $e')),
+        );
       }
     }
   }
@@ -90,8 +87,12 @@ class _State extends State<CourierSignupStep3License> {
       } else {
         await prefs.remove('signup_step3_back');
       }
-    } catch (_) {}
-    setState(() => side == 'front' ? _frontPath = null : _backPath = null);
+    } catch (_) {
+      // Ignore errors
+    }
+    setState(() {
+      side == 'front' ? _frontPath = null : _backPath = null;
+    });
   }
 
   Future<void> _showOptionsFor(String side) async {
@@ -175,8 +176,9 @@ class _State extends State<CourierSignupStep3License> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("Error: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
       }
     }
   }
@@ -184,14 +186,18 @@ class _State extends State<CourierSignupStep3License> {
   @override
   Widget build(BuildContext context) {
     final loading = context.watch<CourierSignupController>().isLoading;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Driver's Licence",
-            style: TextStyle(
-                color: dropCitySafeSlate,
-                fontSize: 18,
-                fontWeight: FontWeight.w800)),
+        const Text(
+          "Driver's Licence",
+          style: TextStyle(
+            color: dropCitySafeSlate,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         const SizedBox(height: 18),
         TextField(
           controller: licence,
@@ -228,9 +234,11 @@ class _State extends State<CourierSignupStep3License> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.calendar_month, color: dropCityTransitTeal),
-          title: Text(expiry == null
-              ? "Expiry Date"
-              : expiry!.toIso8601String().split("T").first),
+          title: Text(
+            expiry == null
+                ? "Expiry Date"
+                : expiry!.toIso8601String().split("T").first,
+          ),
           onTap: () async {
             final d = await showDatePicker(
               context: context,
@@ -251,4 +259,3 @@ class _State extends State<CourierSignupStep3License> {
     );
   }
 }
-

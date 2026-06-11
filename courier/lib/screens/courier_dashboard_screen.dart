@@ -2,7 +2,6 @@ import "package:flutter/material.dart";
 
 import "../auth/auth_state.dart";
 import "../theme.dart";
-import "../widgets/dropcity_brand.dart";
 
 class CourierDashboardScreen extends StatefulWidget {
   const CourierDashboardScreen({super.key, required this.authState});
@@ -62,7 +61,7 @@ class _CourierDashboardScreenState extends State<CourierDashboardScreen> {
         elevation: 0,
         title: const Row(
           children: [
-            DropCityLogoMark(size: 32),
+            Image(image: AssetImage('assets/images/logo.png'), width: 32, height: 32),
             SizedBox(width: 8),
             Text("DropCity", style: TextStyle(fontWeight: FontWeight.w900)),
           ],

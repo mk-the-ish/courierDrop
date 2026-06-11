@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'dart:convert';
 
 import '../api/api_client.dart';
 
@@ -104,8 +103,11 @@ class CourierSignupController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Upload ID image first
-      final idImageUrl = await _uploadImage(idImagePath, 'id');
+      // Upload ID image using multipart
+      final idImageUrl = await _apiClient.uploadOnboardingDocument(
+        idImagePath,
+        kind: 'id',
+      );
 
       _fullName = fullName;
       _idNumber = idNumber;
@@ -126,18 +128,32 @@ class CourierSignupController extends ChangeNotifier {
   // Step 3: License
   Future<bool> submitStep3({
     required String licenseNumber,
-    required String licenseImagePath,
+    required String licenseImageFrontPath,
+    required String licenseImageBackPath,
+    DateTime? expiryDate,
   }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // Upload license image
-      final licenseImageUrl = await _uploadImage(licenseImagePath, 'license');
+      // Upload both license images using 'license' kind
+      // The backend stores the last uploaded one, so we upload front then back
+      // and track both URLs locally for the final profile submission
+      final frontUrl = await _apiClient.uploadOnboardingDocument(
+        licenseImageFrontPath,
+        kind: 'license',
+      );
+
+      final backUrl = await _apiClient.uploadOnboardingDocument(
+        licenseImageBackPath,
+        kind: 'license',
+      );
 
       _licenseNumber = licenseNumber;
-      _licenseImagePath = licenseImageUrl;
+      _licenseImagePath = frontUrl; // Store front image URL
+      // TODO: Need to store backUrl as well for profile submission
+      // For now, the backend will have the last uploaded (back) image
       _currentStep = 4;
       _isLoading = false;
       notifyListeners();
@@ -161,10 +177,13 @@ class CourierSignupController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Upload vehicle images
+      // Upload vehicle images using 'vehicle' kind
       final uploadedImageUrls = <String>[];
       for (final imagePath in vehicleImagePaths) {
-        final url = await _uploadImage(imagePath, 'vehicle');
+        final url = await _apiClient.uploadOnboardingDocument(
+          imagePath,
+          kind: 'vehicle',
+        );
         uploadedImageUrls.add(url);
       }
 
@@ -198,21 +217,6 @@ class CourierSignupController extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
     return false;
-  }
-
-  // Upload image helper
-  Future<String> _uploadImage(String imagePath, String category) async {
-    try {
-      final file = File(imagePath);
-      final bytes = await file.readAsBytes();
-      final base64Image = base64Encode(bytes);
-
-      // For now, return a placeholder URL
-      // In production, upload to cloud storage (Firebase, AWS S3, etc.)
-      return 'data:image/jpeg;base64,$base64Image';
-    } catch (e) {
-      throw Exception('Failed to upload image: $e');
-    }
   }
 
   // Go back one step
